@@ -1,0 +1,53 @@
+# Virtual Environment
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Database (البيانات المالية الشخصية)
+*.db
+*.sqlite
+*.sqlite3
+
+# Build & Distribution
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Flet Build
+.flet/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Secrets & Config
+.env
+*.env
+config_local.py
+secrets.py
+
+# Reports Output
+reports/output/
+exports/
+
+# APK builds
+*.apk
+*.aab
