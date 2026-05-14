@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#1A1A2E"
+    android:padding="20dp">
+
+    <!-- ── حالة الاتصال ──────────────────────────────────────────────── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="16dp">
+
+        <View
+            android:id="@+id/connectionDot"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:background="@drawable/circle_red" />
+
+        <TextView
+            android:id="@+id/tvConnectionStatus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="غير متصل"
+            android:textColor="#AAAAAA"
+            android:textSize="14sp"
+            android:layout_marginStart="8dp" />
+
+        <TextView
+            android:id="@+id/tvUptime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="00:00"
+            android:textColor="#666666"
+            android:textSize="12sp"
+            android:layout_marginEnd="8dp" />
+
+        <ImageButton
+            android:id="@+id/btnSettings"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_preferences"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="الإعدادات"
+            android:tint="#FFFFFF" />
+    </LinearLayout>
+
+    <!-- ── بطاقة الرصيد ──────────────────────────────────────────────── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/card_gradient"
+        android:padding="24dp"
+        android:layout_marginBottom="20dp"
+        android:elevation="8dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="رصيد المحفظة"
+            android:textColor="#BBBBBB"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
+
+            <TextView
+                android:id="@+id/tvBalance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0.00"
+                android:textColor="#FFFFFF"
+                android:textSize="36sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" EGP"
+                android:textColor="#AAAAAA"
+                android:textSize="18sp"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvLastUpdate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="آخر تحديث: —"
+            android:textColor="#888888"
+            android:textSize="11sp"
+            android:layout_marginTop="8dp" />
+    </LinearLayout>
+
+    <!-- ── الإحصائيات السريعة ─────────────────────────────────────────── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="20dp">
+
+        <!-- وارد -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/card_dark"
+            android:padding="12dp"
+            android:layout_marginEnd="6dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="↓ وارد"
+                android:textColor="#4CAF50"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvTotalReceived"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- صادر -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/card_dark"
+            android:padding="12dp"
+            android:layout_marginStart="3dp"
+            android:layout_marginEnd="3dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="↑ صادر"
+                android:textColor="#F44336"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvTotalSent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- معلق -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/card_dark"
+            android:padding="12dp"
+            android:layout_marginStart="6dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⏳ معلق"
+                android:textColor="#FF9800"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvPending"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ── عنوان آخر العمليات ─────────────────────────────────────────── -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="آخر العمليات"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <!-- ── قائمة آخر 5 عمليات ─────────────────────────────────────────── -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvTransactions"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- ── زر التحكم ─────────────────────────────────────────────────── -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnToggleService"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="إيقاف المراقبة"
+        android:textSize="16sp"
+        android:layout_marginTop="12dp"
+        android:backgroundTint="#E53935" />
+
+</LinearLayout>

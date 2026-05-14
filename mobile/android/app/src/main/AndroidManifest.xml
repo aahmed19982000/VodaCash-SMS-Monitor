@@ -1,20 +1,75 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.vodacash">
+    package="com.vodacash.smsmonitor">
 
-    <!-- إذن قراءة SMS -->
+    <!-- ── الصلاحيات المطلوبة ──────────────────────────────────────────── -->
+    <!-- استقبال الرسائل الواردة في الوقت الفعلي -->
     <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+    <!-- قراءة الرسائل المخزنة (للمزامنة) -->
     <uses-permission android:name="android.permission.READ_SMS"/>
+    <!-- الوصول للإنترنت لإرسال البيانات عبر WebSocket -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- إبقاء الخدمة تعمل في الخلفية -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <!-- إعادة التشغيل بعد إعادة تشغيل الجهاز -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- منع الجهاز من النوم أثناء المعالجة -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- إذن الإشعارات (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- مراقبة حالة الشبكة لإدارة WebSocket -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- طلب استثناء من تحسين البطارية -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
-    <application ...>
+    <application
+        android:name=".VodaCashApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.VodaCash">
 
-        <!-- تسجيل الـ BroadcastReceiver -->
-        <receiver
-            android:name=".SmsReceiver"
+        <!-- ── النشاط الرئيسي ──────────────────────────────────────────── -->
+        <activity
+            android:name=".MainActivity"
             android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!-- ── إعدادات الاتصال ─────────────────────────────────────────── -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="إعدادات الاتصال" />
+
+        <!-- ── BroadcastReceiver لاستقبال SMS ──────────────────────────── -->
+        <receiver
+            android:name=".receiver.SmsBroadcastReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
             <intent-filter android:priority="999">
                 <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
             </intent-filter>
         </receiver>
+
+        <!-- ── إعادة التشغيل التلقائية بعد Boot ────────────────────────── -->
+        <receiver
+            android:name=".receiver.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- ── الخدمة الأمامية لضمان العمل في الخلفية ──────────────────── -->
+        <service
+            android:name=".service.SmsMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"/>
 
     </application>
 </manifest>

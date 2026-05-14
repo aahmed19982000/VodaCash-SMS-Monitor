@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dialog لتصنيف رسالة غير مصنفة يدوياً -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="#1A1A2E">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="تصنيف يدوي"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="12dp" />
+
+    <!-- معاينة الرسالة -->
+    <TextView
+        android:id="@+id/tvPreview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#0F3460"
+        android:padding="10dp"
+        android:textColor="#CCCCCC"
+        android:textSize="12sp"
+        android:maxLines="4"
+        android:layout_marginBottom="16dp" />
+
+    <!-- اختيار النوع -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="نوع العملية:"
+        android:textColor="#AAAAAA"
+        android:textSize="13sp"
+        android:layout_marginBottom="6dp" />
+
+    <RadioGroup
+        android:id="@+id/rgType"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="14dp">
+
+        <RadioButton android:id="@+id/rbReceived"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="↓ استلام تحويل" android:textColor="#4CAF50" android:buttonTint="#4CAF50" />
+
+        <RadioButton android:id="@+id/rbSent"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="↑ إرسال تحويل" android:textColor="#F44336" android:buttonTint="#F44336" />
+
+        <RadioButton android:id="@+id/rbBill"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="📄 دفع فاتورة" android:textColor="#FF9800" android:buttonTint="#FF9800" />
+
+        <RadioButton android:id="@+id/rbTopup"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="📱 شحن رصيد" android:textColor="#2196F3" android:buttonTint="#2196F3" />
+
+        <RadioButton android:id="@+id/rbPurchase"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="🛒 شراء" android:textColor="#9C27B0" android:buttonTint="#9C27B0" />
+    </RadioGroup>
+
+    <!-- إدخال المبلغ -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="المبلغ (EGP)"
+        android:layout_marginBottom="10dp">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etAmount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:textColor="#FFFFFF" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- إدخال الطرف الآخر -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="الرقم / اسم التاجر (اختياري)">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etCounterpart"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+</LinearLayout>

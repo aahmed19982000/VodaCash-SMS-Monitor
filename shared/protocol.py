@@ -67,6 +67,18 @@ def make_sync_request(last_sync: datetime) -> str:
     })
 
 
+def make_sync_response(transactions: list) -> str:
+    """رد على طلب المزامنة بالعمليات المعلقة"""
+    return json.dumps({
+        "type"    : MessageType.SYNC_RESPONSE.value,
+        "payload" : {
+            "transactions" : [tx.to_dict() for tx in transactions],
+            "count"        : len(transactions),
+        },
+        "sent_at" : datetime.now().isoformat(),
+    })
+
+
 # ── رسائل مشتركة ──────────────────────────────────────────────────────────
 def make_heartbeat() -> str:
     """ping"""
