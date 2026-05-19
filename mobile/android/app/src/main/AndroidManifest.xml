@@ -48,7 +48,7 @@
 
         <!-- ── BroadcastReceiver لاستقبال SMS ──────────────────────────── -->
         <receiver
-            android:name=".receiver.SmsBroadcastReceiver"
+            android:name=".SmsReceiver"
             android:exported="true"
             android:permission="android.permission.BROADCAST_SMS">
             <intent-filter android:priority="999">
@@ -67,7 +67,7 @@
 
         <!-- ── الخدمة الأمامية لضمان العمل في الخلفية ──────────────────── -->
         <service
-            android:name=".service.SmsMonitorService"
+            android:name=".SmsService"
             android:exported="false"
             android:foregroundServiceType="specialUse"/>
 
