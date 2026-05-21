@@ -24,6 +24,33 @@ Transaction ID: 019995593948"""
         self.assertEqual(tx.transaction_id, "019995593948")
         self.assertGreaterEqual(tx.confidence, 0.9)
 
+        self.assertGreaterEqual(tx.confidence, 0.9)
+
+    def test_sent_transfer_arabic_variation(self):
+        msg = """كسبت 10 جنيه كاش باك تستخدمها دقائق لفودافون اوميجابيتس ب 20 قرش الوحدة! ادخل علي تطبيق انا فودافون http://vf.eg/vfcash او اطلب
+ *365*90#
+ قبل آخر اليوم للاستمتاع بالهدية.
+تم تحويل 5 جنيه لرقم 01222820473 مصاريف الخدمة 1 جنيه رصيد حسابك فى فودافون كاش الحالي 71.31.
+تاريخ العملية: 11:32 26-05-21
+رقم العملية: 020173477469"""
+        tx = SMSEngine.parse(msg, sender="VodafoneCash")
+        self.assertEqual(tx.type, TransactionType.SENT)
+        self.assertEqual(tx.amount, 5.0)
+        self.assertEqual(tx.counterpart, "01222820473")
+        self.assertEqual(tx.balance_after, 71.31)
+        self.assertEqual(tx.transaction_id, "020173477469")
+        self.assertGreaterEqual(tx.confidence, 0.9)
+
+    def test_topup_own_arabic(self):
+        msg = """تم شحن رصيد موبايلك ب 175 بنجاح وخصم 250 من محفظتك شاملة الضريبة; رصيد حسابك في فودافون كاش الحالي 77.31."""
+        tx = SMSEngine.parse(msg, sender="VodafoneCash")
+        self.assertEqual(tx.type, TransactionType.TOPUP)
+        self.assertEqual(tx.amount, 250.0)
+        self.assertEqual(tx.balance_after, 77.31)
+        self.assertGreaterEqual(tx.confidence, 0.9)
+
+
+
     def test_received_transfer_arabic(self):
         msg = """تم استلام مبلغ 50 جنيه من رقم 01002528882 المسجل بإسم Mohamed H Ibrahim على رقم محفظتك  01099437596.
 رصيدك الحالي: 323.31 جنيه

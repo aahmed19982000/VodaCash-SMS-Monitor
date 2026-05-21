@@ -1,0 +1,147 @@
+=== Step 800 (MODEL) ===
+لقد اكتملت جميع الأعمال المطلوبة لحل المشكلة بشكل كامل. 
+
+ملف التثبيت الجديد جاهز هنا: **[app-debug.apk](file:///g:/sms/vodacash_monitor/mobile/android/app/build/outputs/apk/debug/app-debug.apk)**
+
+بمجرد تثبيته على هاتفك، سيتصل تلقائياً بخادم الديسكتوب، وستقوم الواجهة بتحديث الرصيد الفعلي وعرض قائمة بالمعاملات الخمس الأخيرة بشكل فوري وتفاعلي.
+
+=== Step 801 (USER_EXPLICIT) ===
+<USER_REQUEST>
+اعطني امر صفير السجل والبدء من جديد
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-05-21T12:00:55+03:00.
+</ADDITIONAL_METADATA>
+
+=== Step 802 (MODEL) ===
+
+
+=== Step 803 (MODEL) ===
+Created At: 2026-05-21T09:00:58Z
+Completed At: 2026-05-21T09:00:58Z
+File Path: `file:///g:/sms/vodacash_monitor/desktop/db/database.py`
+Total Lines: 205
+Total Bytes: 9537
+Showing lines 1 to 205
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1: # desktop/db/database.py
+2: # ── SQLite Local Cache لسطح المكتب ────────────────────────────────────────
+3: 
+4: import sqlite3
+5: import threading
+6: import os
+7: import logging
+8: from datetime import datetime
+9: from typing import List, Optional, Dict
+10: 
+11: from shared.models import Transaction, TransactionType
+12: 
+13: logger = logging.getLogger("VodaCash.DesktopDB")
+14: 
+15: BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+16: 
+17: DESKTOP_DB_PATH = os.path.join(BASE_DIR, "desktop", "db", "desktop_cache.db")
+18: 
+19: 
+20: class DesktopDatabase:
+21:     """
+22:     قاعدة بيانات محلية لسطح المكتب.
+23:     تُخزن العمليات الواردة من الموبايل عبر الـ WebSocket وتُستخدم لعرضها في الـ Dashboard والفلترة.
+24:     """
+25: 
+26:     _instance = None
+27:     _lock = threading.Lock()
+28: 
+29:     def __new__(cls, db_path: str = None):
+30:         """Singleton"""
+31:         with cls._lock:
+32:             if cls._instance is None:
+33:                 cls._instance = super().__new__(cls)
+34:                 cls._instance._initialized = False
+35:             return cls._instance
+36: 
+37:     def __init__(self, db_path: str = None):
+38:         if self._initialized:
+39:             return
+40:         self._db_path = db_path or DESKTOP_DB_PATH
+41:         self._local = threading.local()
+42:         self._ensure_dir()
+43:         self
+<truncated 6877 bytes>
+ 
+168:         # آخر رصيد معروف
+169:         balance_row = self._conn.execute("""
+170:             SELECT balance_after FROM transactions 
+171:             WHERE balance_after > 0 
+172:             ORDER BY sms_timestamp DESC LIMIT 1
+173:         """).fetchone()
+174:         current_balance = balance_row["balance_after"] if balance_row else 0.0
+175: 
+176:         return {
+177:             "income": row["total_income"],
+178:             "expenses": row["total_expenses"],
+179:             "transactions_count": row["total_transactions"],
+180:             "current_balance": current_balance
+181:         }
+182: 
+183:     # ═════════════════════════════════════════════════════════════════════
+184:     # أدوات
+185:     # ═════════════════════════════════════════════════════════════════════
+186: 
+187:     def _row_to_transaction(self, row: sqlite3.Row) -> Transaction:
+188:         return Transaction(
+189:             transaction_id=row["transaction_id"],
+190:             type=TransactionType(row["type"]),
+191:             amount=row["amount"],
+192:             balance_after=row["balance_after"],
+193:             counterpart=row["counterpart"],
+194:             raw_sms=row["raw_sms"],
+195:             parsed_at=datetime.fromisoformat(row["parsed_at"]),
+196:             sms_timestamp=datetime.fromisoformat(row["sms_timestamp"]),
+197:             confidence=row["confidence"],
+198:             wallet_id=row["wallet_id"],
+199:         )
+200: 
+201:     def close(self):
+202:         if hasattr(self._local, "conn") and self._local.conn:
+203:             self._local.conn.close()
+204:             self._local.conn = None
+205: 
+The above content shows the entire, complete file contents of the requested file.
+
+
+=== Step 804 (MODEL) ===
+لتصفير السجل وإعادة تشغيل التطبيق بالكامل من نقطة الصفر، يمكنك القيام بالخطوات التالية:
+
+### 1. أمر مسح قاعدة بيانات السيرفر (على الكمبيوتر)
+لتصفير جميع العمليات والإحصائيات المخزنة على الكمبيوتر، قم بتشغيل الأمر التالي في نافذة **PowerShell**:
+
+```powershell
+Remove-Item -Path "g:\sms\vodacash_monitor\desktop\db\desktop_cache.db*" -Force -ErrorAction Ignore
+```
+
+*(سيقوم هذا الأمر بحذف ملف قاعدة البيانات وملفات المؤقتة التابعة له، وعند تشغيل التطبيق مجدداً سيقوم بإنشاء قاعدة بيانات فارغة تلقائياً).*
+
+---
+
+### 2. تصفير تطبيق الموبايل (البدء من جديد)
+لحذف أي رصيد أو إحصائيات قديمة مخزنة في ذاكرة تطبيق الهاتف المؤقتة:
+1. اذهب إلى **إعدادات الهاتف (Settings)**.
+2. اختر **التطبيقات (Apps)** ثم ابحث عن تطبيق **SMS Monitor**.
+3. ادخل على **مكان التخزين (Storage)** واضغط على **مسح البيانات (Clear Data)** ثم **مسح التخزين المؤقت (Clear Cache)**.
+
+---
+
+هل تريد مني تشغيل أمر تصفير السجل على الكمبيوتر وإعادة تشغيل السيرفر لك الآن؟
+
+=== Step 805 (USER_EXPLICIT) ===
+<USER_REQUEST>
+لم يصفر النشاط
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-05-21T12:02:20+03:00.
+</ADDITIONAL_METADATA>
+
+=== Step 806 (MODEL) ===
+
+

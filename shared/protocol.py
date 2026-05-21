@@ -11,11 +11,13 @@ class MessageType(Enum):
     NEW_TRANSACTION  = "NEW_TRANSACTION"   # موبايل → ديسكتوب
     BALANCE_UPDATE   = "BALANCE_UPDATE"    # موبايل → ديسكتوب
     UNCLASSIFIED_SMS = "UNCLASSIFIED_SMS"  # موبايل → ديسكتوب
+    NEW_SMS          = "NEW_SMS"           # موبايل (Java) → ديسكتوب (رسالة SMS خام)
     HEARTBEAT        = "HEARTBEAT"         # في الاتجاهين
     HEARTBEAT_ACK    = "HEARTBEAT_ACK"     # رد على الـ heartbeat
     SYNC_REQUEST     = "SYNC_REQUEST"      # ديسكتوب → موبايل
     SYNC_RESPONSE    = "SYNC_RESPONSE"     # موبايل → ديسكتوب
     DISCONNECT       = "DISCONNECT"        # في الاتجاهين
+    RESET_ACTIVITY   = "RESET_ACTIVITY"    # ديسكتوب → موبايل (تصفير النشاط)
 
 
 # ── بناء الرسائل (Mobile → Desktop) ──────────────────────────────────────
@@ -107,6 +109,15 @@ def make_disconnect(reason: str = "") -> str:
     })
 
 
+def make_reset_activity() -> str:
+    """إرسال أمر تصفير النشاط والعمليات للموبايل"""
+    return json.dumps({
+        "type"    : MessageType.RESET_ACTIVITY.value,
+        "payload" : {},
+        "sent_at" : datetime.now().isoformat(),
+    })
+
+
 # ── تحليل الرسائل الواردة ─────────────────────────────────────────────────
 def parse_message(raw: str) -> dict:
     """
@@ -115,10 +126,16 @@ def parse_message(raw: str) -> dict:
     """
     try:
         data = json.loads(raw)
+        msg_type_str = data.get("type")
+        msg_type = MessageType(msg_type_str) if msg_type_str else None
+        
+        # إذا لم يكن هناك مفتاح payload، نعتبر الكائن بالكامل هو الـ payload (مثل رسائل الأندرويد الخام)
+        payload = data.get("payload", data)
+        
         return {
-            "type"    : MessageType(data["type"]),
-            "payload" : data.get("payload", {}),
-            "sent_at" : data.get("sent_at", ""),
+            "type"    : msg_type,
+            "payload" : payload,
+            "sent_at" : data.get("sent_at", data.get("received_at", "")),
         }
     except (json.JSONDecodeError, KeyError, ValueError) as e:
         return {

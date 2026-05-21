@@ -6,15 +6,29 @@ from desktop.ui.views.transactions_view import TransactionsView
 from desktop.ui.views.settings_view import SettingsView
 
 class DesktopApp:
-    def __init__(self, page: ft.Page, db: DesktopDatabase):
+    def __init__(self, page: ft.Page, db: DesktopDatabase, server):
         self.page = page
         self.db = db
+        self.server = server
+
+        # Status components
+        self.status_icon = ft.Icon(ft.Icons.CIRCLE, size=12)
+        self.status_text = ft.Text(weight=ft.FontWeight.BOLD, size=14)
+
         self.setup_page()
+
+        # Initial status
+        self.update_connection_status(self.server.connected_clients > 0)
 
         # Views
         self.dashboard_view = DashboardView(self.page, self.db)
         self.transactions_view = TransactionsView(self.page, self.db)
-        self.settings_view = SettingsView(self.page)
+        self.settings_view = SettingsView(
+            self.page,
+            db=self.db,
+            server=self.server,
+            on_clear_success=self.refresh_all_views
+        )
 
         # Navigation
         self.rail = ft.NavigationRail(
@@ -74,6 +88,28 @@ class DesktopApp:
         self.page.window.min_width = 800
         self.page.window.min_height = 600
 
+        # Add AppBar
+        self.page.appbar = ft.AppBar(
+            leading=ft.Icon(ft.Icons.MONITOR_HEART_OUTLINED, color=ft.Colors.BLUE_400),
+            leading_width=40,
+            title=ft.Text("VodaCash SMS Monitor", weight=ft.FontWeight.BOLD),
+            center_title=False,
+            bgcolor=ft.Colors.BLUE_GREY_900,
+            actions=[
+                ft.Container(
+                    content=ft.Row(
+                        [
+                            self.status_icon,
+                            self.status_text,
+                        ],
+                        spacing=8,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                    ),
+                    padding=ft.Padding(0, 0, 20, 0),
+                )
+            ]
+        )
+
     def on_nav_change(self, e):
         idx = e.control.selected_index
         if idx == 0:
@@ -90,3 +126,22 @@ class DesktopApp:
             self.dashboard_view.update_data()
         elif self.view_container.content == self.transactions_view:
             self.transactions_view.update_data()
+
+    def refresh_all_views(self):
+        """تحديث كافة الصفحات بالبيانات الجديدة"""
+        try:
+            self.dashboard_view.update_data()
+            self.transactions_view.update_data()
+        except Exception as e:
+            print(f"Error refreshing all views: {e}")
+
+    def update_connection_status(self, is_connected: bool):
+        if is_connected:
+            self.status_icon.color = ft.Colors.GREEN_400
+            self.status_text.value = "الموبايل: متصل"
+            self.status_text.color = ft.Colors.GREEN_400
+        else:
+            self.status_icon.color = ft.Colors.RED_400
+            self.status_text.value = "الموبايل: غير متصل"
+            self.status_text.color = ft.Colors.RED_400
+        self.page.update()

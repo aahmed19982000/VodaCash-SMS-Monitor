@@ -10,6 +10,10 @@ VODAFONE_CASH_SENDERS = [
     "VodaCash",
     "01010",
     "Vodafone",
+    "VF Cash",
+    "VF-Cash",
+    "VFCash",
+    "vf_cash",
 ]
 
 # ── الـ Parser ────────────────────────────────────────────────────────────

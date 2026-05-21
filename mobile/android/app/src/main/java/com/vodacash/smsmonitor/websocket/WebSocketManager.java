@@ -53,31 +53,50 @@ public class WebSocketManager {
                 @Override
                 public void onOpen(ServerHandshake handshake) {
                     Log.i(TAG, "🟢 Connected to desktop");
-                    connected.set(true);
-                    if (onConnected != null) onConnected.run();
+                    if (client == this) {
+                        connected.set(true);
+                        if (onConnected != null) onConnected.run();
+                    }
                 }
 
                 @Override
                 public void onMessage(String message) {
-                    if (onMessage != null) onMessage.onMessage(message);
+                    if (client == this) {
+                        if (onMessage != null) onMessage.onMessage(message);
+                    }
                 }
 
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
                     Log.w(TAG, "🔴 Disconnected: " + reason);
-                    connected.set(false);
-                    if (onDisconnected != null) onDisconnected.onDisconnected(reason);
+                    if (client == this) {
+                        connected.set(false);
+                        if (onDisconnected != null) onDisconnected.onDisconnected(reason);
+                    } else {
+                        Log.d(TAG, "Ignored onClose from old client instance");
+                    }
                 }
 
                 @Override
                 public void onError(Exception ex) {
-                    Log.e(TAG, "❌ WS Error: " + ex.getMessage());
-                    connected.set(false);
+                    Log.e(TAG, "❌ WS Error", ex);
+                    if (client == this) {
+                        connected.set(false);
+                        if (onDisconnected != null) {
+                            String reason = ex != null ? ex.getMessage() : "Unknown WebSocket error";
+                            onDisconnected.onDisconnected(reason);
+                        }
+                    } else {
+                        Log.d(TAG, "Ignored onError from old client instance");
+                    }
                 }
             };
             client.connect();
         } catch (Exception e) {
-            Log.e(TAG, "❌ Connection failed: " + e.getMessage());
+            Log.e(TAG, "❌ Connection failed", e);
+            if (onDisconnected != null) {
+                onDisconnected.onDisconnected(e.getMessage());
+            }
         }
     }
 

@@ -1,21 +1,40 @@
 package com.vodacash.smsmonitor;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.button.MaterialButton;
 import com.vodacash.smsmonitor.service.SmsMonitorService;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * النشاط الرئيسي — يطلب أذونات SMS عند بدء التطبيق
- * ثم يُشغّل الخدمة الأمامية.
+ * ثم يُشغّل الخدمة الأمامية ويقوم بتحديث الواجهة.
  */
 public class MainActivity extends AppCompatActivity {
 
@@ -28,10 +47,62 @@ public class MainActivity extends AppCompatActivity {
         Manifest.permission.READ_SMS,
     };
 
+    // عناصر الواجهة
+    private View connectionDot;
+    private TextView tvConnectionStatus;
+    private TextView tvUptime;
+    private TextView tvTotalReceived;
+    private TextView tvTotalSent;
+    private TextView tvPending;
+    private MaterialButton btnToggleService;
+    private TextView tvBalance;
+    private TextView tvLastUpdate;
+    private RecyclerView rvTransactions;
+    private TransactionAdapter transactionAdapter;
+    private final List<JSONObject> transactionList = new ArrayList<>();
+
+    // مستقبل البث للحالة
+    private final BroadcastReceiver statusReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent != null && SmsMonitorService.ACTION_STATUS_UPDATE.equals(intent.getAction())) {
+                boolean isConnected = intent.getBooleanExtra("isConnected", false);
+                String statusDetails = intent.getStringExtra("statusDetails");
+                int processedCount = intent.getIntExtra("processedCount", 0);
+                int sentCount = intent.getIntExtra("sentCount", 0);
+                int queueSize = intent.getIntExtra("queueSize", 0);
+                long startTimeMillis = intent.getLongExtra("startTimeMillis", System.currentTimeMillis());
+
+                double balance = intent.getDoubleExtra("currentBalance", 0.0);
+                String lastUpdate = intent.getStringExtra("lastBalanceUpdate");
+                String txJson = intent.getStringExtra("recentTransactions");
+
+                updateUI(isConnected, statusDetails, processedCount, sentCount, queueSize, startTimeMillis, balance, lastUpdate, txJson);
+            }
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // ربط عناصر الواجهة
+        connectionDot = findViewById(R.id.connectionDot);
+        tvConnectionStatus = findViewById(R.id.tvConnectionStatus);
+        tvUptime = findViewById(R.id.tvUptime);
+        tvTotalReceived = findViewById(R.id.tvTotalReceived);
+        tvTotalSent = findViewById(R.id.tvTotalSent);
+        tvPending = findViewById(R.id.tvPending);
+        btnToggleService = findViewById(R.id.btnToggleService);
+        tvBalance = findViewById(R.id.tvBalance);
+        tvLastUpdate = findViewById(R.id.tvLastUpdate);
+        rvTransactions = findViewById(R.id.rvTransactions);
+
+        // إعداد RecyclerView
+        transactionAdapter = new TransactionAdapter(transactionList);
+        rvTransactions.setLayoutManager(new LinearLayoutManager(this));
+        rvTransactions.setAdapter(transactionAdapter);
 
         // زر الإعدادات
         findViewById(R.id.btnSettings).setOnClickListener(v -> {
@@ -39,7 +110,148 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
+        // زر تشغيل/إيقاف الخدمة
+        btnToggleService.setOnClickListener(v -> {
+            if (SmsMonitorService.isRunning()) {
+                // إيقاف الخدمة ومنع إعادة تشغيلها تلقائياً
+                getSharedPreferences("vodacash_service", MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("was_running", false)
+                    .apply();
+                SmsMonitorService.stop(this);
+                updateUI(false, "الخدمة متوقفة", 0, 0, 0, System.currentTimeMillis());
+            } else {
+                // تشغيل الخدمة
+                getSharedPreferences("vodacash_service", MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("was_running", true)
+                    .apply();
+                SmsMonitorService.start(this);
+            }
+        });
+
         checkAndRequestPermissions();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        
+        // تسجيل مستقبل البث المتوافق مع إصدارات أندرويد المختلفة
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(statusReceiver, new IntentFilter(SmsMonitorService.ACTION_STATUS_UPDATE), Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(statusReceiver, new IntentFilter(SmsMonitorService.ACTION_STATUS_UPDATE));
+        }
+
+        // تحديث الواجهة بشكل مبدئي
+        if (SmsMonitorService.isRunning()) {
+            SmsMonitorService service = SmsMonitorService.getInstance();
+            if (service != null) {
+                service.refreshStatus();
+            }
+        } else {
+            updateUI(false, "الخدمة متوقفة", 0, 0, 0, System.currentTimeMillis());
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        try {
+            unregisterReceiver(statusReceiver);
+        } catch (IllegalArgumentException ignored) {}
+    }
+
+    // تحديث الواجهة الرسومية بناءً على حالة الخدمة والـ WebSocket
+    private void updateUI(boolean isConnected, String statusDetails, int processed, int sent, int pending, long startTimeMillis) {
+        updateUI(isConnected, statusDetails, processed, sent, pending, startTimeMillis, 0.0, "—", null);
+    }
+
+    private void updateUI(boolean isConnected, String statusDetails, int processed, int sent, int pending, long startTimeMillis, double balance, String lastUpdate, String transactionsJson) {
+        if (isConnected) {
+            connectionDot.setBackgroundResource(R.drawable.circle_green);
+            tvConnectionStatus.setText("متصل");
+            tvConnectionStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_light));
+        } else {
+            connectionDot.setBackgroundResource(R.drawable.circle_red);
+            String statusText = "غير متصل";
+            if (statusDetails != null && !statusDetails.isEmpty()) {
+                statusText += " (" + statusDetails + ")";
+            }
+            tvConnectionStatus.setText(statusText);
+            tvConnectionStatus.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
+        }
+
+        // حساب وقت التشغيل (Uptime)
+        long diff = System.currentTimeMillis() - startTimeMillis;
+        long seconds = (diff / 1000) % 60;
+        long minutes = (diff / (1000 * 60)) % 60;
+        long hours = (diff / (1000 * 60 * 60)) % 24;
+        tvUptime.setText(String.format(Locale.getDefault(), "%02d:%02d", hours * 60 + minutes, seconds)); // إظهار الدقائق والثواني لتسهيل الملاحظة
+
+        // تحديث الإحصائيات
+        tvTotalReceived.setText(String.valueOf(processed));
+        tvTotalSent.setText(String.valueOf(sent));
+        tvPending.setText(String.valueOf(pending));
+
+        // زر التحكم بالخدمة
+        if (SmsMonitorService.isRunning()) {
+            btnToggleService.setText("إيقاف المراقبة");
+            btnToggleService.setBackgroundTintList(ContextCompat.getColorStateList(this, android.R.color.holo_red_dark));
+        } else {
+            btnToggleService.setText("تشغيل المراقبة");
+            btnToggleService.setBackgroundTintList(ContextCompat.getColorStateList(this, android.R.color.holo_green_dark));
+        }
+
+        // تحديث الرصيد ووقت التحديث
+        if (tvBalance != null) {
+            tvBalance.setText(String.format(Locale.US, "%.2f", balance));
+        }
+        if (tvLastUpdate != null) {
+            tvLastUpdate.setText("آخر تحديث: " + (lastUpdate != null ? lastUpdate : "—"));
+        }
+
+        // تحديث قائمة العمليات
+        if (transactionsJson != null) {
+            try {
+                JSONArray array = new JSONArray(transactionsJson);
+                transactionList.clear();
+                for (int i = 0; i < array.length(); i++) {
+                    Object item = array.get(i);
+                    if (item instanceof String) {
+                        transactionList.add(new JSONObject((String) item));
+                    } else if (item instanceof JSONObject) {
+                        transactionList.add((JSONObject) item);
+                    }
+                }
+                if (transactionAdapter != null) {
+                    transactionAdapter.notifyDataSetChanged();
+                }
+            } catch (Exception e) {
+                Log.e("VodaCash_UI", "Error parsing recent transactions: " + e.getMessage());
+            }
+        } else {
+            transactionList.clear();
+            if (transactionAdapter != null) {
+                transactionAdapter.notifyDataSetChanged();
+            }
+        }
+    }
+
+    private String formatTimestamp(String isoStr) {
+        if (isoStr == null || isoStr.isEmpty()) return "—";
+        try {
+            int tIndex = isoStr.indexOf('T');
+            if (tIndex != -1 && isoStr.length() >= tIndex + 6) {
+                String timePart = isoStr.substring(tIndex + 1, tIndex + 6); // HH:mm
+                String datePart = isoStr.substring(5, tIndex); // MM-dd
+                return datePart.replace('-', '/') + " " + timePart;
+            }
+        } catch (Exception e) {
+            // ignore and fallback
+        }
+        return isoStr;
     }
 
     // ═════════════════════════════════════════════════════════════════════
@@ -114,8 +326,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void onAllPermissionsGranted() {
         requestBatteryOptimizationWhitelist();
-        Toast.makeText(this, "✅ تم تفعيل مراقبة فودافون كاش", Toast.LENGTH_SHORT).show();
-        SmsMonitorService.start(this);
+        if (!SmsMonitorService.isRunning()) {
+            Toast.makeText(this, "✅ تم تفعيل مراقبة فودافون كاش", Toast.LENGTH_SHORT).show();
+            SmsMonitorService.start(this);
+        }
     }
 
     /**
@@ -132,6 +346,131 @@ public class MainActivity extends AppCompatActivity {
                 );
                 intent.setData(android.net.Uri.parse("package:" + getPackageName()));
                 startActivity(intent);
+            }
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // محول قائمة العمليات (Transaction Adapter)
+    // ═════════════════════════════════════════════════════════════════════
+    private class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.ViewHolder> {
+        private final List<JSONObject> items;
+
+        public TransactionAdapter(List<JSONObject> items) {
+            this.items = items;
+        }
+
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_transaction, parent, false);
+            return new ViewHolder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            JSONObject tx = items.get(position);
+            if (tx == null) return;
+
+            String type = tx.optString("type", "UNKNOWN");
+            double amount = tx.optDouble("amount", 0.0);
+            String counterpart = tx.optString("counterpart", "");
+            String timestamp = tx.optString("sms_timestamp", tx.optString("parsed_at", ""));
+
+            holder.tvTimestamp.setText(formatTimestamp(timestamp));
+
+            if (counterpart == null || counterpart.isEmpty()) {
+                holder.tvCounterpart.setText("—");
+            } else {
+                holder.tvCounterpart.setText(counterpart);
+            }
+
+            String typeText;
+            String iconText = "⚙️";
+            int iconBg = R.drawable.circle_red;
+            int amountColor = 0xFFF44336;
+            String amountPrefix = "-";
+
+            switch (type) {
+                case "RECEIVED":
+                    typeText = "استلام تحويل";
+                    iconText = "↓";
+                    iconBg = R.drawable.circle_green;
+                    amountColor = 0xFF4CAF50;
+                    amountPrefix = "+";
+                    break;
+                case "SENT":
+                    typeText = "تحويل صادر";
+                    iconText = "↑";
+                    iconBg = R.drawable.circle_red;
+                    amountColor = 0xFFF44336;
+                    amountPrefix = "-";
+                    break;
+                case "BILL":
+                    typeText = "دفع فاتورة";
+                    iconText = "🧾";
+                    iconBg = R.drawable.circle_red;
+                    amountColor = 0xFFF44336;
+                    amountPrefix = "-";
+                    break;
+                case "PURCHASE":
+                    typeText = "شراء";
+                    iconText = "🛍️";
+                    iconBg = R.drawable.circle_red;
+                    amountColor = 0xFFF44336;
+                    amountPrefix = "-";
+                    break;
+                case "TOPUP":
+                    typeText = "شحن رصيد";
+                    iconText = "📱";
+                    iconBg = R.drawable.circle_red;
+                    amountColor = 0xFFF44336;
+                    amountPrefix = "-";
+                    break;
+                case "BALANCE":
+                    typeText = "استعلام رصيد";
+                    iconText = "💳";
+                    iconBg = R.drawable.circle_green;
+                    amountColor = 0xFF4CAF50;
+                    amountPrefix = "";
+                    break;
+                case "UNKNOWN":
+                default:
+                    typeText = "عملية غير معروفة";
+                    iconText = "❓";
+                    iconBg = R.drawable.circle_red;
+                    amountColor = 0xFF888888;
+                    amountPrefix = "";
+                    break;
+            }
+
+            holder.tvTxType.setText(typeText);
+            holder.tvIcon.setText(iconText);
+            holder.tvIcon.setBackgroundResource(iconBg);
+            holder.tvAmount.setTextColor(amountColor);
+            holder.tvAmount.setText(String.format(Locale.US, "%s%.2f", amountPrefix, amount));
+        }
+
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+
+        class ViewHolder extends RecyclerView.ViewHolder {
+            final TextView tvIcon;
+            final TextView tvTxType;
+            final TextView tvCounterpart;
+            final TextView tvAmount;
+            final TextView tvTimestamp;
+
+            ViewHolder(@NonNull View itemView) {
+                super(itemView);
+                tvIcon = itemView.findViewById(R.id.tvIcon);
+                tvTxType = itemView.findViewById(R.id.tvTxType);
+                tvCounterpart = itemView.findViewById(R.id.tvCounterpart);
+                tvAmount = itemView.findViewById(R.id.tvAmount);
+                tvTimestamp = itemView.findViewById(R.id.tvTimestamp);
             }
         }
     }

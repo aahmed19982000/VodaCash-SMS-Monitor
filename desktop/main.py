@@ -70,6 +70,11 @@ class MainApplication:
         if self.ui_app:
             self.ui_app.refresh_views()
 
+        # 3. إرسال تحديث للموبايل عبر WebSocket
+        from shared.protocol import make_new_transaction, make_balance_update
+        asyncio.create_task(self.server._broadcast(make_new_transaction(tx)))
+        asyncio.create_task(self.server._broadcast(make_balance_update(tx.balance_after, tx.wallet_id)))
+
     def handle_balance(self, balance: float, wallet_id: str):
         logger.info(f"💳 Balance Update: {balance} EGP")
         # سيتم تحديثه في الـ Dashboard تلقائياً مع العمليات
@@ -82,6 +87,20 @@ class MainApplication:
         # طلب مزامنة العمليات التي لم تصل
         asyncio.create_task(self.server.request_sync())
 
+        # إرسال الرصيد الحالي للعميل الجديد
+        kpi = self.db.get_kpi_summary()
+        current_balance = kpi.get('current_balance', 0.0)
+        from shared.protocol import make_balance_update, make_new_transaction
+        asyncio.create_task(self.server._broadcast(make_balance_update(current_balance, "vodacash")))
+
+        # إرسال آخر 5 عمليات للعميل الجديد
+        recent_txs = self.db.get_all_transactions()[:5]
+        for tx in reversed(recent_txs):
+            asyncio.create_task(self.server._broadcast(make_new_transaction(tx)))
+
+        if self.ui_app:
+            self.ui_app.update_connection_status(True)
+
     def handle_disconnected(self, client: str):
         logger.warning(f"📱 Mobile disconnected: {client}")
         # إشعار للمستخدم بانقطاع الاتصال
@@ -89,6 +108,8 @@ class MainApplication:
             title="VodaCash: Connection Lost",
             message=f"Mobile app disconnected ({client}). Data will be queued on mobile until reconnected."
         )
+        if self.ui_app:
+            self.ui_app.update_connection_status(False)
 
     # ── تشغيل السيرفر والواجهة ──────────────────────────────────────────
 
@@ -109,7 +130,7 @@ class MainApplication:
 
         # 2. تشغيل واجهة المستخدم Flet
         def main_flet(page: ft.Page):
-            self.ui_app = DesktopApp(page, self.db)
+            self.ui_app = DesktopApp(page, self.db, self.server)
 
         ft.app(target=main_flet)
 

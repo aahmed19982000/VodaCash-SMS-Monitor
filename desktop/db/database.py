@@ -198,6 +198,17 @@ class DesktopDatabase:
             wallet_id=row["wallet_id"],
         )
 
+    def clear_database(self) -> bool:
+        """مسح جميع العمليات وتصفير قاعدة البيانات"""
+        try:
+            self._conn.execute("DELETE FROM transactions")
+            self._conn.commit()
+            logger.info("🗑️ Desktop database cleared successfully")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Failed to clear desktop database: {e}")
+            return False
+
     def close(self):
         if hasattr(self._local, "conn") and self._local.conn:
             self._local.conn.close()

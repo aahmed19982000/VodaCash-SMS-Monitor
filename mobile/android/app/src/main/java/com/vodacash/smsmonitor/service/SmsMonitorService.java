@@ -17,6 +17,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -64,10 +65,21 @@ public class SmsMonitorService extends Service {
     public static final String ACTION_START      = "com.vodacash.ACTION_START";
     public static final String ACTION_STOP       = "com.vodacash.ACTION_STOP";
     public static final String ACTION_RESTART_WS = "com.vodacash.ACTION_RESTART_WS";
+    public static final String ACTION_STATUS_UPDATE = "com.vodacash.ACTION_STATUS_UPDATE";
 
     // ── الحالة ───────────────────────────────────────────────────────────
     private enum ServiceState { STARTING, RUNNING, STOPPING }
     private ServiceState currentState = ServiceState.STARTING;
+
+    private static SmsMonitorService instance = null;
+
+    public static boolean isRunning() {
+        return instance != null && instance.currentState == ServiceState.RUNNING;
+    }
+
+    public static SmsMonitorService getInstance() {
+        return instance;
+    }
 
     // ── المكونات ─────────────────────────────────────────────────────────
     private PowerManager.WakeLock wakeLock;
@@ -78,6 +90,11 @@ public class SmsMonitorService extends Service {
     private NotificationManager notificationManager;
     private SharedPreferences prefs;
 
+    // ── حالة الرصيد والعمليات المستلمة من السيرفر ─────────────────────────
+    private double currentBalance = 0.0;
+    private String lastBalanceUpdate = "—";
+    private final LinkedList<String> recentTransactions = new LinkedList<>();
+
     // ── Offline Queue (تخزين مؤقت عند انقطاع الاتصال) ────────────────────
     private final Queue<String> offlineQueue = new LinkedList<>();
 
@@ -86,6 +103,7 @@ public class SmsMonitorService extends Service {
     private int sentCount       = 0;
     private int queuedCount     = 0;
     private long startTimeMillis;
+    private String wsStatusDetails = "";
 
     // ── Heartbeat ────────────────────────────────────────────────────────
     private final Runnable heartbeatRunnable = new Runnable() {
@@ -95,9 +113,6 @@ public class SmsMonitorService extends Service {
 
             if (wsManager != null && wsManager.isConnected()) {
                 wsManager.sendHeartbeat();
-            } else if (wsManager != null) {
-                Log.w(TAG, "💔 WebSocket disconnected — attempting reconnect");
-                wsManager.reconnect();
             }
 
             workerHandler.postDelayed(this, HEARTBEAT_INTERVAL);
@@ -111,6 +126,7 @@ public class SmsMonitorService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        instance = this;
         Log.i(TAG, "🚀 ════════════════════════════════════════");
         Log.i(TAG, "🚀 SmsMonitorService — onCreate");
         Log.i(TAG, "🚀 ════════════════════════════════════════");
@@ -194,6 +210,7 @@ public class SmsMonitorService extends Service {
         Log.w(TAG, "⚠️ ════════════════════════════════════════");
 
         currentState = ServiceState.STOPPING;
+        instance = null;
 
         // إيقاف Heartbeat
         if (workerHandler != null) {
@@ -325,13 +342,20 @@ public class SmsMonitorService extends Service {
             // onConnected
             () -> {
                 Log.i(TAG, "🟢 WebSocket connected");
+                wsStatusDetails = "";
                 mainHandler.post(this::updateStatusNotification);
                 workerHandler.post(this::drainOfflineQueue);
             },
             // onDisconnected
             (reason) -> {
                 Log.w(TAG, "🔴 WebSocket disconnected: " + reason);
-                mainHandler.post(this::updateStatusNotification);
+                wsStatusDetails = reason != null && !reason.isEmpty()
+                    ? reason
+                    : "فشل الاتصال دون سبب محدد";
+                mainHandler.post(() -> {
+                    updateStatusNotification();
+                    Toast.makeText(this, "خطأ اتصال: " + wsStatusDetails, Toast.LENGTH_LONG).show();
+                });
                 // إعادة الاتصال بعد تأخير
                 workerHandler.postDelayed(() -> {
                     if (currentState == ServiceState.RUNNING && wsManager != null) {
@@ -342,6 +366,64 @@ public class SmsMonitorService extends Service {
             // onMessage
             (message) -> {
                 Log.d(TAG, "📥 WS message: " + message);
+                try {
+                    org.json.JSONObject json = new org.json.JSONObject(message);
+                    String type = json.optString("type");
+                    org.json.JSONObject payload = json.optJSONObject("payload");
+                    if (payload == null) payload = json;
+                    
+                    if ("BALANCE_UPDATE".equals(type)) {
+                        double balance = payload.optDouble("balance", 0.0);
+                        currentBalance = balance;
+                        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+                        lastBalanceUpdate = sdf.format(new Date());
+                        
+                        mainHandler.post(this::updateStatusNotification);
+                    } else if ("NEW_TRANSACTION".equals(type)) {
+                        double balanceAfter = payload.optDouble("balance_after", 0.0);
+                        if (balanceAfter > 0.0) {
+                            currentBalance = balanceAfter;
+                            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+                            lastBalanceUpdate = sdf.format(new Date());
+                        }
+                        
+                        synchronized (recentTransactions) {
+                            String txId = payload.optString("transaction_id");
+                            boolean duplicate = false;
+                            if (txId != null && !txId.isEmpty()) {
+                                for (String txStr : recentTransactions) {
+                                    org.json.JSONObject existingTx = new org.json.JSONObject(txStr);
+                                    if (txId.equals(existingTx.optString("transaction_id"))) {
+                                        duplicate = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!duplicate) {
+                                recentTransactions.addFirst(payload.toString());
+                                if (recentTransactions.size() > 5) {
+                                    recentTransactions.removeLast();
+                                }
+                            }
+                        }
+                        mainHandler.post(this::updateStatusNotification);
+                    } else if ("RESET_ACTIVITY".equals(type)) {
+                        currentBalance = 0.0;
+                        lastBalanceUpdate = "—";
+                        processedCount = 0;
+                        sentCount = 0;
+                        queuedCount = 0;
+                        synchronized (recentTransactions) {
+                            recentTransactions.clear();
+                        }
+                        synchronized (offlineQueue) {
+                            offlineQueue.clear();
+                        }
+                        mainHandler.post(this::updateStatusNotification);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing incoming WS message: " + e.getMessage());
+                }
             }
         );
 
@@ -414,9 +496,41 @@ public class SmsMonitorService extends Service {
             processedCount, sentCount, queueSize, uptime
         );
 
+        if (!wsStatusDetails.isEmpty() && (wsManager == null || !wsManager.isConnected())) {
+            status += " | خطأ: " + wsStatusDetails;
+        }
+
         if (notificationManager != null) {
             notificationManager.notify(NOTIFICATION_ID, buildStatusNotification(status));
         }
+
+        // إرسال Broadcast لتحديث الواجهة (MainActivity)
+        Intent intent = new Intent(ACTION_STATUS_UPDATE);
+        intent.setPackage(getPackageName());
+        intent.putExtra("isConnected", wsManager != null && wsManager.isConnected());
+        intent.putExtra("statusDetails", wsStatusDetails);
+        intent.putExtra("processedCount", processedCount);
+        intent.putExtra("sentCount", sentCount);
+        intent.putExtra("queueSize", queueSize);
+        intent.putExtra("startTimeMillis", startTimeMillis);
+        
+        // إرسال الرصيد وحالة المزامنة والعمليات
+        intent.putExtra("currentBalance", currentBalance);
+        intent.putExtra("lastBalanceUpdate", lastBalanceUpdate);
+        
+        synchronized (recentTransactions) {
+            org.json.JSONArray txArray = new org.json.JSONArray();
+            for (String txStr : recentTransactions) {
+                txArray.put(txStr);
+            }
+            intent.putExtra("recentTransactions", txArray.toString());
+        }
+        
+        sendBroadcast(intent);
+    }
+
+    public void refreshStatus() {
+        updateStatusNotification();
     }
 
     private void showAlertNotification(String title, String body) {

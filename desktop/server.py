@@ -182,6 +182,40 @@ class DesktopServer:
             if self._on_unclassified:
                 self._on_unclassified(payload)
 
+        # ── رسالة SMS خام جديدة من الأندرويد ──────────────────────────
+        elif msg_type == MessageType.NEW_SMS:
+            from mobile.parser.engine import SMSEngine
+            from shared.config import CONFIDENCE_THRESHOLD
+            
+            body = payload.get("body", "")
+            sender = payload.get("sender", "")
+            timestamp = payload.get("timestamp")
+            
+            logger.info(f"📨 Received raw SMS from Android: {sender} | {body[:30]}...")
+            
+            tx = SMSEngine.parse(body, sender=sender)
+            if timestamp:
+                tx.sms_timestamp = datetime.fromtimestamp(timestamp / 1000.0)
+            
+            if tx.confidence >= CONFIDENCE_THRESHOLD:
+                logger.info(
+                    f"💰 Parse Success - {tx.type.value}: {tx.amount} EGP "
+                    f"| {tx.counterpart} | conf: {tx.confidence:.0%}"
+                )
+                if self._on_transaction:
+                    self._on_transaction(tx)
+            else:
+                logger.warning(f"📬 Raw SMS is unclassified (conf: {tx.confidence:.0%})")
+                if self._on_unclassified:
+                    self._on_unclassified({
+                        "id": tx.transaction_id,
+                        "raw_sms": body,
+                        "sender": sender,
+                        "received_at": datetime.now().isoformat(),
+                        "confidence": tx.confidence,
+                        "reviewed": False
+                    })
+
         # ── إشعار انقطاع ─────────────────────────────────────────────
         elif msg_type == MessageType.DISCONNECT:
             reason = payload.get("reason", "")

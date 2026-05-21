@@ -25,7 +25,11 @@ public final class SenderFilter {
     private static final Set<String> OFFICIAL_ALPHA_SENDERS = new HashSet<>(Arrays.asList(
         "vodafonecash",
         "vodacash",
-        "vodafone"
+        "vodafone",
+        "vf cash",
+        "vfcash",
+        "vf-cash",
+        "vf_cash"
     ));
 
     /**

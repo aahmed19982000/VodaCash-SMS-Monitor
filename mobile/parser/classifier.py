@@ -29,8 +29,9 @@ class SMSClassifier:
             return TransactionType.RECEIVED
             
         # 2. إرسال (Sent)
-        if any(kw in text_lower for kw in ["were successfully transferred", "تم تحويل مبلغ"]):
+        if any(kw in text_lower for kw in ["were successfully transferred", "تم تحويل"]):
             return TransactionType.SENT
+
             
         # 3. فاتورة (Bill)
         if any(kw in text_lower for kw in ["تم دفع مبلغ", "bill paid", "payment for"]):
