@@ -66,6 +66,7 @@ public class SmsMonitorService extends Service {
     public static final String ACTION_STOP       = "com.vodacash.ACTION_STOP";
     public static final String ACTION_RESTART_WS = "com.vodacash.ACTION_RESTART_WS";
     public static final String ACTION_STATUS_UPDATE = "com.vodacash.ACTION_STATUS_UPDATE";
+    public static final String ACTION_FORCE_RESYNC = "com.vodacash.ACTION_FORCE_RESYNC";
 
     // ── الحالة ───────────────────────────────────────────────────────────
     private enum ServiceState { STARTING, RUNNING, STOPPING }
@@ -134,6 +135,12 @@ public class SmsMonitorService extends Service {
 
         startTimeMillis = System.currentTimeMillis();
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+
+        // حفظ تاريخ أول تثبيت للتطبيق (مرة واحدة فقط للأبد)
+        if (!prefs.contains("install_timestamp")) {
+            prefs.edit().putLong("install_timestamp", System.currentTimeMillis()).apply();
+            Log.i(TAG, "📅 install_timestamp saved: " + System.currentTimeMillis());
+        }
         notificationManager = getSystemService(NotificationManager.class);
 
         // 1. إنشاء قنوات الإشعارات
@@ -191,7 +198,16 @@ public class SmsMonitorService extends Service {
                 });
                 break;
 
+            case ACTION_FORCE_RESYNC:
+                Log.i(TAG, "🔄 Force resync triggered via intent (from install_timestamp)");
+                scanFromInstallDate();
+                break;
+
             case ACTION_STOP:
+                if (prefs == null) {
+                    prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+                }
+                prefs.edit().putBoolean("was_running", false).apply();
                 stopSelf();
                 break;
 
@@ -347,11 +363,15 @@ public class SmsMonitorService extends Service {
                 mainHandler.post(this::updateStatusNotification);
                 workerHandler.post(this::drainOfflineQueue);
                 
-                // تشغيل فحص الرسائل التاريخية عند الاتصال لأول مرة
-                checkAndScanHistoricalSms();
+                // اكتشاف المحافظ من التاريخ عند الاتصال لأول مرة فقط (بلا تسجيل معاملات)
+                checkAndDiscoverWallets();
             },
             // onDisconnected
             (reason) -> {
+                if (currentState != ServiceState.RUNNING) {
+                    Log.i(TAG, "onDisconnected callback received, but service state is not RUNNING (" + currentState + "). Ignoring.");
+                    return;
+                }
                 Log.w(TAG, "🔴 WebSocket disconnected: " + reason);
                 wsStatusDetails = reason != null && !reason.isEmpty()
                     ? reason
@@ -445,6 +465,9 @@ public class SmsMonitorService extends Service {
                             offlineQueue.clear();
                         }
                         mainHandler.post(this::updateStatusNotification);
+                    } else if ("FORCE_SMS_SCAN".equals(type)) {
+                        Log.i(TAG, "🔄 Force resync triggered via WebSocket command (from install_timestamp)");
+                        scanFromInstallDate();
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Error parsing incoming WS message: " + e.getMessage());
@@ -651,28 +674,145 @@ public class SmsMonitorService extends Service {
     // Static Helpers
     // ═════════════════════════════════════════════════════════════════════
 
-    private void checkAndScanHistoricalSms() {
+    /**
+     * يُستدعى عند الاتصال بالـ Desktop لأول مرة فقط.
+     * يمسح كل SMS التاريخية لاكتشاف المحافظ والحسابات الموجودة،
+     * ويرسلها للـ Desktop كـ WALLET_DISCOVERY — بدون تسجيل أي معاملات.
+     */
+    private void checkAndDiscoverWallets() {
         if (prefs == null) {
             prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         }
-        if (prefs.getBoolean("first_time_sms_scan_done", false)) {
-            Log.i(TAG, "🔍 Historical SMS scanning already completed in a previous run.");
+        if (prefs.getBoolean("wallet_discovery_done", false)) {
+            Log.i(TAG, "🔍 Wallet discovery already done in a previous run — skipping.");
             return;
         }
+        discoverWalletsFromHistory();
+    }
 
-        Log.i(TAG, "🔍 Starting historical SMS scan for first-run...");
-        
+    /**
+     * يمسح كل SMS ويستخرج منها wallet_id لكل محفظة/حساب مكتشف،
+     * ثم يرسل قائمة المحافظ للـ Desktop عبر WebSocket.
+     * لا يُسجَّل أي معاملة — الهدف اكتشاف المحافظ فقط.
+     */
+    private void discoverWalletsFromHistory() {
+        Log.i(TAG, "🔍 Starting wallet discovery from SMS history...");
         workerHandler.post(() -> {
             try {
                 android.content.ContentResolver contentResolver = getContentResolver();
-                String[] projection = new String[] { "address", "body", "date" };
-                
-                // Query inbox, sorting by date ASC (oldest to newest) to process transactions chronologically
+                String[] projection = new String[]{"address", "body", "date"};
+
                 android.database.Cursor cursor = contentResolver.query(
                     android.net.Uri.parse("content://sms/inbox"),
                     projection,
-                    null,
-                    null,
+                    null, null,
+                    "date ASC"
+                );
+
+                java.util.Set<String> discoveredWallets = new java.util.LinkedHashSet<>();
+
+                if (cursor != null) {
+                    int addressCol = cursor.getColumnIndex("address");
+                    int bodyCol    = cursor.getColumnIndex("body");
+                    int count = 0;
+
+                    while (cursor.moveToNext()) {
+                        String sender = cursor.getString(addressCol);
+                        String body   = cursor.getString(bodyCol);
+
+                        if (com.vodacash.smsmonitor.util.SenderFilter.isPotentialTransactionSMS(sender, body)) {
+                            // استخرج wallet_id من المُرسِل بدون معالجة كاملة
+                            String walletId = detectWalletId(sender, body);
+                            if (walletId != null && !walletId.isEmpty() && !"unspecified".equals(walletId)) {
+                                discoveredWallets.add(walletId);
+                            }
+                            count++;
+                        }
+                    }
+                    cursor.close();
+                    Log.i(TAG, "🔍 Discovery complete: scanned " + count + " transactional SMS, found wallets: " + discoveredWallets);
+                }
+
+                // أرسل قائمة المحافظ للـ Desktop
+                if (!discoveredWallets.isEmpty() && wsManager != null && wsManager.isConnected()) {
+                    try {
+                        org.json.JSONObject msg = new org.json.JSONObject();
+                        msg.put("type", "WALLET_DISCOVERY");
+                        org.json.JSONArray walletsArr = new org.json.JSONArray();
+                        for (String w : discoveredWallets) walletsArr.put(w);
+                        msg.put("wallets", walletsArr);
+                        msg.put("sent_at", System.currentTimeMillis());
+                        wsManager.send(msg.toString());
+                        Log.i(TAG, "📤 Sent WALLET_DISCOVERY: " + discoveredWallets);
+                    } catch (Exception ex) {
+                        Log.e(TAG, "❌ Failed to send WALLET_DISCOVERY: " + ex.getMessage());
+                    }
+                }
+
+                // حفظ أن الاكتشاف تم
+                prefs.edit().putBoolean("wallet_discovery_done", true).apply();
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error in discoverWalletsFromHistory: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    /**
+     * يستخرج wallet_id من اسم المُرسِل أو محتوى الرسالة.
+     * منطق بسيط يعتمد على الكلمات المفتاحية الموجودة في SenderFilter.
+     */
+    private String detectWalletId(String sender, String body) {
+        if (sender == null) return "unspecified";
+        String s = sender.toLowerCase();
+        String b = body   != null ? body.toLowerCase() : "";
+
+        if (s.contains("vodafone") || s.contains("vfcash") || b.contains("فودافون كاش"))
+            return "vodafone_cash";
+        if (s.contains("orange") || b.contains("اورنج كاش") || b.contains("orange cash"))
+            return "orange_cash";
+        if (s.contains("etisalat") || s.contains("cash_e") || b.contains("اتصالات كاش"))
+            return "etisalat_cash";
+        if (s.contains("we") || b.contains("وي باي") || b.contains("we pay"))
+            return "we_pay";
+        if (s.contains("instapay") || b.contains("انستاباي") || b.contains("instapay"))
+            return "instapay";
+        if (s.contains("bank") || s.contains("cib") || s.contains("nbe") ||
+            s.contains("qnb") || s.contains("bdc") || s.contains("alex") ||
+            b.contains("حسابك") || b.contains("رصيد حسابك"))
+            return "bank";
+
+        return "unspecified";
+    }
+
+    /**
+     * إعادة المزامنة — تجلب الرسائل من تاريخ التثبيت حتى الآن وتعالجها كمعاملات.
+     * الـ Offline Queue تتعامل مع الانقطاعات تلقائياً.
+     * Deduplication في الـ Desktop يمنع تكرار أي معاملة.
+     */
+    private void scanFromInstallDate() {
+        if (prefs == null) {
+            prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        }
+        long installTimestamp = prefs.getLong("install_timestamp", 0L);
+        Log.i(TAG, "🔄 Force resync: scanning SMS from install_timestamp=" + installTimestamp);
+
+        workerHandler.post(() -> {
+            try {
+                android.content.ContentResolver contentResolver = getContentResolver();
+                String[] projection = new String[]{"address", "body", "date"};
+
+                // جلب الرسائل من تاريخ التثبيت فقط
+                String selection = (installTimestamp > 0L) ? "date >= ?" : null;
+                String[] selectionArgs = (installTimestamp > 0L)
+                    ? new String[]{String.valueOf(installTimestamp)}
+                    : null;
+
+                android.database.Cursor cursor = contentResolver.query(
+                    android.net.Uri.parse("content://sms/inbox"),
+                    projection,
+                    selection,
+                    selectionArgs,
                     "date ASC"
                 );
 
@@ -680,20 +820,18 @@ public class SmsMonitorService extends Service {
                     int count = 0;
                     int matchCount = 0;
                     int addressCol = cursor.getColumnIndex("address");
-                    int bodyCol = cursor.getColumnIndex("body");
-                    int dateCol = cursor.getColumnIndex("date");
+                    int bodyCol    = cursor.getColumnIndex("body");
+                    int dateCol    = cursor.getColumnIndex("date");
 
                     while (cursor.moveToNext()) {
-                        String sender = cursor.getString(addressCol);
-                        String body = cursor.getString(bodyCol);
-                        long timestamp = cursor.getLong(dateCol);
+                        String sender    = cursor.getString(addressCol);
+                        String body      = cursor.getString(bodyCol);
+                        long   timestamp = cursor.getLong(dateCol);
 
                         if (com.vodacash.smsmonitor.util.SenderFilter.isPotentialTransactionSMS(sender, body)) {
                             matchCount++;
-                            Log.d(TAG, "🔍 Historical SMS found match from " + sender + " (timestamp=" + timestamp + ")");
+                            Log.d(TAG, "🔄 Resync SMS: " + sender + " (ts=" + timestamp + ")");
                             processSms(sender, body, timestamp);
-                            
-                            // Brief sleep to avoid overwhelming socket buffers and ensure order
                             try {
                                 Thread.sleep(30);
                             } catch (InterruptedException e) {
@@ -703,14 +841,11 @@ public class SmsMonitorService extends Service {
                         count++;
                     }
                     cursor.close();
-                    Log.i(TAG, "🔍 Scan complete: read " + count + " total messages, processed " + matchCount + " transactional messages.");
+                    Log.i(TAG, "🔄 Resync complete: read " + count + " msgs, sent " + matchCount + " transactions.");
                 }
 
-                // Mark scan as completed
-                prefs.edit().putBoolean("first_time_sms_scan_done", true).apply();
-
             } catch (Exception e) {
-                Log.e(TAG, "❌ Error scanning historical SMS: " + e.getMessage(), e);
+                Log.e(TAG, "❌ Error in scanFromInstallDate: " + e.getMessage(), e);
             }
         });
     }

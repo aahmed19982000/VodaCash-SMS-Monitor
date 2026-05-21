@@ -35,6 +35,14 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
             return;
         }
 
+        // التحقق مما إذا كانت الخدمة مفعلة من قبل المستخدم
+        android.content.SharedPreferences prefs = context.getSharedPreferences("vodacash_service", Context.MODE_PRIVATE);
+        if (!prefs.getBoolean("was_running", false)) {
+            Log.d(TAG, "SmsMonitorService is stopped by user. Ignoring incoming SMS.");
+            return;
+        }
+
+
         Bundle bundle = intent.getExtras();
         if (bundle == null) return;
 

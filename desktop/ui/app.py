@@ -4,6 +4,7 @@ from desktop.db.database import DesktopDatabase
 from desktop.ui.views.dashboard_view import DashboardView
 from desktop.ui.views.transactions_view import TransactionsView
 from desktop.ui.views.settings_view import SettingsView
+from desktop.ui.views.phone_search_view import PhoneSearchView
 
 class DesktopApp:
     def __init__(self, page: ft.Page, db: DesktopDatabase, server):
@@ -21,8 +22,9 @@ class DesktopApp:
         self.update_connection_status(self.server.connected_clients > 0)
 
         # Views
-        self.dashboard_view = DashboardView(self.page, self.db)
+        self.dashboard_view = DashboardView(self.page, self.db, self.server)
         self.transactions_view = TransactionsView(self.page, self.db)
+        self.phone_search_view = PhoneSearchView(self.page, self.db)
         self.settings_view = SettingsView(
             self.page,
             db=self.db,
@@ -47,6 +49,11 @@ class DesktopApp:
                     icon=ft.Icons.LIST_ALT_OUTLINED,
                     selected_icon=ft.Icons.LIST_ALT,
                     label="Transactions",
+                ),
+                ft.NavigationRailDestination(
+                    icon=ft.Icons.PERSON_SEARCH_OUTLINED,
+                    selected_icon=ft.Icons.PERSON_SEARCH,
+                    label="Phone Search",
                 ),
                 ft.NavigationRailDestination(
                     icon=ft.Icons.SETTINGS_OUTLINED,
@@ -117,6 +124,8 @@ class DesktopApp:
         elif idx == 1:
             self.view_container.content = self.transactions_view
         elif idx == 2:
+            self.view_container.content = self.phone_search_view
+        elif idx == 3:
             self.view_container.content = self.settings_view
         self.refresh_views()
         self.page.update()
@@ -127,12 +136,17 @@ class DesktopApp:
             self.dashboard_view.update_data()
         elif self.view_container.content == self.transactions_view:
             self.transactions_view.update_data()
+        elif self.view_container.content == self.phone_search_view:
+            self.phone_search_view.update_data()
+        elif self.view_container.content == self.settings_view:
+            self.settings_view.update_data()
 
     def refresh_all_views(self):
         """تحديث كافة الصفحات بالبيانات الجديدة"""
         try:
             self.dashboard_view.update_data()
             self.transactions_view.update_data()
+            self.phone_search_view.update_data()
         except Exception as e:
             print(f"Error refreshing all views: {e}")
 

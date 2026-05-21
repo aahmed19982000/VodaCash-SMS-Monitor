@@ -18,6 +18,8 @@ class MessageType(Enum):
     SYNC_RESPONSE    = "SYNC_RESPONSE"     # موبايل → ديسكتوب
     DISCONNECT       = "DISCONNECT"        # في الاتجاهين
     RESET_ACTIVITY   = "RESET_ACTIVITY"    # ديسكتوب → موبايل (تصفير النشاط)
+    FORCE_SMS_SCAN   = "FORCE_SMS_SCAN"    # ديسكتوب → موبايل (إعادة مزامنة من تاريخ التثبيت)
+    WALLET_DISCOVERY = "WALLET_DISCOVERY"  # موبايل → ديسكتوب (اكتشاف المحافظ من التاريخ، بلا معاملات)
 
 
 # ── بناء الرسائل (Mobile → Desktop) ──────────────────────────────────────
@@ -113,6 +115,15 @@ def make_reset_activity() -> str:
     """إرسال أمر تصفير النشاط والعمليات للموبايل"""
     return json.dumps({
         "type"    : MessageType.RESET_ACTIVITY.value,
+        "payload" : {},
+        "sent_at" : datetime.now().isoformat(),
+    })
+
+
+def make_force_sms_scan() -> str:
+    """أمر إعادة مزامنة وقراءة الرسائل التاريخية من الموبايل"""
+    return json.dumps({
+        "type"    : MessageType.FORCE_SMS_SCAN.value,
         "payload" : {},
         "sent_at" : datetime.now().isoformat(),
     })

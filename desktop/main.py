@@ -37,20 +37,50 @@ class MainApplication:
         self.server.on_unclassified(self.handle_unclassified)
         self.server.on_client_connected(self.handle_connected)
         self.server.on_client_disconnected(self.handle_disconnected)
+        self.server.on_wallet_discovery(self.handle_wallet_discovery)
 
     # ── إشعارات الديسكتوب ────────────────────────────────────────────────
     
     def send_notification(self, title: str, message: str):
-        """إرسال إشعار على سطح المكتب (يدعم macOS حالياً)"""
+        """إرسال إشعار على سطح المكتب مع تشغيل الصوت إذا تم تفعيلهما"""
+        # 1. التحقق من تفعيل الإشعارات
+        notifications_enabled = self.db.get_setting("notifications_enabled", "true") == "true"
+        if not notifications_enabled:
+            return
+
+        # 2. تشغيل الصوت إذا تم تفعيله
+        sound_enabled = self.db.get_setting("sound_enabled", "true") == "true"
+        if sound_enabled:
+            if platform.system() == "Windows":
+                try:
+                    import winsound
+                    winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
+                except Exception as se:
+                    logger.error(f"⚠️ Failed to play notification sound: {se}")
+
+        # 3. إرسال الإشعار لسطح المكتب
         if platform.system() == "Darwin":
             try:
                 apple_script = f'display notification "{message}" with title "{title}"'
                 subprocess.run(['osascript', '-e', apple_script])
             except Exception as e:
                 logger.error(f"❌ Failed to send notification: {e}")
-        else:
-            # يمكن إضافة دعم لويندوز/لينكس لاحقاً هنا عبر plyer مثلاً
-            pass
+        elif platform.system() == "Windows":
+            try:
+                escaped_title = title.replace("'", "''").replace('"', '\\"')
+                escaped_message = message.replace("'", "''").replace('"', '\\"')
+                ps_script = (
+                    f"Add-Type -AssemblyName System.Windows.Forms; "
+                    f"$notification = New-Object System.Windows.Forms.NotifyIcon; "
+                    f"$notification.Icon = [System.Drawing.SystemIcons]::Information; "
+                    f"$notification.BalloonTipTitle = '{escaped_title}'; "
+                    f"$notification.BalloonTipText = '{escaped_message}'; "
+                    f"$notification.Visible = $true; "
+                    f"$notification.ShowBalloonTip(5000)"
+                )
+                subprocess.Popen(["powershell", "-Command", ps_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception as e:
+                logger.error(f"❌ Failed to send Windows notification: {e}")
 
     # ── Callbacks للـ WebSocket ──────────────────────────────────────────
 
@@ -87,6 +117,13 @@ class MainApplication:
                 "current_balance": current_balance
             }
         })))
+
+    def handle_wallet_discovery(self, wallets: list):
+        """عند استقبال قائمة المحافظ المكتشفة من تاريخ الموبايل (بدون معاملات)"""
+        logger.info(f"🔍 Wallets discovered from mobile history: {wallets}")
+        # تحديث لوحة التحكم لعرض المحافظ المكتشفة
+        if self.ui_app:
+            self.ui_app.refresh_views()
 
     def handle_balance(self, balance: float, wallet_id: str):
         logger.info(f"💳 Balance Update: {balance} EGP")

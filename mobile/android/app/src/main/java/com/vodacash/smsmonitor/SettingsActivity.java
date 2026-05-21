@@ -92,14 +92,16 @@ public class SettingsActivity extends AppCompatActivity {
 
         Toast.makeText(this, "تم الحفظ بنجاح", Toast.LENGTH_SHORT).show();
 
-        // إعادة تشغيل الخدمة ليتم تطبيق التغييرات على الـ WebSocket
-        Intent serviceIntent = new Intent(this, SmsMonitorService.class);
-        stopService(serviceIntent);
-        
-        // تأخير بسيط لضمان توقف الخدمة قبل إعادة تشغيلها
-        new android.os.Handler().postDelayed(() -> {
-            startForegroundService(serviceIntent);
-            finish(); // العودة للشاشة السابقة
-        }, 500);
+        // تحديث اتصال الـ WebSocket إذا كانت الخدمة تعمل حالياً
+        if (SmsMonitorService.isRunning()) {
+            Intent serviceIntent = new Intent(this, SmsMonitorService.class);
+            serviceIntent.setAction(SmsMonitorService.ACTION_RESTART_WS);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+        }
+        finish(); // العودة للشاشة السابقة
     }
 }

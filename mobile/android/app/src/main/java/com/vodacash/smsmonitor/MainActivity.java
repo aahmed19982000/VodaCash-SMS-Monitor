@@ -55,6 +55,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvTotalSent;
     private TextView tvPending;
     private MaterialButton btnToggleService;
+    private MaterialButton btnResync;
     private TextView tvBalance;
     private TextView tvLastUpdate;
     private RecyclerView rvTransactions;
@@ -101,6 +102,7 @@ public class MainActivity extends AppCompatActivity {
         tvTotalSent = findViewById(R.id.tvTotalSent);
         tvPending = findViewById(R.id.tvPending);
         btnToggleService = findViewById(R.id.btnToggleService);
+        btnResync = findViewById(R.id.btnResync);
         tvBalance = findViewById(R.id.tvBalance);
         tvLastUpdate = findViewById(R.id.tvLastUpdate);
         rvTransactions = findViewById(R.id.rvTransactions);
@@ -140,6 +142,22 @@ public class MainActivity extends AppCompatActivity {
                     .putBoolean("was_running", true)
                     .apply();
                 SmsMonitorService.start(this);
+            }
+        });
+
+        // زر إعادة المزامنة
+        btnResync.setOnClickListener(v -> {
+            if (SmsMonitorService.isRunning()) {
+                Intent intent = new Intent(this, SmsMonitorService.class);
+                intent.setAction(SmsMonitorService.ACTION_FORCE_RESYNC);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent);
+                } else {
+                    startService(intent);
+                }
+                Toast.makeText(this, "🔄 جاري إعادة فحص ومزامنة الرسائل...", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "⚠️ يجب تشغيل الخدمة أولاً لإعادة المزامنة", Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -208,13 +226,21 @@ public class MainActivity extends AppCompatActivity {
         tvTotalSent.setText(String.valueOf(sent));
         tvPending.setText(String.valueOf(pending));
 
-        // زر التحكم بالخدمة
+        // زر التحكم بالخدمة وزر إعادة المزامنة
         if (SmsMonitorService.isRunning()) {
             btnToggleService.setText("إيقاف المراقبة");
             btnToggleService.setBackgroundTintList(ContextCompat.getColorStateList(this, android.R.color.holo_red_dark));
+            if (btnResync != null) {
+                btnResync.setEnabled(true);
+                btnResync.setAlpha(1.0f);
+            }
         } else {
             btnToggleService.setText("تشغيل المراقبة");
             btnToggleService.setBackgroundTintList(ContextCompat.getColorStateList(this, android.R.color.holo_green_dark));
+            if (btnResync != null) {
+                btnResync.setEnabled(false);
+                btnResync.setAlpha(0.5f);
+            }
         }
 
         // تحديث الرصيد ووقت التحديث

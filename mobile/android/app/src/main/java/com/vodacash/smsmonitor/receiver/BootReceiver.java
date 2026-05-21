@@ -18,13 +18,18 @@ public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
-            Log.i(TAG, "📱 Device booted — restarting SmsMonitorService");
-
-            Intent serviceIntent = new Intent(context, SmsMonitorService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent);
+            Log.i(TAG, "📱 Device booted — checking if SmsMonitorService was running");
+            android.content.SharedPreferences prefs = context.getSharedPreferences("vodacash_service", Context.MODE_PRIVATE);
+            if (prefs.getBoolean("was_running", false)) {
+                Log.i(TAG, "📱 Service was running before boot — restarting");
+                Intent serviceIntent = new Intent(context, SmsMonitorService.class);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent);
+                } else {
+                    context.startService(serviceIntent);
+                }
             } else {
-                context.startService(serviceIntent);
+                Log.i(TAG, "📱 Service was not running before boot — keeping stopped");
             }
         }
     }

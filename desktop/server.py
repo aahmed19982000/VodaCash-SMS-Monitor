@@ -49,6 +49,7 @@ class DesktopServer:
         self._on_unclassified: Optional[Callable] = None
         self._on_client_connected: Optional[Callable] = None
         self._on_client_disconnected: Optional[Callable] = None
+        self._on_wallet_discovery: Optional[Callable] = None
 
         # إحصائيات
         self._received_count = 0
@@ -77,6 +78,10 @@ class DesktopServer:
     def on_client_disconnected(self, callback: Callable):
         """عند انقطاع اتصال موبايل."""
         self._on_client_disconnected = callback
+
+    def on_wallet_discovery(self, callback: Callable):
+        """عند استقبال قائمة المحافظ المكتشفة من التاريخ (بدون معاملات)."""
+        self._on_wallet_discovery = callback
 
     # ═════════════════════════════════════════════════════════════════════
     # التشغيل والإيقاف
@@ -224,10 +229,17 @@ class DesktopServer:
                         "reviewed": False
                     })
 
-        # ── إشعار انقطاع ─────────────────────────────────────────────
+        # ── إشعار انقطاع ──────────────────────────────────
         elif msg_type == MessageType.DISCONNECT:
             reason = payload.get("reason", "")
             logger.info(f"👋 Client disconnecting: {reason}")
+
+        # ── اكتشاف المحافظ (بدون معاملات) ─────────────────────
+        elif msg_type == MessageType.WALLET_DISCOVERY:
+            wallets = payload.get("wallets", [])
+            logger.info(f"🔍 Wallet discovery received from mobile: {wallets}")
+            if self._on_wallet_discovery:
+                self._on_wallet_discovery(wallets)
 
     # ═════════════════════════════════════════════════════════════════════
     # إرسال للموبايل (Desktop → Mobile)

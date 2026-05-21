@@ -20,6 +20,10 @@ class TransactionsView(ft.Container):
         self.expand = True
         self.padding = 20
 
+        # Pagination state
+        self.current_page = 1
+        self.page_size = 50
+
         self.search_field = ft.TextField(
             label="Search (Number, Text...)",
             width=220,
@@ -89,6 +93,43 @@ class TransactionsView(ft.Container):
         # Scrollable container for the table
         self.table_container = ft.Column([self.data_table], scroll=ft.ScrollMode.ADAPTIVE, expand=True)
 
+        # Pagination components
+        self.prev_button = ft.IconButton(
+            icon=ft.Icons.NAVIGATE_BEFORE_ROUNDED,
+            on_click=self.go_prev_page,
+            disabled=True,
+        )
+        self.next_button = ft.IconButton(
+            icon=ft.Icons.NAVIGATE_NEXT_ROUNDED,
+            on_click=self.go_next_page,
+            disabled=True,
+        )
+        self.page_info = ft.Text("Page 1 of 1 (0 transactions)", weight=ft.FontWeight.W_500, color=ft.Colors.WHITE70)
+        self.page_size_dropdown = ft.Dropdown(
+            label="Rows per page",
+            width=140,
+            options=[
+                ft.dropdown.Option("20"),
+                ft.dropdown.Option("50"),
+                ft.dropdown.Option("100"),
+                ft.dropdown.Option("200"),
+            ],
+            value="50",
+            on_select=self.on_page_size_change
+        )
+        
+        self.pagination_row = ft.Row(
+            controls=[
+                self.prev_button,
+                self.page_info,
+                self.next_button,
+                ft.Container(width=20),
+                self.page_size_dropdown
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER
+        )
+
         self.content = ft.Column(
             controls=[
                 ft.Text("Transactions Archive", size=30, weight=ft.FontWeight.BOLD),
@@ -119,11 +160,28 @@ class TransactionsView(ft.Container):
                     expand=True,
                     border=ft.Border.all(1, ft.Colors.WHITE24),
                     border_radius=10,
-                )
+                ),
+                
+                # Pagination
+                self.pagination_row
             ]
         )
 
-    def apply_filters(self, e=None):
+    def go_prev_page(self, e):
+        if self.current_page > 1:
+            self.current_page -= 1
+            self._trigger_update()
+
+    def go_next_page(self, e):
+        self.current_page += 1
+        self._trigger_update()
+
+    def on_page_size_change(self, e):
+        self.page_size = int(self.page_size_dropdown.value)
+        self.current_page = 1
+        self._trigger_update()
+
+    def _trigger_update(self):
         search_val = self.search_field.value if self.search_field.value else None
         min_val = float(self.min_amount.value) if self.min_amount.value else None
         max_val = float(self.max_amount.value) if self.max_amount.value else None
@@ -142,6 +200,10 @@ class TransactionsView(ft.Container):
             wallet_filter=wallet_val
         )
 
+    def apply_filters(self, e=None):
+        self.current_page = 1
+        self._trigger_update()
+
     def clear_filters(self, e=None):
         self.search_field.value = ""
         self.type_dropdown.value = "ALL"
@@ -150,6 +212,7 @@ class TransactionsView(ft.Container):
         self.max_amount.value = ""
         self.start_date.value = ""
         self.end_date.value = ""
+        self.current_page = 1
         self.update_data()
 
     def update_data(self, type_filter="ALL", start_date=None, end_date=None, min_amount=None, max_amount=None, search_query=None, wallet_filter="ALL"):
@@ -168,8 +231,22 @@ class TransactionsView(ft.Container):
             print(f"Error fetching filtered data: {ex}")
             txs = []
 
+        total_count = len(txs)
+        total_pages = max(1, (total_count + self.page_size - 1) // self.page_size)
+        
+        if self.current_page > total_pages:
+            self.current_page = total_pages
+            
+        start_idx = (self.current_page - 1) * self.page_size
+        end_idx = start_idx + self.page_size
+        paginated_txs = txs[start_idx:end_idx]
+
+        self.prev_button.disabled = (self.current_page == 1)
+        self.next_button.disabled = (self.current_page == total_pages)
+        self.page_info.value = f"Page {self.current_page} of {total_pages} ({total_count} transactions)"
+
         self.data_table.rows.clear()
-        for tx in txs:
+        for tx in paginated_txs:
             amount_color = ft.Colors.GREEN_400 if tx.type.value == "RECEIVED" else ft.Colors.RED_400
             
             # Wallet badge

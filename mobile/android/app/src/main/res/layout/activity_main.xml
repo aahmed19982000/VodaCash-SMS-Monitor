@@ -231,14 +231,34 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- ── زر التحكم ─────────────────────────────────────────────────── -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnToggleService"
+    <!-- ── أزرار التحكم ─────────────────────────────────────────────────── -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="إيقاف المراقبة"
-        android:textSize="16sp"
-        android:layout_marginTop="12dp"
-        android:backgroundTint="#E53935" />
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="12dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnToggleService"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="إيقاف المراقبة"
+            android:textSize="14sp"
+            android:layout_marginEnd="6dp"
+            android:backgroundTint="#E53935" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnResync"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="إعادة المزامنة"
+            android:textSize="14sp"
+            android:layout_marginStart="6dp"
+            android:backgroundTint="#1976D2"
+            android:textColor="#FFFFFF"
+            style="@style/Widget.MaterialComponents.Button" />
+    </LinearLayout>
 
 </LinearLayout>

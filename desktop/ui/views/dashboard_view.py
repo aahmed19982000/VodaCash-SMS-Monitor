@@ -49,10 +49,11 @@ WALLET_STYLING = {
 }
 
 class DashboardView(ft.Container):
-    def __init__(self, page: ft.Page, db: DesktopDatabase):
+    def __init__(self, page: ft.Page, db: DesktopDatabase, server=None):
         super().__init__()
         self.flet_page = page
         self.db = db
+        self.server = server
         self.expand = True
         self.padding = 20
 
@@ -74,6 +75,18 @@ class DashboardView(ft.Container):
                     controls=[
                         ft.Icon(ft.Icons.DASHBOARD_ROUNDED, color=ft.Colors.BLUE_ACCENT, size=32),
                         ft.Text("Dashboard / لوحة التحكم", size=28, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+                        ft.Container(expand=True),
+                        ft.ElevatedButton(
+                            "Re-sync / إعادة المزامنة",
+                            icon=ft.Icons.SYNC_ROUNDED,
+                            color=ft.Colors.WHITE,
+                            bgcolor=ft.Colors.BLUE_800,
+                            on_click=self._handle_resync,
+                            style=ft.ButtonStyle(
+                                shape=ft.RoundedRectangleBorder(radius=10),
+                                padding=ft.Padding(15, 10, 15, 10),
+                            )
+                        )
                     ],
                     alignment=ft.MainAxisAlignment.START,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER
@@ -311,4 +324,32 @@ class DashboardView(ft.Container):
                 )
         self.activity_list.controls = new_activity
         
+        self.flet_page.update()
+
+    def _handle_resync(self, e):
+        if not self.server or self.server.connected_clients == 0:
+            self.flet_page.snack_bar = ft.SnackBar(
+                content=ft.Text("الموبايل غير متصل. يرجى توصيل تطبيق الموبايل أولاً لإعادة المزامنة.", size=16, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.Colors.RED_700,
+            )
+            self.flet_page.snack_bar.open = True
+            self.flet_page.update()
+            return
+
+        import asyncio
+        from shared.protocol import make_force_sms_scan
+        try:
+            # إرسال أمر إعادة المزامنة لجميع العملاء المتصلين
+            asyncio.create_task(self.server._broadcast(make_force_sms_scan()))
+            self.flet_page.snack_bar = ft.SnackBar(
+                content=ft.Text("تم إرسال طلب إعادة المزامنة وقراءة الرسائل التاريخية للموبايل بنجاح!", size=16, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.Colors.GREEN_700,
+            )
+            self.flet_page.snack_bar.open = True
+        except Exception as ex:
+            self.flet_page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"حدث خطأ أثناء إرسال طلب المزامنة: {ex}", size=16, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.Colors.RED_700,
+            )
+            self.flet_page.snack_bar.open = True
         self.flet_page.update()

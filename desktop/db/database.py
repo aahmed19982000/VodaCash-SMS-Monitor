@@ -84,6 +84,12 @@ class DesktopDatabase:
             CREATE INDEX IF NOT EXISTS idx_type ON transactions(type);
             CREATE INDEX IF NOT EXISTS idx_sms_timestamp ON transactions(sms_timestamp);
             CREATE INDEX IF NOT EXISTS idx_amount ON transactions(amount);
+
+            -- جدول الإعدادات
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
         """)
         conn.commit()
 
@@ -218,32 +224,54 @@ class DesktopDatabase:
               AND wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''
         """).fetchone()
         
-        # آخر رصيد معروف لكل محفظة باستخدام ROW_NUMBER لتجنب تكرار العمليات في نفس التوقيت
+        # حساب رصيد كل محفظة
         wallet_balances = {}
-        balance_rows = self._conn.execute("""
-            SELECT wallet_id, balance_after
-            FROM (
-                SELECT wallet_id, balance_after,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY wallet_id 
-                           ORDER BY sms_timestamp DESC, received_at DESC, transaction_id DESC
-                       ) as rn
-                FROM transactions
-                WHERE balance_after >= 0 
-                  AND wallet_id IS NOT NULL 
-                  AND wallet_id != 'unspecified' 
-                  AND wallet_id != ''
-            )
-            WHERE rn = 1
-        """).fetchall()
+        supported_wallets = ["vodafone_cash", "orange_cash", "etisalat_cash", "we_pay", "instapay", "bank"]
         
-        for brow in balance_rows:
-            w_id = brow["wallet_id"]
-            if w_id:
-                w_id = w_id.strip().lower()
-            if not w_id or w_id not in ["vodafone_cash", "orange_cash", "etisalat_cash", "we_pay", "instapay", "bank"]:
-                continue
-            wallet_balances[w_id] = brow["balance_after"]
+        for w_id in supported_wallets:
+            # 1. تحقق مما إذا كان هناك رصيد ابتدائي يدوي في الإعدادات
+            initial_bal_str = self.get_setting(f"initial_balance_{w_id}", None)
+            
+            # 2. تحقق مما إذا كان هناك معاملات لهذه المحفظة
+            has_tx = self._conn.execute(
+                "SELECT 1 FROM transactions WHERE wallet_id = ? LIMIT 1", (w_id,)
+            ).fetchone()
+            
+            # نعرض المحفظة فقط إذا كان لها رصيد يدوي أو معاملات مسجلة
+            if initial_bal_str is not None or has_tx is not None:
+                # حساب صافي التغيير من المعاملات في قاعدة البيانات
+                tx_sum = self._conn.execute("""
+                    SELECT 
+                        COALESCE(SUM(CASE WHEN type='RECEIVED' THEN amount ELSE 0 END), 0) -
+                        COALESCE(SUM(CASE WHEN type IN ('SENT', 'BILL', 'PURCHASE', 'TOPUP') THEN amount ELSE 0 END), 0) AS net_change
+                    FROM transactions
+                    WHERE wallet_id = ?
+                """, (w_id,)).fetchone()
+                net_change = tx_sum["net_change"] if tx_sum else 0.0
+                
+                if initial_bal_str is not None:
+                    # إذا تم إدخال رصيد ابتدائي يدوي، نعتمد عليه كـ (الرصيد الابتدائي + صافي المعاملات)
+                    try:
+                        balance = float(initial_bal_str) + net_change
+                    except ValueError:
+                        balance = 0.0 + net_change
+                else:
+                    # إذا لم يوجد رصيد يدوي، نبحث عن آخر معاملة تحتوي على رصيد تلقائي من الرسالة (>= 0)
+                    latest_bal_row = self._conn.execute("""
+                        SELECT balance_after 
+                        FROM transactions 
+                        WHERE wallet_id = ? AND balance_after >= 0 
+                        ORDER BY sms_timestamp DESC, received_at DESC, transaction_id DESC 
+                        LIMIT 1
+                    """, (w_id,)).fetchone()
+                    
+                    if latest_bal_row:
+                        balance = latest_bal_row["balance_after"]
+                    else:
+                        # إذا لم يوجد رصيد تلقائي في الرسائل (مثل انستا باي)، نبدأ من 0 + صافي المعاملات
+                        balance = 0.0 + net_change
+                
+                wallet_balances[w_id] = balance
             
         current_balance = sum(wallet_balances.values())
 
@@ -255,9 +283,14 @@ class DesktopDatabase:
             "wallet_balances": wallet_balances
         }
 
-    # ═════════════════════════════════════════════════════════════════════
-    # أدوات
-    # ═════════════════════════════════════════════════════════════════════
+    def get_transactions_by_counterpart(self, counterpart: str) -> List[Transaction]:
+        """استرجاع العمليات المرتبطة برقم هاتف أو اسم جهة اتصال معينة"""
+        if not counterpart:
+            return []
+        query = "SELECT * FROM transactions WHERE counterpart LIKE ? ORDER BY sms_timestamp DESC"
+        like_query = f"%{counterpart.strip()}%"
+        rows = self._conn.execute(query, (like_query,)).fetchall()
+        return [self._row_to_transaction(r) for r in rows]
 
     def _row_to_transaction(self, row: sqlite3.Row) -> Transaction:
         return Transaction(
@@ -273,10 +306,47 @@ class DesktopDatabase:
             wallet_id=row["wallet_id"],
         )
 
+    def get_setting(self, key: str, default: str) -> str:
+        """Get setting value by key."""
+        try:
+            row = self._conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+            if row:
+                return row["value"]
+        except Exception as e:
+            logger.error(f"Error getting setting {key}: {e}")
+        return default
+
+    def set_setting(self, key: str, value: str) -> bool:
+        """Set setting value by key."""
+        try:
+            self._conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+            self._conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error setting {key} to {value}: {e}")
+            return False
+
+    def get_wallet_net_change(self, wallet_id: str) -> float:
+        """حساب صافي التغير في الرصيد بناءً على المعاملات المسجلة"""
+        try:
+            tx_sum = self._conn.execute("""
+                SELECT 
+                    COALESCE(SUM(CASE WHEN type='RECEIVED' THEN amount ELSE 0 END), 0) -
+                    COALESCE(SUM(CASE WHEN type IN ('SENT', 'BILL', 'PURCHASE', 'TOPUP') THEN amount ELSE 0 END), 0) AS net_change
+                FROM transactions
+                WHERE wallet_id = ?
+            """, (wallet_id,)).fetchone()
+            return tx_sum["net_change"] if tx_sum else 0.0
+        except Exception as e:
+            logger.error(f"Error getting net change for wallet {wallet_id}: {e}")
+            return 0.0
+
     def clear_database(self) -> bool:
         """مسح جميع العمليات وتصفير قاعدة البيانات"""
         try:
             self._conn.execute("DELETE FROM transactions")
+            # امسح الأرصدة الابتدائية اليدوية عند تصفير الحساب لتبدأ من الصفر تماماً
+            self._conn.execute("DELETE FROM settings WHERE key LIKE 'initial_balance_%'")
             self._conn.commit()
             logger.info("🗑️ Desktop database cleared successfully")
             return True
