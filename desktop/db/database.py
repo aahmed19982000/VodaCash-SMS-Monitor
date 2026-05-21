@@ -87,6 +87,44 @@ class DesktopDatabase:
         """)
         conn.commit()
 
+        # تشغيل الهجرة لإعادة تحليل العمليات وتصحيح المحفظة والرصيد
+        try:
+            from mobile.parser.engine import SMSEngine
+            rows = conn.execute("SELECT transaction_id, raw_sms, wallet_id, type FROM transactions").fetchall()
+            for row in rows:
+                tx_id = row["transaction_id"]
+                raw_sms = row["raw_sms"]
+                old_wallet = row["wallet_id"]
+                old_type = row["type"]
+                
+                # إعادة التحليل
+                tx = SMSEngine.parse(raw_sms)
+                
+                # توحيد اسم المحفظة
+                w_id = tx.wallet_id
+                if w_id:
+                    w_id = w_id.strip().lower()
+                if not w_id or w_id not in ["vodafone_cash", "orange_cash", "etisalat_cash", "we_pay", "instapay", "bank", "unspecified"]:
+                    w_id = "unspecified"
+                
+                # الحفاظ على المحفظة القديمة إذا تم التعرف عليها سابقاً وكانت الجديدة unspecified
+                if w_id == "unspecified" and old_wallet:
+                    old_wallet_clean = old_wallet.strip().lower()
+                    if old_wallet_clean not in ["wallet_001", "unspecified", ""]:
+                        w_id = old_wallet_clean
+                
+                tx_type = tx.type.value if tx.type != TransactionType.UNKNOWN else old_type
+                
+                conn.execute("""
+                    UPDATE transactions
+                    SET wallet_id = ?, balance_after = ?, type = ?
+                    WHERE transaction_id = ?
+                """, (w_id, tx.balance_after, tx_type, tx_id))
+            conn.commit()
+            logger.info("🔄 Desktop Cache database successfully migrated and re-parsed.")
+        except Exception as e:
+            logger.error(f"⚠️ Error running DB migration: {e}")
+
     # ═════════════════════════════════════════════════════════════════════
     # العمليات (Transactions)
     # ═════════════════════════════════════════════════════════════════════
@@ -94,6 +132,13 @@ class DesktopDatabase:
     def save_transaction(self, tx: Transaction) -> bool:
         """حفظ عملية جديدة قادمة من الموبايل"""
         try:
+            w_id = tx.wallet_id
+            if w_id:
+                w_id = w_id.strip().lower()
+            if not w_id or w_id == "unspecified" or w_id not in ["vodafone_cash", "orange_cash", "etisalat_cash", "we_pay", "instapay", "bank"]:
+                logger.warning(f"⚠️ Ignoring saving transaction {tx.transaction_id} because wallet/account is unspecified/unknown")
+                return False
+
             self._conn.execute("""
                 INSERT OR REPLACE INTO transactions
                     (transaction_id, type, amount, balance_after, counterpart,
@@ -102,7 +147,7 @@ class DesktopDatabase:
             """, (
                 tx.transaction_id, tx.type.value, tx.amount, tx.balance_after,
                 tx.counterpart, tx.raw_sms, tx.parsed_at.isoformat(),
-                tx.sms_timestamp.isoformat(), tx.confidence, tx.wallet_id,
+                tx.sms_timestamp.isoformat(), tx.confidence, w_id,
             ))
             self._conn.commit()
             return True
@@ -116,7 +161,8 @@ class DesktopDatabase:
                              end_date: str = None,
                              min_amount: float = None,
                              max_amount: float = None,
-                             search_query: str = None) -> List[Transaction]:
+                             search_query: str = None,
+                             wallet_filter: str = "ALL") -> List[Transaction]:
         """استرجاع العمليات مع دعم الفلاتر والبحث الذكي للـ Dashboard"""
         query = "SELECT * FROM transactions WHERE 1=1"
         params = []
@@ -124,6 +170,12 @@ class DesktopDatabase:
         if type_filter and type_filter != "ALL":
             query += " AND type = ?"
             params.append(type_filter)
+
+        if wallet_filter and wallet_filter != "ALL":
+            query += " AND wallet_id = ?"
+            params.append(wallet_filter)
+        else:
+            query += " AND wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''"
 
         if start_date:
             query += " AND date(sms_timestamp) >= date(?)"
@@ -153,31 +205,54 @@ class DesktopDatabase:
 
     def get_kpi_summary(self, month: str = None) -> Dict[str, float]:
         """إحصائيات (رصيد، دخل، مصاريف) للـ Dashboard"""
-        # إذا لم يُحدد شهر، نستخدم الشهر الحالي
-        date_filter = f"LIKE '{month}%'" if month else ">= date('now', 'start of month')"
+        # إذا لم يُحدد شهر، نستخدم الشهر الحالي بالتوقيت المحلي لضمان الدقة
+        date_filter = f"LIKE '{month}%'" if month else ">= date('now', 'localtime', 'start of month')"
         
         row = self._conn.execute(f"""
             SELECT
                 COALESCE(SUM(CASE WHEN type='RECEIVED' THEN amount ELSE 0 END), 0) AS total_income,
-                COALESCE(SUM(CASE WHEN type IN ('SENT', 'BILL', 'PURCHASE') THEN amount ELSE 0 END), 0) AS total_expenses,
+                COALESCE(SUM(CASE WHEN type IN ('SENT', 'BILL', 'PURCHASE', 'TOPUP') THEN amount ELSE 0 END), 0) AS total_expenses,
                 COUNT(*) AS total_transactions
             FROM transactions
             WHERE sms_timestamp {date_filter}
+              AND wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''
         """).fetchone()
         
-        # آخر رصيد معروف
-        balance_row = self._conn.execute("""
-            SELECT balance_after FROM transactions 
-            WHERE balance_after > 0 
-            ORDER BY sms_timestamp DESC LIMIT 1
-        """).fetchone()
-        current_balance = balance_row["balance_after"] if balance_row else 0.0
+        # آخر رصيد معروف لكل محفظة باستخدام ROW_NUMBER لتجنب تكرار العمليات في نفس التوقيت
+        wallet_balances = {}
+        balance_rows = self._conn.execute("""
+            SELECT wallet_id, balance_after
+            FROM (
+                SELECT wallet_id, balance_after,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY wallet_id 
+                           ORDER BY sms_timestamp DESC, received_at DESC, transaction_id DESC
+                       ) as rn
+                FROM transactions
+                WHERE balance_after >= 0 
+                  AND wallet_id IS NOT NULL 
+                  AND wallet_id != 'unspecified' 
+                  AND wallet_id != ''
+            )
+            WHERE rn = 1
+        """).fetchall()
+        
+        for brow in balance_rows:
+            w_id = brow["wallet_id"]
+            if w_id:
+                w_id = w_id.strip().lower()
+            if not w_id or w_id not in ["vodafone_cash", "orange_cash", "etisalat_cash", "we_pay", "instapay", "bank"]:
+                continue
+            wallet_balances[w_id] = brow["balance_after"]
+            
+        current_balance = sum(wallet_balances.values())
 
         return {
             "income": row["total_income"],
             "expenses": row["total_expenses"],
             "transactions_count": row["total_transactions"],
-            "current_balance": current_balance
+            "current_balance": current_balance,
+            "wallet_balances": wallet_balances
         }
 
     # ═════════════════════════════════════════════════════════════════════

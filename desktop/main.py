@@ -74,6 +74,19 @@ class MainApplication:
         from shared.protocol import make_new_transaction, make_balance_update
         asyncio.create_task(self.server._broadcast(make_new_transaction(tx)))
         asyncio.create_task(self.server._broadcast(make_balance_update(tx.balance_after, tx.wallet_id)))
+        
+        # 4. إرسال قائمة المحافظ المحدثة للموبايل
+        import json
+        kpi = self.db.get_kpi_summary()
+        wallet_balances = kpi.get("wallet_balances", {})
+        current_balance = kpi.get('current_balance', 0.0)
+        asyncio.create_task(self.server._broadcast(json.dumps({
+            "type": "WALLET_BALANCES_UPDATE",
+            "payload": {
+                "wallet_balances": wallet_balances,
+                "current_balance": current_balance
+            }
+        })))
 
     def handle_balance(self, balance: float, wallet_id: str):
         logger.info(f"💳 Balance Update: {balance} EGP")
@@ -90,8 +103,19 @@ class MainApplication:
         # إرسال الرصيد الحالي للعميل الجديد
         kpi = self.db.get_kpi_summary()
         current_balance = kpi.get('current_balance', 0.0)
+        wallet_balances = kpi.get("wallet_balances", {})
         from shared.protocol import make_balance_update, make_new_transaction
         asyncio.create_task(self.server._broadcast(make_balance_update(current_balance, "vodacash")))
+        
+        # إرسال قائمة المحافظ للعميل الجديد
+        import json
+        asyncio.create_task(self.server._broadcast(json.dumps({
+            "type": "WALLET_BALANCES_UPDATE",
+            "payload": {
+                "wallet_balances": wallet_balances,
+                "current_balance": current_balance
+            }
+        })))
 
         # إرسال آخر 5 عمليات للعميل الجديد
         recent_txs = self.db.get_all_transactions()[:5]

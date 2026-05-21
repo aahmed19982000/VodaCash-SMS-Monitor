@@ -161,6 +161,10 @@ class DesktopServer:
         # ── عملية جديدة ──────────────────────────────────────────────
         elif msg_type == MessageType.NEW_TRANSACTION:
             tx = Transaction.from_dict(payload)
+            w_id = tx.wallet_id.strip().lower() if tx.wallet_id else "unspecified"
+            if not w_id or w_id == "unspecified" or w_id not in ["vodafone_cash", "orange_cash", "etisalat_cash", "we_pay", "instapay", "bank"]:
+                logger.warning(f"⚠️ Ignoring NEW_TRANSACTION because wallet is unspecified/unknown: {tx.transaction_id}")
+                return
             logger.info(
                 f"💰 {tx.type.value}: {tx.amount} EGP "
                 f"| {tx.counterpart} | conf: {tx.confidence:.0%}"
@@ -198,6 +202,10 @@ class DesktopServer:
                 tx.sms_timestamp = datetime.fromtimestamp(timestamp / 1000.0)
             
             if tx.confidence >= CONFIDENCE_THRESHOLD:
+                w_id = tx.wallet_id.strip().lower() if tx.wallet_id else "unspecified"
+                if not w_id or w_id == "unspecified" or w_id not in ["vodafone_cash", "orange_cash", "etisalat_cash", "we_pay", "instapay", "bank"]:
+                    logger.warning(f"⚠️ Ignoring parsed SMS because wallet is unspecified/unknown: {tx.transaction_id}")
+                    return
                 logger.info(
                     f"💰 Parse Success - {tx.type.value}: {tx.amount} EGP "
                     f"| {tx.counterpart} | conf: {tx.confidence:.0%}"

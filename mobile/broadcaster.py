@@ -205,7 +205,7 @@ class Broadcaster:
         message = make_new_transaction(tx)
         return self._send_or_queue(message, f"{tx.type.value}: {tx.amount} EGP")
 
-    def broadcast_balance(self, balance: float, wallet_id: str = "wallet_001") -> bool:
+    def broadcast_balance(self, balance: float, wallet_id: str = "unspecified") -> bool:
         """إرسال تحديث رصيد."""
         message = make_balance_update(balance, wallet_id)
         return self._send_or_queue(message, f"Balance: {balance} EGP")

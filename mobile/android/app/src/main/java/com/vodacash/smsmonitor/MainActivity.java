@@ -61,6 +61,11 @@ public class MainActivity extends AppCompatActivity {
     private TransactionAdapter transactionAdapter;
     private final List<JSONObject> transactionList = new ArrayList<>();
 
+    private TextView tvWalletsTitle;
+    private RecyclerView rvWallets;
+    private WalletAdapter walletAdapter;
+    private final List<WalletItem> walletList = new ArrayList<>();
+
     // مستقبل البث للحالة
     private final BroadcastReceiver statusReceiver = new BroadcastReceiver() {
         @Override
@@ -76,8 +81,9 @@ public class MainActivity extends AppCompatActivity {
                 double balance = intent.getDoubleExtra("currentBalance", 0.0);
                 String lastUpdate = intent.getStringExtra("lastBalanceUpdate");
                 String txJson = intent.getStringExtra("recentTransactions");
+                String walletBalancesJson = intent.getStringExtra("walletBalances");
 
-                updateUI(isConnected, statusDetails, processedCount, sentCount, queueSize, startTimeMillis, balance, lastUpdate, txJson);
+                updateUI(isConnected, statusDetails, processedCount, sentCount, queueSize, startTimeMillis, balance, lastUpdate, txJson, walletBalancesJson);
             }
         }
     };
@@ -98,11 +104,18 @@ public class MainActivity extends AppCompatActivity {
         tvBalance = findViewById(R.id.tvBalance);
         tvLastUpdate = findViewById(R.id.tvLastUpdate);
         rvTransactions = findViewById(R.id.rvTransactions);
-
-        // إعداد RecyclerView
+        tvWalletsTitle = findViewById(R.id.tvWalletsTitle);
+        rvWallets = findViewById(R.id.rvWallets);
+ 
+        // إعداد RecyclerView العمليات
         transactionAdapter = new TransactionAdapter(transactionList);
         rvTransactions.setLayoutManager(new LinearLayoutManager(this));
         rvTransactions.setAdapter(transactionAdapter);
+
+        // إعداد RecyclerView المحافظ
+        walletAdapter = new WalletAdapter(walletList);
+        rvWallets.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        rvWallets.setAdapter(walletAdapter);
 
         // زر الإعدادات
         findViewById(R.id.btnSettings).setOnClickListener(v -> {
@@ -165,10 +178,10 @@ public class MainActivity extends AppCompatActivity {
 
     // تحديث الواجهة الرسومية بناءً على حالة الخدمة والـ WebSocket
     private void updateUI(boolean isConnected, String statusDetails, int processed, int sent, int pending, long startTimeMillis) {
-        updateUI(isConnected, statusDetails, processed, sent, pending, startTimeMillis, 0.0, "—", null);
+        updateUI(isConnected, statusDetails, processed, sent, pending, startTimeMillis, 0.0, "—", null, null);
     }
 
-    private void updateUI(boolean isConnected, String statusDetails, int processed, int sent, int pending, long startTimeMillis, double balance, String lastUpdate, String transactionsJson) {
+    private void updateUI(boolean isConnected, String statusDetails, int processed, int sent, int pending, long startTimeMillis, double balance, String lastUpdate, String transactionsJson, String walletBalancesJson) {
         if (isConnected) {
             connectionDot.setBackgroundResource(R.drawable.circle_green);
             tvConnectionStatus.setText("متصل");
@@ -210,6 +223,91 @@ public class MainActivity extends AppCompatActivity {
         }
         if (tvLastUpdate != null) {
             tvLastUpdate.setText("آخر تحديث: " + (lastUpdate != null ? lastUpdate : "—"));
+        }
+
+        // تحديث قائمة المحافظ
+        walletList.clear();
+        if (walletBalancesJson != null && !walletBalancesJson.isEmpty() && !walletBalancesJson.equals("{}")) {
+            try {
+                JSONObject walletObj = new JSONObject(walletBalancesJson);
+                java.util.Iterator<String> keys = walletObj.keys();
+                while (keys.hasNext()) {
+                    String wId = keys.next();
+                    double wBal = walletObj.optDouble(wId, 0.0);
+                    
+                    // استبعاد undefined أو unspecified لو كان رصيدها 0 لتنظيف الواجهة
+                    if ("unspecified".equals(wId) && wBal == 0.0) {
+                        continue;
+                    }
+
+                    // الحصول على إعدادات المظهر للمحفظة
+                    String nameEn = "Unspecified";
+                    String nameAr = "غير محدد";
+                    String startColor = "#4E6E5D";
+                    String endColor = "#2E4E3D";
+                    String icon = "❓";
+
+                    switch (wId) {
+                        case "vodafone_cash":
+                            nameEn = "Vodafone Cash";
+                            nameAr = "فودافون كاش";
+                            startColor = "#E60000";
+                            endColor = "#990000";
+                            icon = "📱";
+                            break;
+                        case "orange_cash":
+                            nameEn = "Orange Cash";
+                            nameAr = "أورنج كاش";
+                            startColor = "#FF6600";
+                            endColor = "#CC5200";
+                            icon = "🍊";
+                            break;
+                        case "etisalat_cash":
+                            nameEn = "Etisalat Cash";
+                            nameAr = "اتصالات كاش";
+                            startColor = "#78BE20";
+                            endColor = "#5A8F18";
+                            icon = "💚";
+                            break;
+                        case "we_pay":
+                            nameEn = "WE Pay";
+                            nameAr = "وي باي";
+                            startColor = "#512D6D";
+                            endColor = "#351C49";
+                            icon = "🟣";
+                            break;
+                        case "instapay":
+                            nameEn = "InstaPay";
+                            nameAr = "انستاباي";
+                            startColor = "#EC008C";
+                            endColor = "#00ADEF";
+                            icon = "⚡";
+                            break;
+                        case "bank":
+                            nameEn = "Bank Account";
+                            nameAr = "حساب بنكي";
+                            startColor = "#005A70";
+                            endColor = "#003A48";
+                            icon = "🏦";
+                            break;
+                    }
+
+                    walletList.add(new WalletItem(wId, nameEn, nameAr, wBal, startColor, endColor, icon));
+                }
+            } catch (Exception e) {
+                Log.e("VodaCash_UI", "Error parsing wallet balances: " + e.getMessage());
+            }
+        }
+
+        if (walletList.isEmpty()) {
+            if (tvWalletsTitle != null) tvWalletsTitle.setVisibility(View.GONE);
+            if (rvWallets != null) rvWallets.setVisibility(View.GONE);
+        } else {
+            if (tvWalletsTitle != null) tvWalletsTitle.setVisibility(View.VISIBLE);
+            if (rvWallets != null) rvWallets.setVisibility(View.VISIBLE);
+            if (walletAdapter != null) {
+                walletAdapter.notifyDataSetChanged();
+            }
         }
 
         // تحديث قائمة العمليات
@@ -474,4 +572,89 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+
+    private static class WalletItem {
+        String id;
+        String nameEn;
+        String nameAr;
+        double balance;
+        String startColor;
+        String endColor;
+        String icon;
+
+        WalletItem(String id, String nameEn, String nameAr, double balance, String startColor, String endColor, String icon) {
+            this.id = id;
+            this.nameEn = nameEn;
+            this.nameAr = nameAr;
+            this.balance = balance;
+            this.startColor = startColor;
+            this.endColor = endColor;
+            this.icon = icon;
+        }
+    }
+
+    private class WalletAdapter extends RecyclerView.Adapter<WalletAdapter.ViewHolder> {
+        private final List<WalletItem> items;
+
+        public WalletAdapter(List<WalletItem> items) {
+            this.items = items;
+        }
+
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_wallet, parent, false);
+            return new ViewHolder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            WalletItem wallet = items.get(position);
+            holder.tvWalletNameEn.setText(wallet.nameEn);
+            holder.tvWalletNameAr.setText(wallet.nameAr);
+            holder.tvWalletIcon.setText(wallet.icon);
+            holder.tvWalletBalance.setText(String.format(Locale.US, "%.2f EGP", wallet.balance));
+
+            try {
+                android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                    new int[] {
+                        android.graphics.Color.parseColor(wallet.startColor),
+                        android.graphics.Color.parseColor(wallet.endColor)
+                    }
+                );
+                gd.setCornerRadius(dpToPx(12));
+                holder.itemView.setBackground(gd);
+            } catch (Exception e) {
+                holder.itemView.setBackgroundResource(R.drawable.card_dark);
+            }
+        }
+
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+
+        private int dpToPx(int dp) {
+            float density = getResources().getDisplayMetrics().density;
+            return Math.round((float) dp * density);
+        }
+
+        class ViewHolder extends RecyclerView.ViewHolder {
+            final TextView tvWalletIcon;
+            final TextView tvWalletNameEn;
+            final TextView tvWalletNameAr;
+            final TextView tvWalletBalance;
+
+            ViewHolder(@NonNull View itemView) {
+                super(itemView);
+                tvWalletIcon = itemView.findViewById(R.id.tvWalletIcon);
+                tvWalletNameEn = itemView.findViewById(R.id.tvWalletNameEn);
+                tvWalletNameAr = itemView.findViewById(R.id.tvWalletNameAr);
+                tvWalletBalance = itemView.findViewById(R.id.tvWalletBalance);
+            }
+        }
+    }
 }
+

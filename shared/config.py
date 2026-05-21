@@ -4,17 +4,30 @@
 WEBSOCKET_HOST = "0.0.0.0"   # الديسكتوب يستقبل على كل الـ interfaces
 WEBSOCKET_PORT = 8765         # البورت الافتراضي
 
-# ── فودافون كاش ──────────────────────────────────────────────────────────
-VODAFONE_CASH_SENDERS = [
-    "VodafoneCash",
-    "VodaCash",
-    "01010",
-    "Vodafone",
-    "VF Cash",
-    "VF-Cash",
-    "VFCash",
-    "vf_cash",
-]
+# ── المحافظ والجهات المدعومة ──────────────────────────────────────────────────
+WALLET_SENDERS = {
+    "vodafone_cash": [
+        "VodafoneCash", "VodaCash", "01010", "Vodafone", "VF Cash", "VF-Cash", "VFCash", "vf_cash", "858", "2000"
+    ],
+    "orange_cash": [
+        "Orange Cash", "OrangeCash", "Orange", "Orange-Cash", "orange_cash", "7770"
+    ],
+    "etisalat_cash": [
+        "EtisalatCash", "Etisalat Cash", "Etisalat", "Etisalat-Cash", "etisalat_cash"
+    ],
+    "we_pay": [
+        "WEPay", "WE Pay", "WE_Pay", "WE", "we_cash"
+    ],
+    "instapay": [
+        "InstaPay", "InstaPay Egypt", "IPN"
+    ],
+    "bank": [
+        "CIB", "CIB Egypt", "NBE", "BM", "Banque Misr", "QNB", "QNB Egypt", "AlexBank", "HSBC", "AAIB"
+    ]
+}
+
+# للاتساق مع الكود القديم
+VODAFONE_CASH_SENDERS = WALLET_SENDERS["vodafone_cash"]
 
 # ── الـ Parser ────────────────────────────────────────────────────────────
 CONFIDENCE_THRESHOLD = 0.7    # أقل من كده → unclassified

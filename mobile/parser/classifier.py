@@ -1,21 +1,60 @@
-# mobile/parser/classifier.py
-
 import re
-from shared.config import VODAFONE_CASH_SENDERS
 from shared.models import TransactionType
 
 class SMSClassifier:
     @staticmethod
     def is_official_sender(sender: str) -> bool:
         """
-        التحقق مما إذا كان المرسل من قائمة فودافون كاش الرسمية.
+        التحقق مما إذا كان المرسل من المحافظ المدعومة أو مرسل رسمي (غير شخصي).
         """
-        # تنظيف اسم المرسل (إزالة المسافات، تحويل لحروف صغيرة)
-        clean_sender = sender.strip()
-        for official in VODAFONE_CASH_SENDERS:
-            if clean_sender.lower() == official.lower():
+        clean_sender = sender.strip().lower()
+        
+        # 1. تحقق من القوائم الثابتة
+        from shared.config import WALLET_SENDERS
+        for wallet, senders in WALLET_SENDERS.items():
+            for official in senders:
+                if clean_sender == official.lower():
+                    return True
+        
+        # 2. تحقق لو كان اسم مرسل رسمي (alphanumeric) وليس رقم هاتف شخصي عادي
+        # أرقام الهواتف الشخصية في مصر تكون أرقاماً بحتة بطول 11 رقم أو تبدأ بـ +20
+        is_personal_phone = re.match(r'^(?:\+?20|0)?1[0125]\d{8}$', clean_sender)
+        if not is_personal_phone:
+            # إذا كان الاسم يحتوي على حروف أبجدية أو كود قصير (أقل من 6 أرقام)، فهو غالباً جهة/شركة
+            if re.search(r'[a-z]', clean_sender) or (clean_sender.isdigit() and len(clean_sender) <= 5):
                 return True
+                
         return False
+
+    @staticmethod
+    def detect_wallet(sender: str, text: str) -> str:
+        """
+        تحديد نوع المحفظة أو الجهة بناءً على اسم المرسل ومحتوى الرسالة.
+        """
+        if sender:
+            clean_sender = sender.strip().lower()
+            from shared.config import WALLET_SENDERS
+            for wallet, senders in WALLET_SENDERS.items():
+                for official in senders:
+                    if clean_sender == official.lower():
+                        return wallet
+        
+        # فحص الكلمات المفتاحية في النص كخطة بديلة
+        text_lower = text.lower()
+        if any(kw in text_lower for kw in ["فودافون كاش", "vodafone cash", "vodacash", "voda cash", "858", "فودافون", "vodafone"]):
+            return "vodafone_cash"
+        elif any(kw in text_lower for kw in ["اورنج كاش", "اورنچ كاش", "orange cash", "أورنج كاش", "أورنچ كاش", "orange_cash", "7770"]):
+            return "orange_cash"
+        elif any(kw in text_lower for kw in ["اتصالات كاش", "etisalat cash", "etisalat_cash"]):
+            return "etisalat_cash"
+        elif any(kw in text_lower for kw in ["وي باي", "we pay", "wepay", "we_pay"]):
+            return "we_pay"
+        elif any(kw in text_lower for kw in ["انستاباي", "instapay", "ipn", "19623", "تحويل لحظي"]):
+            return "instapay"
+        elif any(kw in text_lower for kw in ["cib", "nbe", "البنك الأهلي", "بنك مصر", "qnb", "حسابكم", "حسابك"]):
+            return "bank"
+            
+        return "unspecified"
 
     @staticmethod
     def classify_type_preliminary(text: str) -> TransactionType:
@@ -25,25 +64,37 @@ class SMSClassifier:
         text_lower = text.lower()
         
         # 1. استلام (Received)
-        if any(kw in text_lower for kw in ["تم استلام مبلغ", "received egp", "received from"]):
+        if any(kw in text_lower for kw in [
+            "تم استلام مبلغ", "received egp", "received from", "تم استلام عملية تحويل", 
+            "أودع", "إيداع", "تم إضافة", "تم تحويل مبلغ لك", "تم تحويل مبلغ لـك", 
+            "تمت إضافته لرصيدك", "received", "تم استلام", "أودع في حسابك", "تم إيداع",
+            "تم استقبال تحويل", "إضافة تحويل", "تحويل لحظي إلى حسابكم"
+        ]):
             return TransactionType.RECEIVED
             
         # 2. إرسال (Sent)
-        if any(kw in text_lower for kw in ["were successfully transferred", "تم تحويل"]):
+        if any(kw in text_lower for kw in [
+            "were successfully transferred", "تم تحويل", "عملية تحويل أموال ناجحة", 
+            "تم خصم", "تم سحب", "خصم مبلغ", "تحويل مبلغ", "transferred", "sent to",
+            "successfully sent", "تم تنفيذ تحويل", "تحويل لحظي من حسابكم", "تحويل من حسابكم", 
+            "خصم من حسابكم", "تحويل لحظي"
+        ]):
             return TransactionType.SENT
-
             
         # 3. فاتورة (Bill)
-        if any(kw in text_lower for kw in ["تم دفع مبلغ", "bill paid", "payment for"]):
+        if any(kw in text_lower for kw in ["تم دفع مبلغ", "bill paid", "payment for", "paid egp"]):
             return TransactionType.BILL
             
         # 4. شحن (Top-up)
-        if any(kw in text_lower for kw in ["تم شحن رصيد", "recharged successfully"]):
+        if any(kw in text_lower for kw in ["تم شحن رصيد", "recharged successfully", "شحن رصيد"]):
             return TransactionType.TOPUP
             
         # 5. استعلام رصيد (Balance)
-        if any(kw in text_lower for kw in ["vodafone cash balance", "رصيد محفظتك الحالي"]):
-            if "تم دفع" not in text_lower and "تم استلام" not in text_lower:
+        if any(kw in text_lower for kw in [
+            "vodafone cash balance", "رصيد محفظتك الحالي", "رصيدك الحالي", 
+            "رصيد حسابك", "رصيد محفظتك", "الرصيد الحالي", "balance is", "current balance", "balance:"
+        ]):
+            if "تم دفع" not in text_lower and "تم استلام" not in text_lower and "تم تحويل" not in text_lower and "received" not in text_lower:
                 return TransactionType.BALANCE
                 
         # 6. شراء (Purchase)

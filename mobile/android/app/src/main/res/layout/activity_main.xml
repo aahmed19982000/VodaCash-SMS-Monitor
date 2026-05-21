@@ -193,6 +193,27 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- ── عنوان المحافظ ────────────────────────────────────────────── -->
+    <TextView
+        android:id="@+id/tvWalletsTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="حساباتي ومحافظي"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp"
+        android:visibility="gone" />
+
+    <!-- ── قائمة المحافظ ────────────────────────────────────────────── -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvWallets"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone" />
+
     <!-- ── عنوان آخر العمليات ─────────────────────────────────────────── -->
     <TextView
         android:layout_width="wrap_content"

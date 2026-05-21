@@ -83,12 +83,12 @@ public class SmsBroadcastReceiver extends BroadcastReceiver {
             Log.d(TAG, "📩 SMS from: " + sender);
             Log.d(TAG, "📄 Body length: " + fullBody.length() + " chars");
 
-            // ── فلترة: قبول فقط أرقام فودافون كاش الرسمية ─────────────
-            if (SenderFilter.isOfficialVodafoneCash(sender)) {
-                Log.i(TAG, "✅ VodafoneCash SMS accepted!");
+            // ── فلترة: قبول المرسلين الرسميين والرسائل المالية ─────────────
+            if (SenderFilter.isPotentialTransactionSMS(sender, fullBody)) {
+                Log.i(TAG, "✅ Transaction SMS accepted!");
                 forwardToService(context, sender, fullBody, timestamp);
             } else {
-                Log.d(TAG, "⛔ Rejected — not an official VodafoneCash sender");
+                Log.d(TAG, "⛔ Rejected — not a transaction SMS");
             }
         }
     }

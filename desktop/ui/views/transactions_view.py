@@ -2,6 +2,16 @@
 import flet as ft
 from desktop.db.database import DesktopDatabase
 
+WALLET_BADGES = {
+    "vodafone_cash": {"name": "Vodafone Cash", "color": "#990000"},
+    "orange_cash": {"name": "Orange Cash", "color": "#CC5200"},
+    "etisalat_cash": {"name": "Etisalat Cash", "color": "#5A8F18"},
+    "we_pay": {"name": "WE Pay", "color": "#351C49"},
+    "instapay": {"name": "InstaPay", "color": "#005A70"},
+    "bank": {"name": "Bank Account", "color": "#0F4C5C"},
+    "unspecified": {"name": "Unspecified", "color": "#4E6E5D"},
+}
+
 class TransactionsView(ft.Container):
     def __init__(self, page: ft.Page, db: DesktopDatabase):
         super().__init__()
@@ -12,7 +22,7 @@ class TransactionsView(ft.Container):
 
         self.search_field = ft.TextField(
             label="Search (Number, Text...)",
-            width=250,
+            width=220,
             prefix_icon=ft.Icons.SEARCH,
             on_submit=self.apply_filters
         )
@@ -20,7 +30,7 @@ class TransactionsView(ft.Container):
         # Filter Controls
         self.type_dropdown = ft.Dropdown(
             label="Type",
-            width=150,
+            width=130,
             options=[
                 ft.dropdown.Option("ALL"),
                 ft.dropdown.Option("RECEIVED"),
@@ -32,13 +42,29 @@ class TransactionsView(ft.Container):
             value="ALL",
             on_select=self.apply_filters
         )
+
+        self.wallet_dropdown = ft.Dropdown(
+            label="Wallet",
+            width=150,
+            options=[
+                ft.dropdown.Option("ALL"),
+                ft.dropdown.Option("vodafone_cash", "Vodafone Cash"),
+                ft.dropdown.Option("orange_cash", "Orange Cash"),
+                ft.dropdown.Option("etisalat_cash", "Etisalat Cash"),
+                ft.dropdown.Option("we_pay", "WE Pay"),
+                ft.dropdown.Option("instapay", "InstaPay"),
+                ft.dropdown.Option("bank", "Bank Account"),
+                ft.dropdown.Option("unspecified", "Unspecified"),
+            ],
+            value="ALL",
+            on_select=self.apply_filters
+        )
         
-        self.min_amount = ft.TextField(label="Min Amount", width=120, keyboard_type=ft.KeyboardType.NUMBER, on_submit=self.apply_filters)
-        self.max_amount = ft.TextField(label="Max Amount", width=120, keyboard_type=ft.KeyboardType.NUMBER, on_submit=self.apply_filters)
+        self.min_amount = ft.TextField(label="Min Amount", width=100, keyboard_type=ft.KeyboardType.NUMBER, on_submit=self.apply_filters)
+        self.max_amount = ft.TextField(label="Max Amount", width=100, keyboard_type=ft.KeyboardType.NUMBER, on_submit=self.apply_filters)
         
-        # TODO: Flet DatePicker is a bit complex to setup inline quickly, so we use TextField for YYYY-MM-DD for now.
-        self.start_date = ft.TextField(label="Start Date (YYYY-MM-DD)", width=200, on_submit=self.apply_filters)
-        self.end_date = ft.TextField(label="End Date (YYYY-MM-DD)", width=200, on_submit=self.apply_filters)
+        self.start_date = ft.TextField(label="Start Date (YYYY-MM-DD)", width=170, on_submit=self.apply_filters)
+        self.end_date = ft.TextField(label="End Date (YYYY-MM-DD)", width=170, on_submit=self.apply_filters)
 
         self.btn_filter = ft.ElevatedButton("Apply Filters", on_click=self.apply_filters, icon=ft.Icons.FILTER_ALT)
         self.btn_clear = ft.OutlinedButton("Clear", on_click=self.clear_filters, icon=ft.Icons.CLEAR)
@@ -48,6 +74,7 @@ class TransactionsView(ft.Container):
             columns=[
                 ft.DataColumn(ft.Text("Date & Time")),
                 ft.DataColumn(ft.Text("Type")),
+                ft.DataColumn(ft.Text("Wallet")),
                 ft.DataColumn(ft.Text("Amount (EGP)", text_align=ft.TextAlign.RIGHT)),
                 ft.DataColumn(ft.Text("Balance (EGP)", text_align=ft.TextAlign.RIGHT)),
                 ft.DataColumn(ft.Text("Counterpart")),
@@ -72,6 +99,7 @@ class TransactionsView(ft.Container):
                     controls=[
                         self.search_field,
                         self.type_dropdown,
+                        self.wallet_dropdown,
                         self.min_amount,
                         self.max_amount,
                         self.start_date,
@@ -102,6 +130,7 @@ class TransactionsView(ft.Container):
         start = self.start_date.value if self.start_date.value else None
         end = self.end_date.value if self.end_date.value else None
         type_val = self.type_dropdown.value
+        wallet_val = self.wallet_dropdown.value
 
         self.update_data(
             type_filter=type_val,
@@ -109,19 +138,21 @@ class TransactionsView(ft.Container):
             end_date=end,
             min_amount=min_val,
             max_amount=max_val,
-            search_query=search_val
+            search_query=search_val,
+            wallet_filter=wallet_val
         )
 
     def clear_filters(self, e=None):
         self.search_field.value = ""
         self.type_dropdown.value = "ALL"
+        self.wallet_dropdown.value = "ALL"
         self.min_amount.value = ""
         self.max_amount.value = ""
         self.start_date.value = ""
         self.end_date.value = ""
         self.update_data()
 
-    def update_data(self, type_filter="ALL", start_date=None, end_date=None, min_amount=None, max_amount=None, search_query=None):
+    def update_data(self, type_filter="ALL", start_date=None, end_date=None, min_amount=None, max_amount=None, search_query=None, wallet_filter="ALL"):
         """تحديث بيانات الجدول مع الفلاتر"""
         try:
             txs = self.db.get_all_transactions(
@@ -130,7 +161,8 @@ class TransactionsView(ft.Container):
                 end_date=end_date,
                 min_amount=min_amount,
                 max_amount=max_amount,
-                search_query=search_query
+                search_query=search_query,
+                wallet_filter=wallet_filter
             )
         except Exception as ex:
             print(f"Error fetching filtered data: {ex}")
@@ -140,13 +172,25 @@ class TransactionsView(ft.Container):
         for tx in txs:
             amount_color = ft.Colors.GREEN_400 if tx.type.value == "RECEIVED" else ft.Colors.RED_400
             
+            # Wallet badge
+            w_info = WALLET_BADGES.get(tx.wallet_id, WALLET_BADGES["unspecified"])
+            wallet_cell = ft.DataCell(
+                ft.Container(
+                    content=ft.Text(w_info["name"], size=11, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+                    bgcolor=w_info["color"],
+                    padding=ft.Padding(left=8, top=4, right=8, bottom=4),
+                    border_radius=5,
+                )
+            )
+
             self.data_table.rows.append(
                 ft.DataRow(
                     cells=[
                         ft.DataCell(ft.Text(tx.sms_timestamp.strftime('%Y-%m-%d %H:%M'))),
                         ft.DataCell(ft.Text(tx.type.value, weight=ft.FontWeight.BOLD)),
+                        wallet_cell,
                         ft.DataCell(ft.Text(f"{tx.amount:,.2f}", color=amount_color, text_align=ft.TextAlign.RIGHT)),
-                        ft.DataCell(ft.Text(f"{tx.balance_after:,.2f}", text_align=ft.TextAlign.RIGHT)),
+                        ft.DataCell(ft.Text(f"{tx.balance_after:,.2f}" if tx.balance_after >= 0 else "N/A", text_align=ft.TextAlign.RIGHT)),
                         ft.DataCell(ft.Text(tx.counterpart)),
                     ]
                 )

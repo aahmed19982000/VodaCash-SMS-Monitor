@@ -93,6 +93,7 @@ public class SmsMonitorService extends Service {
     // ── حالة الرصيد والعمليات المستلمة من السيرفر ─────────────────────────
     private double currentBalance = 0.0;
     private String lastBalanceUpdate = "—";
+    private String lastWalletBalancesJson = "{}";
     private final LinkedList<String> recentTransactions = new LinkedList<>();
 
     // ── Offline Queue (تخزين مؤقت عند انقطاع الاتصال) ────────────────────
@@ -345,6 +346,9 @@ public class SmsMonitorService extends Service {
                 wsStatusDetails = "";
                 mainHandler.post(this::updateStatusNotification);
                 workerHandler.post(this::drainOfflineQueue);
+                
+                // تشغيل فحص الرسائل التاريخية عند الاتصال لأول مرة
+                checkAndScanHistoricalSms();
             },
             // onDisconnected
             (reason) -> {
@@ -372,17 +376,38 @@ public class SmsMonitorService extends Service {
                     org.json.JSONObject payload = json.optJSONObject("payload");
                     if (payload == null) payload = json;
                     
-                    if ("BALANCE_UPDATE".equals(type)) {
+                    if ("WALLET_BALANCES_UPDATE".equals(type)) {
+                        org.json.JSONObject walletBalancesObj = payload.optJSONObject("wallet_balances");
+                        if (walletBalancesObj != null) {
+                            lastWalletBalancesJson = walletBalancesObj.toString();
+                            double sum = 0.0;
+                            java.util.Iterator<String> keys = walletBalancesObj.keys();
+                            while (keys.hasNext()) {
+                                String key = keys.next();
+                                if (!"unspecified".equals(key)) {
+                                    sum += walletBalancesObj.optDouble(key, 0.0);
+                                }
+                            }
+                            currentBalance = sum;
+                        } else {
+                            currentBalance = payload.optDouble("current_balance", 0.0);
+                        }
+                        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+                        lastBalanceUpdate = sdf.format(new Date());
+                        mainHandler.post(this::updateStatusNotification);
+                    } else if ("BALANCE_UPDATE".equals(type)) {
                         double balance = payload.optDouble("balance", 0.0);
-                        currentBalance = balance;
+                        String walletId = payload.optString("wallet_id", "");
+                        updateWalletBalanceAndRecalculate(walletId, balance);
                         SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
                         lastBalanceUpdate = sdf.format(new Date());
                         
                         mainHandler.post(this::updateStatusNotification);
                     } else if ("NEW_TRANSACTION".equals(type)) {
                         double balanceAfter = payload.optDouble("balance_after", 0.0);
+                        String walletId = payload.optString("wallet_id", "");
                         if (balanceAfter > 0.0) {
-                            currentBalance = balanceAfter;
+                            updateWalletBalanceAndRecalculate(walletId, balanceAfter);
                             SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
                             lastBalanceUpdate = sdf.format(new Date());
                         }
@@ -428,6 +453,31 @@ public class SmsMonitorService extends Service {
         );
 
         wsManager.connect();
+    }
+
+    private void updateWalletBalanceAndRecalculate(String walletId, double balance) {
+        if (walletId == null || walletId.isEmpty() || "unspecified".equals(walletId)) {
+            return;
+        }
+        try {
+            org.json.JSONObject walletBalancesObj = new org.json.JSONObject(lastWalletBalancesJson);
+            walletBalancesObj.put(walletId, balance);
+            lastWalletBalancesJson = walletBalancesObj.toString();
+            
+            // Recalculate total balance
+            double sum = 0.0;
+            java.util.Iterator<String> keys = walletBalancesObj.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                if (!"unspecified".equals(key)) {
+                    sum += walletBalancesObj.optDouble(key, 0.0);
+                }
+            }
+            currentBalance = sum;
+        } catch (Exception e) {
+            Log.e(TAG, "Error in updateWalletBalanceAndRecalculate: " + e.getMessage());
+            currentBalance = balance;
+        }
     }
 
     // ═════════════════════════════════════════════════════════════════════
@@ -517,6 +567,7 @@ public class SmsMonitorService extends Service {
         // إرسال الرصيد وحالة المزامنة والعمليات
         intent.putExtra("currentBalance", currentBalance);
         intent.putExtra("lastBalanceUpdate", lastBalanceUpdate);
+        intent.putExtra("walletBalances", lastWalletBalancesJson);
         
         synchronized (recentTransactions) {
             org.json.JSONArray txArray = new org.json.JSONArray();
@@ -599,6 +650,70 @@ public class SmsMonitorService extends Service {
     // ═════════════════════════════════════════════════════════════════════
     // Static Helpers
     // ═════════════════════════════════════════════════════════════════════
+
+    private void checkAndScanHistoricalSms() {
+        if (prefs == null) {
+            prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        }
+        if (prefs.getBoolean("first_time_sms_scan_done", false)) {
+            Log.i(TAG, "🔍 Historical SMS scanning already completed in a previous run.");
+            return;
+        }
+
+        Log.i(TAG, "🔍 Starting historical SMS scan for first-run...");
+        
+        workerHandler.post(() -> {
+            try {
+                android.content.ContentResolver contentResolver = getContentResolver();
+                String[] projection = new String[] { "address", "body", "date" };
+                
+                // Query inbox, sorting by date ASC (oldest to newest) to process transactions chronologically
+                android.database.Cursor cursor = contentResolver.query(
+                    android.net.Uri.parse("content://sms/inbox"),
+                    projection,
+                    null,
+                    null,
+                    "date ASC"
+                );
+
+                if (cursor != null) {
+                    int count = 0;
+                    int matchCount = 0;
+                    int addressCol = cursor.getColumnIndex("address");
+                    int bodyCol = cursor.getColumnIndex("body");
+                    int dateCol = cursor.getColumnIndex("date");
+
+                    while (cursor.moveToNext()) {
+                        String sender = cursor.getString(addressCol);
+                        String body = cursor.getString(bodyCol);
+                        long timestamp = cursor.getLong(dateCol);
+
+                        if (com.vodacash.smsmonitor.util.SenderFilter.isPotentialTransactionSMS(sender, body)) {
+                            matchCount++;
+                            Log.d(TAG, "🔍 Historical SMS found match from " + sender + " (timestamp=" + timestamp + ")");
+                            processSms(sender, body, timestamp);
+                            
+                            // Brief sleep to avoid overwhelming socket buffers and ensure order
+                            try {
+                                Thread.sleep(30);
+                            } catch (InterruptedException e) {
+                                break;
+                            }
+                        }
+                        count++;
+                    }
+                    cursor.close();
+                    Log.i(TAG, "🔍 Scan complete: read " + count + " total messages, processed " + matchCount + " transactional messages.");
+                }
+
+                // Mark scan as completed
+                prefs.edit().putBoolean("first_time_sms_scan_done", true).apply();
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error scanning historical SMS: " + e.getMessage(), e);
+            }
+        });
+    }
 
     /** بدء الخدمة من أي مكان */
     public static void start(Context context) {

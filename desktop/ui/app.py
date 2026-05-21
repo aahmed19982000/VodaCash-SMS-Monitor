@@ -119,6 +119,7 @@ class DesktopApp:
         elif idx == 2:
             self.view_container.content = self.settings_view
         self.refresh_views()
+        self.page.update()
 
     def refresh_views(self):
         """تحديث الواجهة الحالية بالبيانات الجديدة"""

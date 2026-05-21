@@ -23,13 +23,13 @@ class Transaction:
     transaction_id : str             = field(default_factory=lambda: str(uuid.uuid4()))
     type           : TransactionType = TransactionType.UNKNOWN
     amount         : float           = 0.0
-    balance_after  : float           = 0.0
+    balance_after  : float           = -1.0
     counterpart    : str             = ""        # رقم الطرف أو اسم التاجر
     raw_sms        : str             = ""        # نص الرسالة الأصلي
     parsed_at      : datetime        = field(default_factory=datetime.now)
     sms_timestamp  : datetime        = field(default_factory=datetime.now)
     confidence     : float           = 0.0       # 0.0 → 1.0
-    wallet_id      : str             = "wallet_001"
+    wallet_id      : str             = "unspecified"
 
     def is_valid(self) -> bool:
         """العملية صالحة لو confidence فوق الحد المسموح"""
@@ -58,13 +58,13 @@ class Transaction:
             transaction_id = data.get("transaction_id", str(uuid.uuid4())),
             type           = TransactionType(data.get("type", "UNKNOWN")),
             amount         = float(data.get("amount", 0.0)),
-            balance_after  = float(data.get("balance_after", 0.0)),
+            balance_after  = float(data.get("balance_after", -1.0)),
             counterpart    = data.get("counterpart", ""),
             raw_sms        = data.get("raw_sms", ""),
             parsed_at      = datetime.fromisoformat(data.get("parsed_at", datetime.now().isoformat())),
             sms_timestamp  = datetime.fromisoformat(data.get("sms_timestamp", datetime.now().isoformat())),
             confidence     = float(data.get("confidence", 0.0)),
-            wallet_id      = data.get("wallet_id", "wallet_001"),
+            wallet_id      = data.get("wallet_id", "unspecified"),
         )
 
 

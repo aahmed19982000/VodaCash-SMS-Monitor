@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/walletCardBg"
+    android:layout_width="160dp"
+    android:layout_height="100dp"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:layout_marginEnd="10dp"
+    android:background="@drawable/card_dark"
+    android:elevation="4dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tvWalletIcon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:gravity="center"
+            android:textSize="18sp"
+            android:text="📱"
+            android:background="@drawable/circle_semi_transparent" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="8dp">
+
+            <TextView
+                android:id="@+id/tvWalletNameEn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/tvWalletNameAr"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#CCCCCC"
+                android:textSize="10sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="الرصيد / Balance"
+            android:textColor="#B3FFFFFF"
+            android:textSize="9sp" />
+
+        <TextView
+            android:id="@+id/tvWalletBalance"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>
