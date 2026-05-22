@@ -22,6 +22,15 @@ class SettingsView(ft.Container):
         }
         self.balance_inputs = {}
 
+        # Consistent Input styling helper
+        self.input_style = {
+            "border_radius": 10,
+            "bgcolor": "#0B0F19",
+            "border_color": ft.Colors.WHITE24,
+            "focused_border_color": ft.Colors.BLUE_ACCENT,
+            "filled": True
+        }
+
         # إعدادات التنبيهات من قاعدة البيانات
         notif_val = self.db.get_setting("notifications_enabled", "true") == "true" if self.db else True
         sound_val = self.db.get_setting("sound_enabled", "true") == "true" if self.db else True
@@ -29,106 +38,175 @@ class SettingsView(ft.Container):
         self.switch_notifications = ft.Switch(
             label="تفعيل إشعارات سطح المكتب (Enable Desktop Notifications)",
             value=notif_val,
-            on_change=self.on_notifications_change
+            on_change=self.on_notifications_change,
+            active_color=ft.Colors.BLUE_ACCENT,
+            label_text_style=ft.TextStyle(size=13, color=ft.Colors.WHITE)
         )
         self.switch_sound = ft.Switch(
             label="تفعيل صوت التنبيه (Enable Notification Sound)",
             value=sound_val,
-            on_change=self.on_sound_change
+            on_change=self.on_sound_change,
+            active_color=ft.Colors.BLUE_ACCENT,
+            label_text_style=ft.TextStyle(size=13, color=ft.Colors.WHITE)
         )
 
         # جلب الـ IP المحلي
         self.local_ips = self.get_local_ips()
 
-        ips_list = ft.ListView(spacing=10, expand=True)
+        ips_list = ft.Row(wrap=True, spacing=15)
         for ip in self.local_ips:
             ips_list.controls.append(
-                ft.ListTile(
-                    leading=ft.Icon(ft.Icons.WIFI, color=ft.Colors.BLUE_400),
-                    title=ft.Text(f"Wi-Fi / LAN IP: {ip}", weight=ft.FontWeight.BOLD),
-                    subtitle=ft.Text("أدخل هذا الرقم في إعدادات التطبيق على الموبايل."),
+                ft.Container(
+                    content=ft.Row(
+                        controls=[
+                            ft.Container(
+                                content=ft.Icon(ft.Icons.WIFI, color=ft.Colors.BLUE_400, size=22),
+                                bgcolor=ft.Colors.with_opacity(0.12, ft.Colors.BLUE_400),
+                                padding=10,
+                                border_radius=10,
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Text(f"Wi-Fi / LAN IP", size=11, color=ft.Colors.WHITE54),
+                                    ft.Text(ip, size=15, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE, selectable=True),
+                                ],
+                                spacing=2,
+                                tight=True
+                            )
+                        ],
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER
+                    ),
+                    bgcolor="#0B0F19",
+                    border=ft.Border.all(1, ft.Colors.with_opacity(0.2, ft.Colors.BLUE_400)),
+                    border_radius=12,
+                    padding=12,
+                    width=250,
+                    shadow=ft.BoxShadow(spread_radius=0, blur_radius=8, color=ft.Colors.with_opacity(0.1, ft.Colors.BLACK))
                 )
             )
 
         # Dialog for confirmation
         self.confirm_dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("تأكيد تصفير العمليات والنشاط"),
-            content=ft.Text("هل أنت متأكد من رغبتك في تصفير جميع العمليات والنشاط؟ سيتم حذف كافة العمليات والبيانات من قاعدة بيانات الكمبيوتر والموبايل بشكل نهائي ولا يمكن التراجع عن ذلك."),
+            title=ft.Text("تأكيد تصفير العمليات والنشاط / Reset Confirm", weight=ft.FontWeight.BOLD),
+            content=ft.Text("هل أنت متأكد من رغبتك في تصفير جميع العمليات والنشاط؟ سيتم حذف كافة العمليات والبيانات من قاعدة بيانات الكمبيوتر والموبايل بشكل نهائي ولا يمكن التراجع عن ذلك.\n\nAre you sure you want to reset all transactions? This action is permanent and cannot be undone."),
             actions=[
-                ft.TextButton("نعم، تصفير", on_click=self.confirm_clear_data, style=ft.ButtonStyle(color=ft.Colors.RED_400)),
-                ft.TextButton("إلغاء", on_click=self.close_dialog),
+                ft.TextButton("نعم، تصفير / Yes, Reset", on_click=self.confirm_clear_data, style=ft.ButtonStyle(color=ft.Colors.RED_400)),
+                ft.TextButton("إلغاء / Cancel", on_click=self.close_dialog),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        # Connection & Network Info Panel
+        self.ip_panel = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text(
+                        "عناوين الاتصال (Connection IPs)",
+                        size=16,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.BLUE_200
+                    ),
+                    ft.Text(
+                        "لتوصيل تطبيق الموبايل بسطح المكتب، قم بفتح شاشة الإعدادات في الموبايل وأدخل أحد عناوين الـ IP التالية:",
+                        size=13,
+                        color=ft.Colors.WHITE70
+                    ),
+                    ft.Container(height=5),
+                    ips_list,
+                    ft.Container(height=5),
+                    ft.Text("ملاحظات هامة / Important Notes:", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400, size=12),
+                    ft.Text("• إذا كنت تستخدم كابل USB مع (adb reverse tcp:8765 tcp:8765)، فاختر وضع USB في الموبايل ليتم الاتصال عبر 127.0.0.1", color=ft.Colors.WHITE54, size=12),
+                    ft.Text("• إذا كنت تستخدم Wi-Fi، أدخل أحد عناوين الـ IP المعروضة هنا وشكّل استثناء لـ port 8765 في جدار الحماية الخاص بويندوز.", color=ft.Colors.WHITE54, size=12),
+                ],
+                spacing=8
+            ),
+            gradient=ft.LinearGradient(
+                colors=["#1E293B", "#0F172A"],
+                begin=ft.alignment.Alignment.TOP_LEFT,
+                end=ft.alignment.Alignment.BOTTOM_RIGHT
+            ),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.BLUE_ACCENT)),
+            border_radius=16,
+            padding=20,
+            margin=ft.Margin(0, 0, 0, 15)
+        )
+
+        # Notification Settings Panel
+        self.notif_panel = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text("إعدادات التنبيهات (Notification Settings)", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_200),
+                    ft.Text("تحكم في كيفية تنبيهك عند استلام عمليات جديدة على الكمبيوتر.", color=ft.Colors.WHITE54, size=13),
+                    ft.Container(height=5),
+                    self.switch_notifications,
+                    self.switch_sound,
+                ],
+                spacing=10
+            ),
+            gradient=ft.LinearGradient(
+                colors=["#1E293B", "#0F172A"],
+                begin=ft.alignment.Alignment.TOP_LEFT,
+                end=ft.alignment.Alignment.BOTTOM_RIGHT
+            ),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.BLUE_ACCENT)),
+            border_radius=16,
+            padding=20,
+            margin=ft.Margin(0, 0, 0, 15)
+        )
+
+        # System Actions Panel
+        self.system_panel = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text("إجراءات النظام (System Actions)", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_400),
+                    ft.Text("استخدم هذا الزر لحذف كافة السجلات وتصفير الحساب لتبدأ من جديد.", color=ft.Colors.WHITE54, size=13),
+                    ft.Container(height=5),
+                    ft.ElevatedButton(
+                        "تصفير السجل والنشاط بالكامل",
+                        icon=ft.Icons.DELETE_FOREVER,
+                        color=ft.Colors.WHITE,
+                        bgcolor=ft.Colors.RED_700,
+                        on_click=self.show_clear_dialog,
+                        style=ft.ButtonStyle(
+                            shape=ft.RoundedRectangleBorder(radius=10),
+                            padding=ft.Padding(20, 15, 20, 15)
+                        )
+                    )
+                ],
+                spacing=8
+            ),
+            gradient=ft.LinearGradient(
+                colors=["#3B0712", "#0F172A"],
+                begin=ft.alignment.Alignment.TOP_LEFT,
+                end=ft.alignment.Alignment.BOTTOM_RIGHT
+            ),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.15, ft.Colors.RED_ACCENT)),
+            border_radius=16,
+            padding=20,
+            margin=ft.Margin(0, 0, 0, 15)
+        )
+
+        # Title Row
+        self.title_row = ft.Row(
+            controls=[
+                ft.Icon(ft.Icons.SETTINGS_ROUNDED, color=ft.Colors.BLUE_ACCENT, size=32),
+                ft.Text("Settings & Connection / الإعدادات والاتصال", size=28, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+            ],
+            alignment=ft.MainAxisAlignment.START,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER
         )
 
         self.content = ft.Column(
             scroll=ft.ScrollMode.AUTO,
             controls=[
-                ft.Text("Connection Info & Settings", size=30, weight=ft.FontWeight.BOLD),
+                self.title_row,
                 ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
-                
-                ft.Text(
-                    "لتوصيل تطبيق الموبايل بسطح المكتب، قم بفتح شاشة الإعدادات في الموبايل وأدخل أحد عناوين الـ IP التالية:",
-                    size=16,
-                    color=ft.Colors.WHITE70
-                ),
-                
-                ft.Container(
-                    content=ips_list,
-                    height=180,
-                    border=ft.Border.all(1, ft.Colors.WHITE24),
-                    border_radius=10,
-                    padding=10,
-                    margin=ft.Margin(left=0, top=10, right=0, bottom=10)
-                ),
-
-                ft.Text("ملاحظة:", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400),
-                ft.Text("• إذا كنت تستخدم كابل USB مع (adb reverse tcp:8765 tcp:8765)، فاختر وضع USB في الموبايل ليتم الاتصال عبر 127.0.0.1", color=ft.Colors.WHITE54),
-                ft.Text("• إذا كنت تستخدم Wi-Fi، أدخل أحد عناوين الـ IP المعروضة هنا وشكّل استثناء لـ port 8765 في جدار الحماية الخاص بويندوز.", color=ft.Colors.WHITE54),
-                
-                ft.Divider(height=30, color=ft.Colors.WHITE24),
-
-                # قسم إعدادات الإشعارات
-                ft.Text("إعدادات التنبيهات (Notification Settings)", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400),
-                ft.Text("تحكم في كيفية تنبيهك عند استلام عمليات جديدة على الكمبيوتر.", color=ft.Colors.WHITE54),
-                ft.Container(
-                    content=ft.Column(
-                        controls=[
-                            self.switch_notifications,
-                            self.switch_sound,
-                        ],
-                        spacing=15,
-                    ),
-                    margin=ft.Margin(left=0, top=10, right=0, bottom=20)
-                ),
-                
-                ft.Divider(height=30, color=ft.Colors.WHITE24),
-
-                # قسم تعديل الأرصدة
-                ft.Text("تعديل أرصدة الحسابات والمحافظ (Wallet & Account Balances)", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400),
-                ft.Text("يمكنك إدخال الرصيد الحالي الفعلي لأي محفظة أو حساب (مثال: انستا باي)، وسيقوم التطبيق بحساب الرصيد تلقائياً بناءً على المعاملات اللاحقة.", color=ft.Colors.WHITE54),
+                self.ip_panel,
+                self.notif_panel,
                 self.build_balances_section(),
-                
-                ft.Divider(height=30, color=ft.Colors.WHITE24),
-                
-                # قسم إجراءات النظام
-                ft.Text("إجراءات النظام (System Actions)", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_400),
-                ft.Text("استخدم هذا الزر لحذف كافة السجلات وتصفير الحساب لتبدأ من جديد.", color=ft.Colors.WHITE54),
-                ft.Container(
-                    content=ft.Row(
-                        controls=[
-                            ft.ElevatedButton(
-                                "تصفير السجل والنشاط بالكامل",
-                                icon=ft.Icons.DELETE_FOREVER,
-                                color=ft.Colors.WHITE,
-                                bgcolor=ft.Colors.RED_700,
-                                on_click=self.show_clear_dialog,
-                            )
-                        ]
-                    ),
-                    margin=ft.Margin(left=0, top=10, right=0, bottom=10)
-                )
+                self.build_fees_section(),
+                self.system_panel
             ]
         )
 
@@ -248,26 +326,55 @@ class SettingsView(ft.Container):
             
             tf = ft.TextField(
                 value=f"{current_bal:.2f}",
-                width=120,
+                width=150,
                 text_align=ft.TextAlign.RIGHT,
                 keyboard_type=ft.KeyboardType.NUMBER,
                 content_padding=10,
                 height=40,
                 text_size=14,
+                **self.input_style
             )
             self.balance_inputs[w_id] = tf
+            
+            # Simple branding colors/icons for wallets
+            w_colors = {
+                "vodafone_cash": ft.Colors.RED_ACCENT,
+                "orange_cash": ft.Colors.ORANGE_ACCENT,
+                "etisalat_cash": ft.Colors.GREEN_ACCENT,
+                "we_pay": ft.Colors.PURPLE_ACCENT,
+                "instapay": ft.Colors.PINK_ACCENT,
+                "bank": ft.Colors.CYAN_ACCENT,
+            }
+            w_color = w_colors.get(w_id, ft.Colors.BLUE_ACCENT)
             
             controls.append(
                 ft.Row(
                     controls=[
-                        ft.Text(w_name, weight=ft.FontWeight.W_500, expand=True, size=15),
-                        tf,
-                        ft.Text(" EGP", size=14, color=ft.Colors.WHITE70),
-                        ft.IconButton(
-                            icon=ft.Icons.SAVE_ROUNDED,
-                            icon_color=ft.Colors.BLUE_400,
-                            tooltip="تحديث الرصيد / Update Balance",
-                            on_click=lambda e, wallet=w_id: self.update_wallet_balance(wallet)
+                        ft.Row(
+                            controls=[
+                                ft.Container(
+                                    width=8,
+                                    height=8,
+                                    bgcolor=w_color,
+                                    shape=ft.BoxShape.CIRCLE,
+                                ),
+                                ft.Text(w_name, weight=ft.FontWeight.W_500, size=14, color=ft.Colors.WHITE),
+                            ],
+                            spacing=8
+                        ),
+                        ft.Row(
+                            controls=[
+                                tf,
+                                ft.Text(" EGP", size=12, color=ft.Colors.WHITE54),
+                                ft.IconButton(
+                                    icon=ft.Icons.SAVE_ROUNDED,
+                                    icon_color=ft.Colors.BLUE_400,
+                                    tooltip="تحديث الرصيد / Update Balance",
+                                    on_click=lambda e, wallet=w_id: self.update_wallet_balance(wallet)
+                                )
+                            ],
+                            spacing=5,
+                            alignment=ft.MainAxisAlignment.END
                         )
                     ],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -276,12 +383,24 @@ class SettingsView(ft.Container):
             )
             
         return ft.Container(
-            content=ft.Column(controls=controls, spacing=10),
-            border=ft.Border.all(1, ft.Colors.WHITE10),
-            border_radius=10,
-            padding=15,
-            bgcolor=ft.Colors.BLACK12,
-            margin=ft.Margin(0, 10, 0, 20)
+            content=ft.Column(
+                controls=[
+                    ft.Text("تعديل أرصدة الحسابات والمحافظ (Wallet & Account Balances)", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_200),
+                    ft.Text("يمكنك إدخال الرصيد الحالي الفعلي لأي محفظة أو حساب (مثال: انستا باي)، وسيقوم التطبيق بحساب الرصيد تلقائياً بناءً على المعاملات اللاحقة.", color=ft.Colors.WHITE54, size=13),
+                    ft.Container(height=5),
+                    ft.Column(controls=controls, spacing=12),
+                ],
+                spacing=10
+            ),
+            gradient=ft.LinearGradient(
+                colors=["#1E293B", "#0F172A"],
+                begin=ft.alignment.Alignment.TOP_LEFT,
+                end=ft.alignment.Alignment.BOTTOM_RIGHT
+            ),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.BLUE_ACCENT)),
+            border_radius=16,
+            padding=20,
+            margin=ft.Margin(0, 0, 0, 15)
         )
 
     def update_wallet_balance(self, wallet_id):
@@ -331,13 +450,207 @@ class SettingsView(ft.Container):
         self.flet_page.snack_bar.open = True
         self.flet_page.update()
 
+    def build_fees_section(self):
+        self.fee_deposit_inputs = {}
+        self.fee_withdraw_inputs = {}
+        self.fee_withdraw_min_inputs = {}
+        
+        controls = []
+        for w_id, w_name in self.wallet_names.items():
+            # Get current values from DB (defaults are 0.0)
+            dep_fee = self.db.get_setting(f"fee_deposit_{w_id}", "0.0") if self.db else "0.0"
+            wth_fee = self.db.get_setting(f"fee_withdraw_{w_id}", "0.0") if self.db else "0.0"
+            wth_min = self.db.get_setting(f"fee_withdraw_min_{w_id}", "0.0") if self.db else "0.0"
+            
+            tf_dep = ft.TextField(
+                value=dep_fee,
+                label="الإيداع % (Dep %)",
+                width=120,
+                text_align=ft.TextAlign.RIGHT,
+                keyboard_type=ft.KeyboardType.NUMBER,
+                content_padding=10,
+                height=45,
+                text_size=13,
+                **self.input_style
+            )
+            tf_wth = ft.TextField(
+                value=wth_fee,
+                label="السحب % (Wth %)",
+                width=120,
+                text_align=ft.TextAlign.RIGHT,
+                keyboard_type=ft.KeyboardType.NUMBER,
+                content_padding=10,
+                height=45,
+                text_size=13,
+                **self.input_style
+            )
+            tf_min = ft.TextField(
+                value=wth_min,
+                label="الأدنى ج.م (Min EGP)",
+                width=120,
+                text_align=ft.TextAlign.RIGHT,
+                keyboard_type=ft.KeyboardType.NUMBER,
+                content_padding=10,
+                height=45,
+                text_size=13,
+                **self.input_style
+            )
+            
+            self.fee_deposit_inputs[w_id] = tf_dep
+            self.fee_withdraw_inputs[w_id] = tf_wth
+            self.fee_withdraw_min_inputs[w_id] = tf_min
+            
+            w_colors = {
+                "vodafone_cash": ft.Colors.RED_ACCENT,
+                "orange_cash": ft.Colors.ORANGE_ACCENT,
+                "etisalat_cash": ft.Colors.GREEN_ACCENT,
+                "we_pay": ft.Colors.PURPLE_ACCENT,
+                "instapay": ft.Colors.PINK_ACCENT,
+                "bank": ft.Colors.CYAN_ACCENT,
+            }
+            w_color = w_colors.get(w_id, ft.Colors.BLUE_ACCENT)
+
+            controls.append(
+                ft.Container(
+                    content=ft.Column(
+                        controls=[
+                            ft.Row(
+                                controls=[
+                                    ft.Row(
+                                        controls=[
+                                            ft.Container(
+                                                width=8,
+                                                height=8,
+                                                bgcolor=w_color,
+                                                shape=ft.BoxShape.CIRCLE,
+                                            ),
+                                            ft.Text(w_name, weight=ft.FontWeight.BOLD, size=14, color=ft.Colors.WHITE),
+                                        ],
+                                        spacing=8
+                                    ),
+                                    ft.IconButton(
+                                        icon=ft.Icons.SAVE_ROUNDED,
+                                        icon_color=ft.Colors.BLUE_400,
+                                        tooltip="حفظ الرسوم / Save Fees",
+                                        on_click=lambda e, wallet=w_id: self.update_wallet_fees(wallet)
+                                    )
+                                ],
+                                alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                            ),
+                            ft.Row(
+                                controls=[
+                                    tf_dep,
+                                    tf_wth,
+                                    tf_min,
+                                ],
+                                spacing=15,
+                                alignment=ft.MainAxisAlignment.START
+                            )
+                        ],
+                        spacing=5
+                    ),
+                    padding=ft.Padding(0, 0, 0, 10),
+                    border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.WHITE10))
+                )
+            )
+            
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text("تحديد أرباح/رسوم السحب والإيداع للمحافظ (Wallet Profit/Fee Settings)", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_200),
+                    ft.Text("حدد نسبة الرسوم (الأرباح التي ستحصل عليها) للإيداع والسحب والحد الأدنى لرسوم السحب لكل محفظة ليتم احتسابها ديناميكياً وعرضها كأرباح لك في التطبيق.", color=ft.Colors.WHITE54, size=13),
+                    ft.Container(height=5),
+                    ft.Column(controls=controls, spacing=10),
+                ],
+                spacing=10
+            ),
+            gradient=ft.LinearGradient(
+                colors=["#1E293B", "#0F172A"],
+                begin=ft.alignment.Alignment.TOP_LEFT,
+                end=ft.alignment.Alignment.BOTTOM_RIGHT
+            ),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.BLUE_ACCENT)),
+            border_radius=16,
+            padding=20,
+            margin=ft.Margin(0, 0, 0, 15)
+        )
+
+    def update_wallet_fees(self, wallet_id):
+        tf_dep = self.fee_deposit_inputs.get(wallet_id)
+        tf_wth = self.fee_withdraw_inputs.get(wallet_id)
+        tf_min = self.fee_withdraw_min_inputs.get(wallet_id)
+        
+        if not tf_dep or not tf_wth or not tf_min or not self.db:
+            return
+            
+        dep_str = tf_dep.value.strip()
+        wth_str = tf_wth.value.strip()
+        min_str = tf_min.value.strip()
+        
+        try:
+            dep_val = float(dep_str)
+            wth_val = float(wth_str)
+            min_val = float(min_str)
+            if dep_val < 0 or wth_val < 0 or min_val < 0:
+                raise ValueError("Values must be positive")
+        except ValueError:
+            self.flet_page.snack_bar = ft.SnackBar(
+                content=ft.Text("الرجاء إدخال أرقام موجبة صحيحة!", size=16, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.Colors.RED_700,
+            )
+            self.flet_page.snack_bar.open = True
+            self.flet_page.update()
+            return
+            
+        # Save settings to DB
+        s1 = self.db.set_setting(f"fee_deposit_{wallet_id}", f"{dep_val:.2f}")
+        s2 = self.db.set_setting(f"fee_withdraw_{wallet_id}", f"{wth_val:.2f}")
+        s3 = self.db.set_setting(f"fee_withdraw_min_{wallet_id}", f"{min_val:.2f}")
+        
+        if s1 and s2 and s3:
+            msg = f"تم تحديث رسوم محفظة {self.wallet_names[wallet_id]} بنجاح!"
+            bg = ft.Colors.GREEN_700
+            
+            # Notify views to refresh
+            if self.on_clear_success:
+                try:
+                    self.on_clear_success()
+                except Exception as ex:
+                    print(f"Error calling on_clear_success callback: {ex}")
+        else:
+            msg = "حدث خطأ أثناء حفظ الإعدادات."
+            bg = ft.Colors.RED_700
+            
+        self.flet_page.snack_bar = ft.SnackBar(
+            content=ft.Text(msg, size=16, weight=ft.FontWeight.BOLD),
+            bgcolor=bg,
+        )
+        self.flet_page.snack_bar.open = True
+        self.flet_page.update()
+
     def update_data(self):
-        """تحديث قيم الأرصدة المعروضة من قاعدة البيانات"""
+        """تحديث قيم الأرصدة والرسوم المعروضة من قاعدة البيانات"""
         if not self.db:
             return
+        # 1. Balances
         kpi = self.db.get_kpi_summary()
         wallet_balances = kpi.get("wallet_balances", {})
         for w_id, tf in self.balance_inputs.items():
             current_bal = wallet_balances.get(w_id, 0.0)
             tf.value = f"{current_bal:.2f}"
+            
+        # 2. Fees
+        if hasattr(self, 'fee_deposit_inputs'):
+            for w_id in self.wallet_names.keys():
+                dep_fee = self.db.get_setting(f"fee_deposit_{w_id}", "0.0")
+                wth_fee = self.db.get_setting(f"fee_withdraw_{w_id}", "0.0")
+                wth_min = self.db.get_setting(f"fee_withdraw_min_{w_id}", "0.0")
+                
+                if w_id in self.fee_deposit_inputs:
+                    self.fee_deposit_inputs[w_id].value = dep_fee
+                if w_id in self.fee_withdraw_inputs:
+                    self.fee_withdraw_inputs[w_id].value = wth_fee
+                if w_id in self.fee_withdraw_min_inputs:
+                    self.fee_withdraw_min_inputs[w_id].value = wth_min
+
         self.flet_page.update()

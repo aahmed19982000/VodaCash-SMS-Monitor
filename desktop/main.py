@@ -155,7 +155,7 @@ class MainApplication:
         })))
 
         # إرسال آخر 5 عمليات للعميل الجديد
-        recent_txs = self.db.get_all_transactions()[:5]
+        recent_txs = self.db.get_all_transactions(limit=5)
         for tx in reversed(recent_txs):
             asyncio.create_task(self.server._broadcast(make_new_transaction(tx)))
 

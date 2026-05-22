@@ -165,5 +165,36 @@ PATTERNS = [
             re.IGNORECASE | re.DOTALL
         ),
         "groups": {"balance": 1, "date": 2, "time": 3, "trx_id": 4}
-    }
+    },
+
+    # 8. سحب ATM من محفظة (Wallet ATM Withdrawal) - عربي
+    # تم سحب 200.00 جنية من محفظة فودافون كاش. رصيد حسابك الحالي 186.53 جنيه. تاريخ العملية 17:28 25-11-27 رقم العملية; 015747083812.
+    # تم سحب مبلغ 200.00 جنيه من محفظة فودافون كاش؛ رصيد حسابك الحالي 0.98 جنيه. تاريخ العملية ‎23-07-25 22:26؛ رقم العملية 012918985998.
+    {
+        "id": "atm_withdrawal_wallet",
+        "type": TransactionType.ATM_WITHDRAWAL,
+        "regex": re.compile(
+            r"تم سحب\s+(?:مبلغ\s+)?" + AMOUNT + r"\s*جني[هة]\s+من محفظة" +
+            r".*(?:رصيد حسابك الحالي|رصيدك الحالي)\s+" + AMOUNT +
+            r".*(?:تاريخ العملية|تاريخ العملية\s+‎?)\s*" + r"(?:" + TIME + r"\s+" + DATE + r"|" + DATE + r"\s+" + TIME + r")" +
+            r".*(?:رقم العملية[;؛]?\s*)" + TRX_ID,
+            re.IGNORECASE | re.DOTALL
+        ),
+        "groups": {"amount": 1, "balance": 2, "time_a": 3, "date_a": 4, "date_b": 5, "time_b": 6, "trx_id": 7}
+    },
+
+    # 9. سحب ATM بطاقة بنكية / انستاباي (Bank/Instapay Card ATM Withdrawal)
+    # تم خصم 4200.00EGP من بطاقة الخصم المباشر رقم 1950 عند NBE ATM031 يوم 06/08 الساعه 18:33 المتاح 10413.45 للمزيد إتصل ب 19623
+    {
+        "id": "atm_withdrawal_bank",
+        "type": TransactionType.ATM_WITHDRAWAL,
+        "regex": re.compile(
+            r"تم خصم\s+" + AMOUNT + r"EGP\s+من بطاقة.*?(?:ATM|صراف)" +
+            r".*?(?:يوم|تاريخ)\s+(?P<date_slash>\d{2}/\d{2})\s+(?:الساعه?|الساعة)?\s*" + TIME +
+            r".*?(?:المتاح|الرصيد|المتاح:?)\s+" + AMOUNT,
+            re.IGNORECASE | re.DOTALL
+        ),
+        "groups": {"amount": 1, "date_slash": "date_slash", "time": 3, "balance": 4}
+    },
 ]
+

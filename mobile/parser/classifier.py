@@ -63,6 +63,14 @@ class SMSClassifier:
         """
         text_lower = text.lower()
         
+        # 0. ATM Withdrawal - يجب أن يكون قبل SENT لمنع التصنيف الخاطئ
+        # رسائل سحب ATM من محفظة فودافون كاش
+        if "تم سحب" in text_lower and "من محفظة" in text_lower:
+            return TransactionType.ATM_WITHDRAWAL
+        # رسائل سحب ATM ببطاقة من بنك/انستاباي
+        if "من بطاقة" in text_lower and ("atm" in text_lower or "صراف" in text_lower):
+            return TransactionType.ATM_WITHDRAWAL
+
         # 1. استلام (Received)
         if any(kw in text_lower for kw in [
             "تم استلام مبلغ", "received egp", "received from", "تم استلام عملية تحويل", 

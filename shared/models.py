@@ -8,13 +8,15 @@ import uuid
 
 # ── نوع العملية ───────────────────────────────────────────────────────────
 class TransactionType(Enum):
-    RECEIVED = "RECEIVED"   # استلام تحويل
-    SENT     = "SENT"       # إرسال تحويل
-    BILL     = "BILL"       # دفع فاتورة
-    PURCHASE = "PURCHASE"   # شراء من محل
-    TOPUP    = "TOPUP"      # شحن رصيد
-    BALANCE  = "BALANCE"    # استعلام رصيد
-    UNKNOWN  = "UNKNOWN"    # غير مصنف
+    RECEIVED       = "RECEIVED"        # استلام تحويل
+    SENT           = "SENT"            # إرسال تحويل
+    BILL           = "BILL"            # دفع فاتورة
+    PURCHASE       = "PURCHASE"        # شراء من محل
+    TOPUP          = "TOPUP"           # شحن رصيد
+    BALANCE        = "BALANCE"         # استعلام رصيد
+    ATM_WITHDRAWAL = "ATM_WITHDRAWAL"  # سحب نقدي من ATM / فرع
+    ATM_DEPOSIT    = "ATM_DEPOSIT"     # إيداع نقدي في ATM / فرع
+    UNKNOWN        = "UNKNOWN"         # غير مصنف
 
 
 # ── بيانات العملية الواحدة ────────────────────────────────────────────────

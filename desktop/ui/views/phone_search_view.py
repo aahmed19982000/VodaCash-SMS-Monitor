@@ -7,43 +7,50 @@ WALLET_STYLING = {
     "vodafone_cash": {
         "name": "Vodafone Cash",
         "name_ar": "فودافون كاش",
-        "colors": ["#E60000", "#990000"],
+        "colors": ["#450A0A", "#0B0F19"],
+        "accent_color": "#EF4444",
         "icon": ft.Icons.PHONE_ANDROID,
     },
     "orange_cash": {
         "name": "Orange Cash",
         "name_ar": "أورنج كاش",
-        "colors": ["#FF6600", "#CC5200"],
+        "colors": ["#431407", "#0B0F19"],
+        "accent_color": "#F97316",
         "icon": ft.Icons.MONEY_ROUNDED,
     },
     "etisalat_cash": {
         "name": "Etisalat Cash",
         "name_ar": "اتصالات كاش",
-        "colors": ["#78BE20", "#5A8F18"],
+        "colors": ["#14532D", "#0B0F19"],
+        "accent_color": "#22C55E",
         "icon": ft.Icons.PHONELINK_RING,
     },
     "we_pay": {
         "name": "WE Pay",
         "name_ar": "وي باي",
-        "colors": ["#512D6D", "#351C49"],
+        "colors": ["#3B0764", "#0B0F19"],
+        "accent_color": "#A855F7",
         "icon": ft.Icons.PAYMENT,
     },
     "instapay": {
         "name": "InstaPay",
         "name_ar": "انستاباي",
-        "colors": ["#EC008C", "#00ADEF"],
+        "colors": ["#1E1B4B", "#311042"],
+        "accent_color": "#EC008C",
         "icon": ft.Icons.SWIPE_RIGHT_OUTLINED,
     },
     "bank": {
         "name": "Bank Account",
         "name_ar": "حساب بنكي",
-        "colors": ["#005A70", "#003A48"],
+        "colors": ["#115E59", "#0B0F19"],
+        "accent_color": "#06B6D4",
         "icon": ft.Icons.ACCOUNT_BALANCE,
     },
     "unspecified": {
         "name": "Unspecified",
         "name_ar": "غير محدد",
-        "colors": ["#4E6E5D", "#2E4E3D"],
+        "colors": ["#1E293B", "#0F172A"],
+        "accent_color": "#64748B",
         "icon": ft.Icons.HELP_OUTLINE,
     }
 }
@@ -68,15 +75,16 @@ class PhoneSearchView(ft.Container):
 
         # Search Control
         self.search_field = ft.TextField(
-            label="ابحث برقم الهاتف أو الاسم / Search by Phone or Name",
-            hint_text="أدخل رقم الهاتف أو الاسم للبحث الفوري...",
-            prefix_icon=ft.Icons.PHONE_ANDROID_ROUNDED,
+            label="Search by Phone or Name / ابحث برقم الهاتف أو الاسم",
+            hint_text="Type phone number or contact name...",
+            prefix_icon=ft.Icons.PERSON_SEARCH_ROUNDED,
             width=450,
             border_radius=12,
             on_change=self.on_search_change,
             on_submit=self.on_search_change,
             text_align=ft.TextAlign.LEFT,
             filled=True,
+            bgcolor="#0B0F19",
             border_color=ft.Colors.WHITE24,
             focused_border_color=ft.Colors.BLUE_ACCENT,
         )
@@ -96,10 +104,10 @@ class PhoneSearchView(ft.Container):
 
         self.kpi_row = ft.Row(
             controls=[
-                self._build_kpi_card("إجمالي العمليات / Total TXs", self.total_txs_text, ft.Icons.SYNC_ALT_ROUNDED, ft.Colors.BLUE_GREY_900, ft.Colors.BLUE_400),
-                self._build_kpi_card("إجمالي المستلم / Received", self.received_text, ft.Icons.ARROW_DOWNWARD_ROUNDED, ft.Colors.GREEN_900, ft.Colors.GREEN_400),
-                self._build_kpi_card("إجمالي المرسل / Sent", self.sent_text, ft.Icons.ARROW_UPWARD_ROUNDED, ft.Colors.RED_900, ft.Colors.RED_400),
-                self._build_kpi_card("صافي التدفق / Net Flow", self.net_flow_text, ft.Icons.MONEY_ROUNDED, ft.Colors.BLACK38, ft.Colors.AMBER_400),
+                self._build_kpi_card("إجمالي العمليات / Total TXs", self.total_txs_text, ft.Icons.SYNC_ALT_ROUNDED, ["#06152B", "#020714"], ft.Colors.BLUE_400),
+                self._build_kpi_card("إجمالي المستلم / Received", self.received_text, ft.Icons.ARROW_DOWNWARD_ROUNDED, ["#081C15", "#040E0B"], ft.Colors.GREEN_400),
+                self._build_kpi_card("إجمالي المرسل / Sent", self.sent_text, ft.Icons.ARROW_UPWARD_ROUNDED, ["#1F080C", "#0E0305"], ft.Colors.RED_400),
+                self._build_kpi_card("صافي التدفق / Net Flow", self.net_flow_text, ft.Icons.MONEY_ROUNDED, ["#1C160C", "#0B0A07"], ft.Colors.AMBER_400),
             ],
             alignment=ft.MainAxisAlignment.START,
             spacing=15,
@@ -109,17 +117,18 @@ class PhoneSearchView(ft.Container):
         # DataTable
         self.data_table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Date & Time")),
-                ft.DataColumn(ft.Text("Type")),
-                ft.DataColumn(ft.Text("Wallet")),
-                ft.DataColumn(ft.Text("Amount (EGP)", text_align=ft.TextAlign.RIGHT)),
-                ft.DataColumn(ft.Text("Balance (EGP)", text_align=ft.TextAlign.RIGHT)),
-                ft.DataColumn(ft.Text("Counterpart")),
-                ft.DataColumn(ft.Text("SMS Content", text_align=ft.TextAlign.CENTER)),
+                ft.DataColumn(ft.Text("Date & Time / التاريخ والوقت", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT)),
+                ft.DataColumn(ft.Text("Type / النوع", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT)),
+                ft.DataColumn(ft.Text("Wallet / المحفظة", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT)),
+                ft.DataColumn(ft.Text("Amount / المبلغ", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT)),
+                ft.DataColumn(ft.Text("Profit / الأرباح", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT)),
+                ft.DataColumn(ft.Text("Balance / الرصيد", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT)),
+                ft.DataColumn(ft.Text("Counterpart / الطرف الآخر", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT)),
+                ft.DataColumn(ft.Text("SMS / تفاصيل", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT)),
             ],
             rows=[],
             expand=True,
-            heading_row_color=ft.Colors.BLACK26,
+            heading_row_color="#0B0F19",
             vertical_lines=ft.BorderSide(1, ft.Colors.WHITE10),
             horizontal_lines=ft.BorderSide(1, ft.Colors.WHITE10),
         )
@@ -129,8 +138,10 @@ class PhoneSearchView(ft.Container):
         self.table_container = ft.Container(
             content=self.table_scroll_container,
             expand=True,
-            border=ft.Border.all(1, ft.Colors.WHITE24),
-            border_radius=10,
+            border=ft.Border.all(1, ft.Colors.WHITE10),
+            border_radius=15,
+            bgcolor=ft.Colors.BLACK26,
+            padding=10,
             visible=False
         )
 
@@ -200,31 +211,68 @@ class PhoneSearchView(ft.Container):
             expand=True
         )
 
-    def _build_kpi_card(self, title: str, text_control: ft.Text, icon: str, bg_color: str, accent_color: str):
+    def _build_kpi_card(self, title: str, text_control: ft.Text, icon: str, gradient_colors: list, accent_color: str):
+        title_parts = title.split(" / ")
+        title_en = title_parts[1] if len(title_parts) > 1 else title
+        title_ar = title_parts[0] if len(title_parts) > 0 else ""
+
         return ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Row([ft.Icon(icon, color=accent_color, size=18), ft.Text(title, color=ft.Colors.WHITE54, size=12)], alignment=ft.MainAxisAlignment.CENTER),
-                    ft.Divider(height=8, color=ft.Colors.WHITE10),
-                    text_control
+                    ft.Row(
+                        controls=[
+                            ft.Container(
+                                content=ft.Icon(icon, color=accent_color, size=18),
+                                bgcolor=ft.Colors.with_opacity(0.12, accent_color),
+                                padding=6,
+                                border_radius=15,
+                                border=ft.Border.all(1, ft.Colors.with_opacity(0.2, accent_color)),
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Text(title_en, color=ft.Colors.WHITE, size=12, weight=ft.FontWeight.W_600, overflow=ft.TextOverflow.ELLIPSIS),
+                                    ft.Text(title_ar, color=ft.Colors.WHITE60, size=10, overflow=ft.TextOverflow.ELLIPSIS),
+                                ],
+                                spacing=1,
+                                horizontal_alignment=ft.CrossAxisAlignment.START,
+                                expand=True
+                            )
+                        ],
+                        alignment=ft.MainAxisAlignment.START,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER
+                    ),
+                    ft.Divider(height=10, color=ft.Colors.WHITE10),
+                    ft.Container(
+                        content=text_control,
+                        alignment=ft.alignment.Alignment.CENTER,
+                        expand=True
+                    )
                 ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                alignment=ft.MainAxisAlignment.CENTER
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN
             ),
             width=220,
-            height=100,
-            bgcolor=bg_color,
-            border_radius=12,
-            padding=10,
-            border=ft.Border.all(1, ft.Colors.with_opacity(0.1, accent_color)),
-            shadow=ft.BoxShadow(spread_radius=1, blur_radius=6, color=ft.Colors.BLACK38),
+            height=110,
+            gradient=ft.LinearGradient(
+                colors=gradient_colors,
+                begin=ft.alignment.Alignment.TOP_LEFT,
+                end=ft.alignment.Alignment.BOTTOM_RIGHT
+            ),
+            border_radius=16,
+            padding=12,
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.18, accent_color)),
+            shadow=ft.BoxShadow(spread_radius=0, blur_radius=12, color=ft.Colors.with_opacity(0.15, ft.Colors.BLACK)),
             scale=1.0,
-            animate_scale=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
+            animate_scale=ft.Animation(250, ft.AnimationCurve.EASE_OUT_BACK),
             on_hover=self._handle_card_hover
         )
 
     def _handle_card_hover(self, e):
-        e.control.scale = 1.03 if e.data == "true" else 1.0
+        e.control.scale = 1.04 if e.data == "true" else 1.0
+        accent_color = e.control.border.top.color
+        if e.data == "true":
+            e.control.shadow = ft.BoxShadow(spread_radius=1, blur_radius=16, color=ft.Colors.with_opacity(0.15, accent_color))
+        else:
+            e.control.shadow = ft.BoxShadow(spread_radius=0, blur_radius=12, color=ft.Colors.with_opacity(0.15, ft.Colors.BLACK))
         e.control.update()
 
     def on_search_change(self, e):
@@ -240,38 +288,38 @@ class PhoneSearchView(ft.Container):
             self.flet_page.update()
 
         dialog = ft.AlertDialog(
-            title=ft.Text("تفاصيل الرسالة النصية / SMS Details"),
+            title=ft.Text("تفاصيل الرسالة النصية / SMS Details", weight=ft.FontWeight.BOLD),
             content=ft.Container(
                 content=ft.Column(
                     controls=[
-                        ft.Text("نص الرسالة الأصلي (Raw SMS):", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400),
+                        ft.Text("نص الرسالة الأصلي (Raw SMS):", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT, size=13),
                         ft.Container(
-                            content=ft.Text(tx.raw_sms, size=14, selectable=True),
+                            content=ft.Text(tx.raw_sms, size=13, selectable=True, color=ft.Colors.WHITE),
                             padding=15,
-                            bgcolor=ft.Colors.BLACK12,
-                            border_radius=8,
+                            bgcolor="#0B0F19",
+                            border_radius=10,
                             border=ft.Border.all(1, ft.Colors.WHITE10),
                             width=500,
                         ),
-                        ft.Divider(height=15),
+                        ft.Divider(height=15, color=ft.Colors.WHITE10),
                         ft.Row(
                             controls=[
-                                ft.Text("رقم المعاملة (TX ID):", weight=ft.FontWeight.BOLD, size=12),
-                                ft.Text(tx.transaction_id, size=12, selectable=True),
+                                ft.Text("رقم المعاملة (TX ID):", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.WHITE70),
+                                ft.Text(tx.transaction_id, size=12, selectable=True, weight=ft.FontWeight.W_500),
                             ],
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                         ),
                         ft.Row(
                             controls=[
-                                ft.Text("توقيت الاستلام:", weight=ft.FontWeight.BOLD, size=12),
-                                ft.Text(tx.sms_timestamp.strftime('%Y-%m-%d %H:%M:%S'), size=12),
+                                ft.Text("توقيت الاستلام:", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.WHITE70),
+                                ft.Text(tx.sms_timestamp.strftime('%Y-%m-%d %H:%M:%S'), size=12, weight=ft.FontWeight.W_500),
                             ],
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                         ),
                         ft.Row(
                             controls=[
-                                ft.Text("نسبة التأكيد (Confidence):", weight=ft.FontWeight.BOLD, size=12),
-                                ft.Text(f"{tx.confidence:.0%}", size=12, color=ft.Colors.GREEN_400 if tx.confidence >= 0.8 else ft.Colors.AMBER_400),
+                                ft.Text("نسبة التأكيد (Confidence):", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.WHITE70),
+                                ft.Text(f"{tx.confidence:.0%}", size=12, color=ft.Colors.GREEN_400 if tx.confidence >= 0.8 else ft.Colors.AMBER_400, weight=ft.FontWeight.BOLD),
                             ],
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                         ),
@@ -282,9 +330,10 @@ class PhoneSearchView(ft.Container):
                 width=500
             ),
             actions=[
-                ft.TextButton("إغلاق / Close", on_click=close_dialog)
+                ft.TextButton("إغلاق / Close", on_click=close_dialog, style=ft.ButtonStyle(color=ft.Colors.BLUE_ACCENT))
             ],
             actions_alignment=ft.MainAxisAlignment.END,
+            bgcolor="#080C14",
         )
         self.flet_page.dialog = dialog
         dialog.open = True
@@ -302,7 +351,7 @@ class PhoneSearchView(ft.Container):
             return
 
         try:
-            txs = self.db.get_transactions_by_counterpart(query)
+            txs = self.db.get_transactions_by_counterpart(query, limit=101)
         except Exception as ex:
             print(f"Error searching transactions: {ex}")
             txs = []
@@ -316,10 +365,10 @@ class PhoneSearchView(ft.Container):
             self.flet_page.update()
             return
 
-        # Slice results to 100 for high performance
+        # Check if more than 100 results exist
         total_found = len(txs)
         if total_found > 100:
-            self.status_label.value = f"تم العثور على {total_found} معاملة (يعرض آخر 100) / Found {total_found} txs (showing latest 100)"
+            self.status_label.value = "تم العثور على أكثر من 100 معاملة (يعرض آخر 100) / Found more than 100 txs (showing latest 100)"
             txs = txs[:100]
         else:
             self.status_label.value = f"تم العثور على {total_found} معاملة / Found {total_found} txs"
@@ -355,27 +404,30 @@ class PhoneSearchView(ft.Container):
 
         # Update table rows
         self.data_table.rows.clear()
-        for tx in txs:
+        
+        for idx, tx in enumerate(txs):
             amount_color = ft.Colors.GREEN_400 if tx.type.value == "RECEIVED" else ft.Colors.RED_400
             
-            # Wallet badge
+            # Wallet badge - gradient styled
             w_info = WALLET_STYLING.get(tx.wallet_id, WALLET_STYLING["unspecified"])
             w_colors = w_info["colors"]
             wallet_cell = ft.DataCell(
                 ft.Container(
-                    content=ft.Text(w_info["name"], size=11, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+                    content=ft.Text(w_info["name"], size=10, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
                     gradient=ft.LinearGradient(colors=w_colors),
-                    padding=ft.Padding(left=8, top=4, right=8, bottom=4),
-                    border_radius=5,
+                    padding=ft.Padding(left=10, top=5, right=10, bottom=5),
+                    border_radius=12,
+                    border=ft.Border.all(1, ft.Colors.with_opacity(0.2, w_info.get("accent_color", "#64748B")))
                 )
             )
 
-            # Action cell with View SMS button
+            # Action cell with View SMS button styled nicely
             action_cell = ft.DataCell(
                 ft.Container(
                     content=ft.IconButton(
                         icon=ft.Icons.FEED_OUTLINED,
-                        icon_color=ft.Colors.BLUE_400,
+                        icon_color=ft.Colors.BLUE_ACCENT,
+                        icon_size=18,
                         tooltip="عرض تفاصيل الرسالة",
                         on_click=lambda e, t=tx: self.show_sms_dialog(t)
                     ),
@@ -383,15 +435,24 @@ class PhoneSearchView(ft.Container):
                 )
             )
 
+            fee = self.db.calculate_fee(tx)
+            fee_color = ft.Colors.AMBER_400 if fee > 0 else ft.Colors.WHITE38
+            fee_text = f"+{fee:,.2f}" if fee > 0 else "-"
+
+            # Alternate row background color
+            row_color = ft.Colors.with_opacity(0.04, ft.Colors.WHITE) if idx % 2 != 0 else ft.Colors.TRANSPARENT
+
             self.data_table.rows.append(
                 ft.DataRow(
+                    color=row_color,
                     cells=[
-                        ft.DataCell(ft.Text(tx.sms_timestamp.strftime('%Y-%m-%d %H:%M'))),
-                        ft.DataCell(ft.Text(tx.type.value, weight=ft.FontWeight.BOLD)),
+                        ft.DataCell(ft.Text(tx.sms_timestamp.strftime('%Y-%m-%d %H:%M'), color=ft.Colors.WHITE70)),
+                        ft.DataCell(ft.Text(tx.type.value, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE)),
                         wallet_cell,
-                        ft.DataCell(ft.Text(f"{tx.amount:,.2f}", color=amount_color, text_align=ft.TextAlign.RIGHT)),
-                        ft.DataCell(ft.Text(f"{tx.balance_after:,.2f}" if tx.balance_after >= 0 else "N/A", text_align=ft.TextAlign.RIGHT)),
-                        ft.DataCell(ft.Text(tx.counterpart)),
+                        ft.DataCell(ft.Text(f"{tx.amount:,.2f} EGP", color=amount_color, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.RIGHT)),
+                        ft.DataCell(ft.Text(fee_text, color=fee_color, weight=ft.FontWeight.BOLD if fee > 0 else ft.FontWeight.NORMAL, text_align=ft.TextAlign.RIGHT)),
+                        ft.DataCell(ft.Text(f"{tx.balance_after:,.2f} EGP" if tx.balance_after >= 0 else "N/A", color=ft.Colors.WHITE70, weight=ft.FontWeight.W_500, text_align=ft.TextAlign.RIGHT)),
+                        ft.DataCell(ft.Text(tx.counterpart or "—", color=ft.Colors.WHITE70)),
                         action_cell,
                     ]
                 )

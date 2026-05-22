@@ -259,6 +259,54 @@ class SMSEngine:
                 date_str = match.group(groups["date_long"])
                 time_str = match.group(groups["time_long"])
                 sms_timestamp = datetime.strptime(f"{date_str} {time_str}", "%B %d, %Y %I:%M:%S %p")
+            elif "date_slash" in groups and "time" in groups:
+                # تنسيق DD/MM من رسائل ATM البنكية: مثل 06/08 نفترض MM/DD مع السنة الحالية
+                date_slash_str = match.group(groups["date_slash"])
+                time_str = match.group(groups["time"])
+                current_year = datetime.now().year
+                parts = date_slash_str.split("/")
+                month_c, day_c = int(parts[0]), int(parts[1])
+                # إذا كان الرقم الأول أكبر من 12، فهو اليوم
+                if month_c > 12:
+                    day_c, month_c = month_c, day_c
+                try:
+                    sms_timestamp = datetime(current_year, month_c, day_c,
+                                            int(time_str[:2]), int(time_str[3:5]))
+                except Exception:
+                    pass
+            elif "time_a" in groups or "date_a" in groups:
+                # نمط ATM للمحفظة: التاريخ والوقت قد يكونان بترتيبين مختلفين
+                # time_a/date_a = TIME DATE (وقت ثم تاريخ)
+                # date_b/time_b = DATE TIME (تاريخ ثم وقت)
+                def _parse_date_time(date_str, time_str):
+                    """محاولة تحليل تاريخ YY-MM-DD أو DD-MM-YY مع وقت HH:MM"""
+                    if not date_str or not time_str:
+                        return None
+                    parts = date_str.split('-')
+                    t = time_str[:5]
+                    try:
+                        if len(parts) == 3:
+                            if len(parts[0]) == 2 and int(parts[0]) > 31:
+                                # YY-MM-DD
+                                return datetime.strptime(f"20{date_str} {t}", "%Y-%m-%d %H:%M")
+                            else:
+                                # DD-MM-YY or YY-MM-DD (2-digit year format)
+                                return datetime.strptime(f"{date_str} {t}", "%d-%m-%y %H:%M")
+                    except Exception:
+                        return None
+                
+                time_a = match.group(groups.get("time_a")) if groups.get("time_a") and match.group(groups["time_a"]) else None
+                date_a = match.group(groups.get("date_a")) if groups.get("date_a") and match.group(groups["date_a"]) else None
+                date_b = match.group(groups.get("date_b")) if groups.get("date_b") and match.group(groups["date_b"]) else None
+                time_b = match.group(groups.get("time_b")) if groups.get("time_b") and match.group(groups["time_b"]) else None
+                
+                result = None
+                if time_a and date_a:
+                    result = _parse_date_time(date_a, time_a)
+                if result is None and date_b and time_b:
+                    result = _parse_date_time(date_b, time_b)
+                if result:
+                    sms_timestamp = result
             elif "date" in groups and "time" in groups:
                 date_str = match.group(groups["date"])
                 time_str = match.group(groups["time"])
