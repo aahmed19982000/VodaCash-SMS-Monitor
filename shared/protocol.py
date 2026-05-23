@@ -20,6 +20,7 @@ class MessageType(Enum):
     RESET_ACTIVITY   = "RESET_ACTIVITY"    # ديسكتوب → موبايل (تصفير النشاط)
     FORCE_SMS_SCAN   = "FORCE_SMS_SCAN"    # ديسكتوب → موبايل (إعادة مزامنة من تاريخ التثبيت)
     WALLET_DISCOVERY = "WALLET_DISCOVERY"  # موبايل → ديسكتوب (اكتشاف المحافظ من التاريخ، بلا معاملات)
+    INITIATE_TRANSFER = "INITIATE_TRANSFER" # ديسكتوب → موبايل (طلب تحويل أموال)
 
 
 # ── بناء الرسائل (Mobile → Desktop) ──────────────────────────────────────
@@ -125,6 +126,21 @@ def make_force_sms_scan() -> str:
     return json.dumps({
         "type"    : MessageType.FORCE_SMS_SCAN.value,
         "payload" : {},
+        "sent_at" : datetime.now().isoformat(),
+    })
+
+
+def make_initiate_transfer(wallet_id: str, recipient: str, amount: float, pin: str, sim_slot: int = 0) -> str:
+    """طلب إرسال تحويل مالي"""
+    return json.dumps({
+        "type"    : MessageType.INITIATE_TRANSFER.value,
+        "payload" : {
+            "wallet_id" : wallet_id,
+            "recipient" : recipient,
+            "amount"    : amount,
+            "pin"       : pin,
+            "sim_slot"  : sim_slot,
+        },
         "sent_at" : datetime.now().isoformat(),
     })
 

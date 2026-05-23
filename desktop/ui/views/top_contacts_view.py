@@ -486,16 +486,36 @@ class TopContactsView(ft.Container):
             txs = []
 
         def close_dialog(e):
-            dialog.open = False
-            self.flet_page.update()
+            self.flet_page.close_dialog_overlay(details_overlay)
 
         def view_sms_content(tx_item):
-            # Dialog showing the raw SMS content
-            sms_dialog = ft.AlertDialog(
-                title=ft.Text("تفاصيل الرسالة النصية / SMS Details", weight=ft.FontWeight.BOLD),
+            def close_sms_dialog(e):
+                self.flet_page.close_dialog_overlay(sms_overlay)
+
+            tx_type_str = tx_item.type.value if hasattr(tx_item.type, "value") else str(tx_item.type)
+            if tx_type_str == "RECEIVED":
+                phone_label = "الرقم المحوّل منه / From"
+            elif tx_type_str == "SENT":
+                phone_label = "الرقم المحوّل إليه / To"
+            elif tx_type_str == "TOPUP":
+                phone_label = "رقم الشحن / Top-up"
+            elif tx_type_str == "BILL":
+                phone_label = "المستلم / Merchant"
+            else:
+                phone_label = "الطرف الآخر / Counterpart"
+
+            sms_overlay = ft.Container(
                 content=ft.Container(
                     content=ft.Column(
                         controls=[
+                            ft.Row(
+                                controls=[
+                                    ft.Icon(ft.Icons.SMS_OUTLINED, color=ft.Colors.BLUE_ACCENT, size=24),
+                                    ft.Text("تفاصيل الرسالة النصية / SMS Details", weight=ft.FontWeight.BOLD, size=16, color=ft.Colors.WHITE),
+                                ],
+                                spacing=10,
+                            ),
+                            ft.Divider(height=10, color=ft.Colors.WHITE10),
                             ft.Text("نص الرسالة الأصلي (Raw SMS):", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT, size=13),
                             ft.Container(
                                 content=ft.Text(tx_item.raw_sms, size=13, selectable=True, color=ft.Colors.WHITE),
@@ -503,25 +523,41 @@ class TopContactsView(ft.Container):
                                 bgcolor="#0B0F19",
                                 border_radius=10,
                                 border=ft.Border.all(1, ft.Colors.WHITE10),
-                                width=400
+                                width=450,
+                            ),
+                            ft.Row(
+                                controls=[
+                                    ft.Text(f"{phone_label}:", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.WHITE70),
+                                    ft.Text(tx_item.counterpart or "—", size=12, selectable=True, weight=ft.FontWeight.W_500),
+                                ],
+                                alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                            ),
+                            ft.Divider(height=10, color=ft.Colors.WHITE10),
+                            ft.Row(
+                                controls=[
+                                    ft.TextButton("إغلاق / Close", on_click=close_sms_dialog, style=ft.ButtonStyle(color=ft.Colors.BLUE_ACCENT))
+                                ],
+                                alignment=ft.MainAxisAlignment.END,
                             )
                         ],
-                        tight=True
+                        tight=True,
+                        spacing=10
                     ),
-                    width=400
+                    bgcolor="#080C14",
+                    border_radius=18,
+                    padding=20,
+                    width=480,
+                    border=ft.Border.all(1, ft.Colors.WHITE10),
                 ),
-                actions=[
-                    ft.TextButton("إغلاق / Close", on_click=lambda e: close_sms_dialog())
-                ]
+                alignment=ft.alignment.Alignment.CENTER,
+                bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.BLACK),
+                left=0,
+                top=0,
+                right=0,
+                bottom=0,
             )
             
-            def close_sms_dialog():
-                sms_dialog.open = False
-                self.flet_page.update()
-
-            self.flet_page.dialog = sms_dialog
-            sms_dialog.open = True
-            self.flet_page.update()
+            self.flet_page.show_dialog_overlay(sms_overlay)
 
         tx_list = ft.ListView(expand=True, spacing=10, height=350)
         
@@ -573,27 +609,37 @@ class TopContactsView(ft.Container):
                 )
             )
 
-        dialog = ft.AlertDialog(
-            title=ft.Text(f"تفاصيل العمليات: {counterpart} / Transactions", size=18, weight=ft.FontWeight.BOLD),
+        details_overlay = ft.Container(
             content=ft.Container(
                 content=ft.Column(
                     controls=[
+                        ft.Text(f"تفاصيل العمليات: {counterpart} / Transactions", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
                         ft.Text(f"إجمالي العمليات: {len(txs)} / Total Transactions", size=13, color=ft.Colors.WHITE70),
                         ft.Divider(height=10, color=ft.Colors.WHITE10),
-                        tx_list
+                        tx_list,
+                        ft.Divider(height=10, color=ft.Colors.WHITE10),
+                        ft.Row(
+                            controls=[
+                                ft.TextButton("إغلاق / Close", on_click=close_dialog, style=ft.ButtonStyle(color=ft.Colors.WHITE54))
+                            ],
+                            alignment=ft.MainAxisAlignment.END,
+                        )
                     ],
                     tight=True,
-                    width=550
+                    spacing=12,
                 ),
+                bgcolor="#0B0F19",
+                border_radius=18,
+                padding=20,
                 width=550,
-                padding=5
+                border=ft.Border.all(1, ft.Colors.WHITE10),
             ),
-            actions=[
-                ft.TextButton("إغلاق / Close", on_click=close_dialog)
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
+            alignment=ft.alignment.Alignment.CENTER,
+            bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.BLACK),
+            left=0,
+            top=0,
+            right=0,
+            bottom=0,
         )
 
-        self.flet_page.dialog = dialog
-        dialog.open = True
-        self.flet_page.update()
+        self.flet_page.show_dialog_overlay(details_overlay)

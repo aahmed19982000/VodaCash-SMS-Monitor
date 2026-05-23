@@ -45,6 +45,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String[] REQUIRED_PERMISSIONS = {
         Manifest.permission.RECEIVE_SMS,
         Manifest.permission.READ_SMS,
+        Manifest.permission.CALL_PHONE,
+        Manifest.permission.READ_PHONE_STATE,
     };
 
     // عناصر الواجهة

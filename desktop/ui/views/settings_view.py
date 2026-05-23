@@ -85,16 +85,39 @@ class SettingsView(ft.Container):
                 )
             )
 
-        # Dialog for confirmation
-        self.confirm_dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Text("تأكيد تصفير العمليات والنشاط / Reset Confirm", weight=ft.FontWeight.BOLD),
-            content=ft.Text("هل أنت متأكد من رغبتك في تصفير جميع العمليات والنشاط؟ سيتم حذف كافة العمليات والبيانات من قاعدة بيانات الكمبيوتر والموبايل بشكل نهائي ولا يمكن التراجع عن ذلك.\n\nAre you sure you want to reset all transactions? This action is permanent and cannot be undone."),
-            actions=[
-                ft.TextButton("نعم، تصفير / Yes, Reset", on_click=self.confirm_clear_data, style=ft.ButtonStyle(color=ft.Colors.RED_400)),
-                ft.TextButton("إلغاء / Cancel", on_click=self.close_dialog),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
+        # Dialog for confirmation (custom overlay style to fix Flet click issues)
+        self.confirm_dialog = ft.Container(
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Text("تأكيد تصفير العمليات والنشاط / Reset Confirm", weight=ft.FontWeight.BOLD, size=16, color=ft.Colors.WHITE),
+                        ft.Divider(height=10, color=ft.Colors.WHITE10),
+                        ft.Text("هل أنت متأكد من رغبتك في تصفير جميع العمليات والنشاط؟ سيتم حذف كافة العمليات والبيانات من قاعدة بيانات الكمبيوتر والموبايل بشكل نهائي ولا يمكن التراجع عن ذلك.\n\nAre you sure you want to reset all transactions? This action is permanent and cannot be undone.", size=13, color=ft.Colors.WHITE70),
+                        ft.Divider(height=10, color=ft.Colors.WHITE10),
+                        ft.Row(
+                            controls=[
+                                ft.ElevatedButton("نعم، تصفير / Yes, Reset", on_click=self.confirm_clear_data, bgcolor=ft.Colors.RED_800, color=ft.Colors.WHITE),
+                                ft.TextButton("إلغاء / Cancel", on_click=self.close_dialog, style=ft.ButtonStyle(color=ft.Colors.WHITE54)),
+                            ],
+                            alignment=ft.MainAxisAlignment.END,
+                            spacing=10,
+                        )
+                    ],
+                    tight=True,
+                    spacing=12,
+                ),
+                bgcolor="#0B0F19",
+                border_radius=18,
+                padding=20,
+                width=500,
+                border=ft.Border.all(1, ft.Colors.WHITE10),
+            ),
+            alignment=ft.alignment.Alignment.CENTER,
+            bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.BLACK),
+            left=0,
+            top=0,
+            right=0,
+            bottom=0,
         )
 
         # Connection & Network Info Panel
@@ -211,16 +234,13 @@ class SettingsView(ft.Container):
         )
 
     def show_clear_dialog(self, e):
-        self.flet_page.dialog = self.confirm_dialog
-        self.confirm_dialog.open = True
-        self.flet_page.update()
+        self.flet_page.show_dialog_overlay(self.confirm_dialog)
 
     def close_dialog(self, e):
-        self.confirm_dialog.open = False
-        self.flet_page.update()
+        self.flet_page.close_dialog_overlay(self.confirm_dialog)
 
     def confirm_clear_data(self, e):
-        self.confirm_dialog.open = False
+        self.flet_page.close_dialog_overlay(self.confirm_dialog)
         
         # 1. Clear Desktop DB
         db_cleared = False
@@ -229,11 +249,10 @@ class SettingsView(ft.Container):
             
         # 2. Broadcast Reset command to mobile clients
         if self.server:
-            import asyncio
             from shared.protocol import make_reset_activity
             try:
-                # Send clear message over websocket
-                asyncio.create_task(self.server._broadcast(make_reset_activity()))
+                # Send clear message over websocket thread-safely
+                self.server.broadcast_threadsafe(make_reset_activity())
             except Exception as ex:
                 print(f"Failed to broadcast reset message: {ex}")
                 

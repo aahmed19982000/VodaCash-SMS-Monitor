@@ -86,10 +86,10 @@ class CalculatorView(ft.Container):
         self.type_dropdown = ft.Dropdown(
             label="Transaction Type / نوع المعاملة",
             options=[
-                ft.dropdown.Option("RECEIVED", "Deposit / إيداع (استلام)"),
-                ft.dropdown.Option("SENT", "Withdrawal & Transfer / سحب وتحويل (إرسال)"),
+                ft.dropdown.Option("SENT", "Deposit to Customer / إيداع للعميل"),
+                ft.dropdown.Option("RECEIVED", "Withdrawal from Customer / سحب من العميل"),
             ],
-            value="SENT",
+            value="RECEIVED",
             on_select=self.calculate_fees,
             border_radius=12,
             bgcolor="#0B0F19",
@@ -373,11 +373,11 @@ class CalculatorView(ft.Container):
         self.wallet_info_container.bgcolor = ft.Colors.with_opacity(0.06, accent_color)
         
         # Rules text summary
-        if tx_type == "RECEIVED":
-            self.wallet_info_text.value = f"{style['name']} — Deposit Profit Rate: {dep_fee_pct}% | أرباح الإيداع: {dep_fee_pct}%"
+        if tx_type == "SENT":
+            self.wallet_info_text.value = f"{style['name']} — Deposit Profit Rate: {dep_fee_pct}% (Min {wth_min} EGP) | أرباح الإيداع: {dep_fee_pct}% (حد أدنى {wth_min} ج.م)"
             # Dynamic fee calculation for Option A (based on base amount)
             dummy_tx = Transaction(
-                type=TransactionType.RECEIVED,
+                type=TransactionType.SENT,
                 amount=amount,
                 wallet_id=w_id
             )
@@ -394,14 +394,18 @@ class CalculatorView(ft.Container):
             else:
                 opt_b_total = amount
                 fee_b = 0.0
+
+            if fee_b < wth_min:
+                fee_b = wth_min
+                opt_b_total = amount + wth_min
                 
             opt_b_net = amount
             
-        else: # SENT
+        else: # RECEIVED
             self.wallet_info_text.value = f"{style['name']} — Withdraw Profit Rate: {wth_fee_pct}% (Min {wth_min} EGP) | أرباح السحب: {wth_fee_pct}% (حد أدنى {wth_min} ج.م)"
             # Dynamic fee calculation for Option A (based on base amount)
             dummy_tx = Transaction(
-                type=TransactionType.SENT,
+                type=TransactionType.RECEIVED,
                 amount=amount,
                 wallet_id=w_id
             )

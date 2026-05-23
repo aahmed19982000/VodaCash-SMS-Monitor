@@ -41,7 +41,7 @@ class MainApplication:
 
     # ── إشعارات الديسكتوب ────────────────────────────────────────────────
     
-    def send_notification(self, title: str, message: str):
+    def send_notification(self, title: str, message: str, play_default_sound: bool = True):
         """إرسال إشعار على سطح المكتب مع تشغيل الصوت إذا تم تفعيلهما"""
         # 1. التحقق من تفعيل الإشعارات
         notifications_enabled = self.db.get_setting("notifications_enabled", "true") == "true"
@@ -50,7 +50,7 @@ class MainApplication:
 
         # 2. تشغيل الصوت إذا تم تفعيله
         sound_enabled = self.db.get_setting("sound_enabled", "true") == "true"
-        if sound_enabled:
+        if sound_enabled and play_default_sound:
             if platform.system() == "Windows":
                 try:
                     import winsound
@@ -84,21 +84,44 @@ class MainApplication:
 
     # ── Callbacks للـ WebSocket ──────────────────────────────────────────
 
-    def handle_transaction(self, tx: Transaction):
+    def handle_transaction(self, tx: Transaction, is_live: bool = False):
         """عند استقبال عملية من الموبايل"""
-        logger.info(f"💰 Received Transaction: {tx.type.value} | {tx.amount} EGP")
+        logger.info(f"💰 Received Transaction: {tx.type.value} | {tx.amount} EGP | Live: {is_live}")
         
-        # 0. إرسال إشعار على الديسكتوب
+        # 0. تشغيل صوت مميز مخصص للعمليات المباشرة
+        sound_enabled = self.db.get_setting("sound_enabled", "true") == "true"
+        if is_live and sound_enabled and platform.system() == "Windows":
+            import threading
+            def play_chime():
+                try:
+                    import winsound
+                    # RECEIVED = Customer Withdrawal (سحب للعميل). SENT = Customer Deposit (إيداع للعميل).
+                    is_incoming = (tx.type == TransactionType.RECEIVED)
+                    if is_incoming:
+                        # Ascending chime for incoming
+                        winsound.Beep(523, 100) # C5
+                        winsound.Beep(659, 100) # E5
+                        winsound.Beep(784, 180) # G5
+                    else:
+                        # Descending chime for outgoing
+                        winsound.Beep(784, 100) # G5
+                        winsound.Beep(659, 100) # E5
+                        winsound.Beep(523, 180) # C5
+                except Exception:
+                    pass
+            threading.Thread(target=play_chime, daemon=True).start()
+
+        # 1. إرسال إشعار على الديسكتوب (مع تعطيل الصوت الافتراضي للعمليات المباشرة لأننا شغلنا صوتاً مميزاً لها)
         title = f"Vodafone Cash: {tx.type.value}"
         message = f"Amount: {tx.amount} EGP\nBalance: {tx.balance_after} EGP"
-        self.send_notification(title, message)
+        self.send_notification(title, message, play_default_sound=not is_live)
         
-        # 1. حفظ في قاعدة البيانات المحلية للديسكتوب
+        # 2. حفظ في قاعدة البيانات المحلية للديسكتوب
         self.db.save_transaction(tx)
         
-        # 2. تحديث واجهة المستخدم لو كانت شغالة
+        # 3. تحديث واجهة المستخدم لو كانت شغالة
         if self.ui_app:
-            self.ui_app.refresh_views()
+            self.ui_app.page.run_thread(self.ui_app.handle_new_transaction, tx, is_live)
 
         # 3. إرسال تحديث للموبايل عبر WebSocket
         from shared.protocol import make_new_transaction, make_balance_update

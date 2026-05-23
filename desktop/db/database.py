@@ -79,7 +79,7 @@ class DesktopDatabase:
                 wallet_id       TEXT    DEFAULT '',
                 received_at     TEXT    DEFAULT (datetime('now'))
             );
-            
+
             -- فهارس للفلترة السريعة
             CREATE INDEX IF NOT EXISTS idx_type ON transactions(type);
             CREATE INDEX IF NOT EXISTS idx_sms_timestamp ON transactions(sms_timestamp);
@@ -90,8 +90,28 @@ class DesktopDatabase:
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+
+            -- سجل حركات النقدية
+            CREATE TABLE IF NOT EXISTS cash_ledger (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                type         TEXT    NOT NULL,
+                amount       REAL    NOT NULL,
+                description  TEXT    DEFAULT '',
+                source_tx_id TEXT    DEFAULT '',
+                created_at   TEXT    DEFAULT (datetime('now'))
+            );
         """)
         conn.commit()
+
+        # هجرة: إضافة عمود profit_status إذا لم يكن موجوداً
+        try:
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(transactions)").fetchall()]
+            if "profit_status" not in cols:
+                conn.execute("ALTER TABLE transactions ADD COLUMN profit_status TEXT DEFAULT 'UNSET'")
+                conn.commit()
+                logger.info("✅ Added profit_status column to transactions table")
+        except Exception as e:
+            logger.warning(f"profit_status migration warning: {e}")
 
         # تشغيل الهجرة لإعادة تحليل العمليات وتصحيح المحفظة والرصيد
         try:
@@ -120,6 +140,7 @@ class DesktopDatabase:
                         w_id = old_wallet_clean
                 
                 tx_type = tx.type.value if tx.type != TransactionType.UNKNOWN else old_type
+                amount = tx.amount
                 
                 # Always update the type if the new parser classified it correctly
                 # This ensures ATM_WITHDRAWAL and ATM_DEPOSIT are properly set
@@ -128,25 +149,25 @@ class DesktopDatabase:
                 if tx_id is not None:
                     if balance_after is not None:
                         conn.execute(
-                            "UPDATE transactions SET wallet_id=?, type=?, balance_after=? WHERE transaction_id=?",
-                            (w_id, tx_type, balance_after, tx_id)
+                            "UPDATE transactions SET wallet_id=?, type=?, amount=?, balance_after=? WHERE transaction_id=?",
+                            (w_id, tx_type, amount, balance_after, tx_id)
                         )
                     else:
                         conn.execute(
-                            "UPDATE transactions SET wallet_id=?, type=? WHERE transaction_id=?",
-                            (w_id, tx_type, tx_id)
+                            "UPDATE transactions SET wallet_id=?, type=?, amount=? WHERE transaction_id=?",
+                            (w_id, tx_type, amount, tx_id)
                         )
                 else:
                     # Use raw_sms as identifier for rows without transaction_id
                     if balance_after is not None:
                         conn.execute(
-                            "UPDATE transactions SET wallet_id=?, type=?, balance_after=? WHERE transaction_id IS NULL AND raw_sms=?",
-                            (w_id, tx_type, balance_after, raw_sms)
+                            "UPDATE transactions SET wallet_id=?, type=?, amount=?, balance_after=? WHERE transaction_id IS NULL AND raw_sms=?",
+                            (w_id, tx_type, amount, balance_after, raw_sms)
                         )
                     else:
                         conn.execute(
-                            "UPDATE transactions SET wallet_id=?, type=? WHERE transaction_id IS NULL AND raw_sms=?",
-                            (w_id, tx_type, raw_sms)
+                            "UPDATE transactions SET wallet_id=?, type=?, amount=? WHERE transaction_id IS NULL AND raw_sms=?",
+                            (w_id, tx_type, amount, raw_sms)
                         )
             conn.commit()
             logger.info("🔄 Desktop Cache database successfully migrated and re-parsed.")
@@ -193,7 +214,8 @@ class DesktopDatabase:
                              wallet_filter: str = "ALL",
                              limit: int = None,
                              offset: int = None,
-                             fee_filter: str = "ALL") -> List[Transaction]:
+                             fee_filter: str = "ALL",
+                             profit_status_filter: str = "ALL") -> List[Transaction]:
         """استرجاع العمليات مع دعم الفلاتر والبحث الذكي للـ Dashboard"""
         query = "SELECT * FROM transactions WHERE 1=1"
         params = []
@@ -207,6 +229,10 @@ class DesktopDatabase:
             params.append(wallet_filter)
         else:
             query += " AND wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''"
+
+        if profit_status_filter and profit_status_filter != "ALL":
+            query += " AND COALESCE(profit_status, 'UNSET') = ?"
+            params.append(profit_status_filter)
 
         if start_date:
             query += " AND date(sms_timestamp) >= date(?)"
@@ -266,7 +292,8 @@ class DesktopDatabase:
                                max_amount: float = None,
                                search_query: str = None,
                                wallet_filter: str = "ALL",
-                               fee_filter: str = "ALL") -> int:
+                               fee_filter: str = "ALL",
+                               profit_status_filter: str = "ALL") -> int:
         """الحصول على عدد العمليات المطابقة للفلاتر"""
         if fee_filter and fee_filter != "ALL":
             all_txs = self.get_all_transactions(
@@ -277,7 +304,8 @@ class DesktopDatabase:
                 max_amount=max_amount,
                 search_query=search_query,
                 wallet_filter=wallet_filter,
-                fee_filter=fee_filter
+                fee_filter=fee_filter,
+                profit_status_filter=profit_status_filter
             )
             return len(all_txs)
 
@@ -293,6 +321,10 @@ class DesktopDatabase:
             params.append(wallet_filter)
         else:
             query += " AND wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''"
+
+        if profit_status_filter and profit_status_filter != "ALL":
+            query += " AND COALESCE(profit_status, 'UNSET') = ?"
+            params.append(profit_status_filter)
 
         if start_date:
             query += " AND date(sms_timestamp) >= date(?)"
@@ -364,13 +396,23 @@ class DesktopDatabase:
                     WHERE wallet_id = ?
                 """, (w_id,)).fetchone()
                 net_change = tx_sum["net_change"] if tx_sum else 0.0
+
+                # حساب الأرباح التي لا تزال في المحفظة (IN_WALLET)
+                wallet_tx_rows = self._conn.execute(
+                    "SELECT * FROM transactions WHERE wallet_id = ?", (w_id,)
+                ).fetchall()
+                wallet_in_wallet_fees = 0.0
+                for r in wallet_tx_rows:
+                    tx = self._row_to_transaction(r)
+                    if r["profit_status"] == "IN_WALLET":
+                        wallet_in_wallet_fees += self.calculate_fee(tx)
                 
                 if initial_bal_str is not None:
-                    # إذا تم إدخال رصيد ابتدائي يدوي، نعتمد عليه كـ (الرصيد الابتدائي + صافي المعاملات)
+                    # إذا تم إدخال رصيد ابتدائي يدوي:
                     try:
-                        balance = float(initial_bal_str) + net_change
+                        balance_raw = float(initial_bal_str) + net_change
                     except ValueError:
-                        balance = 0.0 + net_change
+                        balance_raw = 0.0 + net_change
                 else:
                     # إذا لم يوجد رصيد يدوي، نبحث عن آخر معاملة تحتوي على رصيد تلقائي من الرسالة (>= 0)
                     latest_bal_row = self._conn.execute("""
@@ -382,11 +424,14 @@ class DesktopDatabase:
                     """, (w_id,)).fetchone()
                     
                     if latest_bal_row:
-                        balance = latest_bal_row["balance_after"]
+                        balance_raw = latest_bal_row["balance_after"]
                     else:
-                        # إذا لم يوجد رصيد تلقائي في الرسائل (مثل انستا باي)، نبدأ من 0 + صافي المعاملات
-                        balance = 0.0 + net_change
+                        # إذا لم يوجد رصيد تلقائي في الرسائل، نبدأ من 0 + صافي المعاملات
+                        balance_raw = 0.0 + net_change
                 
+                # طرح الأرباح التي لا تزال بالمحفظة مع ضمان عدم تخطي الرصيد أو جعله سالباً
+                wallet_in_wallet_fees = min(wallet_in_wallet_fees, max(0.0, balance_raw))
+                balance = balance_raw - wallet_in_wallet_fees
                 wallet_balances[w_id] = balance
             
         current_balance = sum(wallet_balances.values())
@@ -429,18 +474,8 @@ class DesktopDatabase:
             except ValueError:
                 pass
 
-        if tx_type in [TransactionType.RECEIVED, TransactionType.ATM_DEPOSIT]:
-            # إيداع / استلام
-            dep_fee_str = self.get_setting(f"fee_deposit_{w_id}", "0.0")
-            try:
-                dep_fee_pct = float(dep_fee_str)
-            except ValueError:
-                dep_fee_pct = 0.0
-            return tx.amount * (dep_fee_pct / 100.0)
-
-        elif tx_type in [TransactionType.SENT, TransactionType.BILL, TransactionType.PURCHASE,
-                         TransactionType.TOPUP, TransactionType.ATM_WITHDRAWAL]:
-            # سحب / دفوعات / سحب ATM
+        # RECEIVED represents Customer Withdrawal (سحب للعميل). We charge the withdraw fee.
+        if tx_type == TransactionType.RECEIVED:
             wth_fee_str = self.get_setting(f"fee_withdraw_{w_id}", "0.0")
             wth_min_str = self.get_setting(f"fee_withdraw_min_{w_id}", "0.0")
             try:
@@ -457,6 +492,25 @@ class DesktopDatabase:
                 fee = wth_min
             return fee
 
+        # SENT, BILL, PURCHASE, TOPUP represents Customer Deposit (إيداع للعميل). We charge the deposit fee.
+        elif tx_type in [TransactionType.SENT, TransactionType.BILL, TransactionType.PURCHASE, TransactionType.TOPUP]:
+            dep_fee_str = self.get_setting(f"fee_deposit_{w_id}", "0.0")
+            wth_min_str = self.get_setting(f"fee_withdraw_min_{w_id}", "0.0")
+            try:
+                dep_fee_pct = float(dep_fee_str)
+            except ValueError:
+                dep_fee_pct = 0.0
+            try:
+                wth_min = float(wth_min_str)
+            except ValueError:
+                wth_min = 0.0
+
+            fee = tx.amount * (dep_fee_pct / 100.0)
+            if fee > 0.0 and fee < wth_min:
+                fee = wth_min
+            return fee
+
+        # ATM_WITHDRAWAL and ATM_DEPOSIT are internal movements and do not generate customer profit
         return 0.0
 
     def get_available_months(self) -> List[str]:
@@ -540,6 +594,7 @@ class DesktopDatabase:
         return [self._row_to_transaction(r) for r in rows]
 
     def _row_to_transaction(self, row: sqlite3.Row) -> Transaction:
+        keys = row.keys() if hasattr(row, "keys") else []
         return Transaction(
             transaction_id=row["transaction_id"],
             type=TransactionType(row["type"]),
@@ -551,7 +606,9 @@ class DesktopDatabase:
             sms_timestamp=datetime.fromisoformat(row["sms_timestamp"]),
             confidence=row["confidence"],
             wallet_id=row["wallet_id"],
+            profit_status=row["profit_status"] if "profit_status" in keys else "UNSET",
         )
+
 
     def get_setting(self, key: str, default: str) -> str:
         """Get setting value by key."""
@@ -567,6 +624,11 @@ class DesktopDatabase:
         """Set setting value by key."""
         try:
             self._conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+            if key == "initial_cash_balance":
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                    ("initial_cash_timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                )
             self._conn.commit()
             return True
         except Exception as e:
@@ -574,7 +636,7 @@ class DesktopDatabase:
             return False
 
     def get_wallet_net_change(self, wallet_id: str) -> float:
-        """حساب صافي التغير في الرصيد بناءً على المعاملات المسجلة"""
+        """حساب صافي التغير في الرصيد بناءً على المعاملات المسجلة (مع خصم الأرباح التي لا تزال بالمحفظة)"""
         try:
             tx_sum = self._conn.execute("""
                 SELECT 
@@ -583,7 +645,20 @@ class DesktopDatabase:
                 FROM transactions
                 WHERE wallet_id = ?
             """, (wallet_id,)).fetchone()
-            return tx_sum["net_change"] if tx_sum else 0.0
+            net_change = tx_sum["net_change"] if tx_sum else 0.0
+            
+            # طرح الأرباح التي لا تزال بالمحفظة من صافي التغيير
+            wallet_tx_rows = self._conn.execute(
+                "SELECT * FROM transactions WHERE wallet_id = ?", (wallet_id,)
+            ).fetchall()
+            wallet_in_wallet_fees = 0.0
+            for r in wallet_tx_rows:
+                tx = self._row_to_transaction(r)
+                if r["profit_status"] == "IN_WALLET":
+                    wallet_in_wallet_fees += self.calculate_fee(tx)
+            
+            wallet_in_wallet_fees = min(wallet_in_wallet_fees, max(0.0, net_change))
+            return net_change - wallet_in_wallet_fees
         except Exception as e:
             logger.error(f"Error getting net change for wallet {wallet_id}: {e}")
             return 0.0
@@ -592,6 +667,7 @@ class DesktopDatabase:
         """مسح جميع العمليات وتصفير قاعدة البيانات"""
         try:
             self._conn.execute("DELETE FROM transactions")
+            self._conn.execute("DELETE FROM cash_ledger")
             # امسح الأرصدة الابتدائية اليدوية عند تصفير الحساب لتبدأ من الصفر تماماً
             self._conn.execute("DELETE FROM settings WHERE key LIKE 'initial_balance_%'")
             self._conn.commit()
@@ -600,6 +676,231 @@ class DesktopDatabase:
         except Exception as e:
             logger.error(f"❌ Failed to clear desktop database: {e}")
             return False
+
+    def get_transaction_profit_status(self, tx_id: str) -> str:
+        """
+        الحصول على حالة الربح لمعاملة معينة.
+        """
+        try:
+            row = self._conn.execute(
+                "SELECT profit_status FROM transactions WHERE transaction_id=?",
+                (tx_id,)
+            ).fetchone()
+            if row:
+                return row["profit_status"] or "UNSET"
+            return "UNSET"
+        except Exception as e:
+            logger.error(f"❌ Error getting transaction profit status: {e}")
+            return "UNSET"
+
+    def mark_profit_status(self, tx_id: str, raw_sms: str, status: str) -> bool:
+        """
+        تحديث حالة الربح لعملية معينة.
+        status: 'IN_WALLET' | 'CASH' | 'NONE' | 'UNSET'
+        """
+        valid = {"IN_WALLET", "CASH", "NONE", "UNSET"}
+        if status not in valid:
+            logger.error(f"Invalid profit_status: {status}")
+            return False
+        try:
+            if tx_id is not None:
+                self._conn.execute(
+                    "UPDATE transactions SET profit_status=? WHERE transaction_id=?",
+                    (status, tx_id)
+                )
+            else:
+                self._conn.execute(
+                    "UPDATE transactions SET profit_status=? WHERE transaction_id IS NULL AND raw_sms=?",
+                    (status, raw_sms)
+                )
+            self._conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error marking profit status: {e}")
+            return False
+
+    def get_profit_summary(self) -> dict:
+        """
+        إجمالي الأرباح مقسمة حسب الحالة:
+        - in_wallet: أرباح لا تزال في المحفظة
+        - cash:      أرباح استُلمت نقداً
+        - unset:     أرباح لم يُحدد وضعها بعد
+        """
+        try:
+            rows = self._conn.execute("""
+                SELECT *
+                FROM transactions
+                WHERE wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''
+            """).fetchall()
+
+            in_wallet = 0.0
+            cash_taken = 0.0
+            unset_total = 0.0
+
+            for r in rows:
+                tx = self._row_to_transaction(r)
+                fee = self.calculate_fee(tx)
+                if fee <= 0:
+                    continue
+                ps = r["profit_status"] if "profit_status" in r.keys() else "UNSET"
+                if ps == "IN_WALLET":
+                    in_wallet += fee
+                elif ps == "CASH":
+                    cash_taken += fee
+                else:  # UNSET or NONE with fee > 0
+                    unset_total += fee
+
+            return {
+                "in_wallet": in_wallet,
+                "cash": cash_taken,
+                "unset": unset_total,
+                "total": in_wallet + cash_taken + unset_total,
+            }
+        except Exception as e:
+            logger.error(f"❌ Error getting profit summary: {e}")
+            return {"in_wallet": 0.0, "cash": 0.0, "unset": 0.0, "total": 0.0}
+
+    # ═════════════════════════════════════════════════════════════════════
+    # إدارة النقدية (Cash Ledger)
+    # ═════════════════════════════════════════════════════════════════════
+
+    def add_cash_entry(self, entry_type: str, amount: float,
+                       description: str = "", source_tx_id: str = "") -> bool:
+        """
+        إضافة حركة نقدية.
+        entry_type: 'CASH_IN' | 'CASH_OUT' | 'PROFIT_IN' | 'EXPENSE'
+        """
+        valid = {"CASH_IN", "CASH_OUT", "PROFIT_IN", "EXPENSE"}
+        if entry_type not in valid:
+            logger.error(f"Invalid cash entry type: {entry_type}")
+            return False
+        try:
+            self._conn.execute(
+                "INSERT INTO cash_ledger (type, amount, description, source_tx_id) VALUES (?, ?, ?, ?)",
+                (entry_type, abs(amount), description, source_tx_id)
+            )
+            self._conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error adding cash entry: {e}")
+            return False
+
+    def delete_cash_entry(self, entry_id: int) -> bool:
+        """حذف حركة نقدية بالمعرف"""
+        try:
+            self._conn.execute("DELETE FROM cash_ledger WHERE id=?", (entry_id,))
+            self._conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error deleting cash entry: {e}")
+            return False
+
+    def get_cash_summary(self) -> dict:
+        """
+        إجمالي النقدية:
+        - total_in:  كل النقد الداخل (CASH_IN + PROFIT_IN + العمليات التلقائية)
+        - total_out: كل النقد الخارج (CASH_OUT + EXPENSE + العمليات التلقائية)
+        - balance:   الرصيد النقدي المتاح (الافتتاحية + الداخل - الخارج)
+        """
+        try:
+            initial_cash_ts = self.get_setting("initial_cash_timestamp", "1970-01-01 00:00:00")
+
+            # 1. حساب حركات النقدية اليدوية من الخزينة بعد توقيت النقدية الافتتاحية
+            row = self._conn.execute("""
+                SELECT
+                    COALESCE(SUM(CASE WHEN type IN ('CASH_IN', 'PROFIT_IN') THEN amount ELSE 0 END), 0) AS total_in,
+                    COALESCE(SUM(CASE WHEN type IN ('CASH_OUT', 'EXPENSE')  THEN amount ELSE 0 END), 0) AS total_out
+                FROM cash_ledger
+                WHERE datetime(created_at, 'localtime') >= datetime(?)
+            """, (initial_cash_ts,)).fetchone()
+            ledger_in  = row["total_in"]  if row else 0.0
+            ledger_out = row["total_out"] if row else 0.0
+
+            # 2. حساب حركات النقدية التلقائية من العمليات بعد توقيت النقدية الافتتاحية
+            tx_rows = self._conn.execute("""
+                SELECT *
+                FROM transactions
+                WHERE wallet_id IS NOT NULL AND wallet_id NOT IN ('unspecified', '', 'instapay', 'bank')
+                  AND datetime(sms_timestamp) >= datetime(?)
+            """, (initial_cash_ts,)).fetchall()
+
+            tx_in = 0.0
+            tx_out = 0.0
+            for r in tx_rows:
+                t_type = r["type"]
+                amount = r["amount"]
+                p_status = r["profit_status"] if "profit_status" in r.keys() else "UNSET"
+
+                # حساب العمولة لهذه المعاملة
+                tx = self._row_to_transaction(r)
+                fee = self.calculate_fee(tx)
+
+                if t_type in ['SENT', 'BILL', 'PURCHASE', 'TOPUP']:
+                    if p_status == "CASH":
+                        tx_in += (amount + fee)
+                    else:
+                        tx_in += amount
+                elif t_type == 'ATM_WITHDRAWAL':
+                    tx_in += amount
+                elif t_type == 'RECEIVED':
+                    if p_status in ['IN_WALLET', 'CASH', 'UNSET']:
+                        tx_out += max(0.0, amount - fee)
+                    else:
+                        tx_out += amount
+                elif t_type == 'ATM_DEPOSIT':
+                    tx_out += amount
+
+            # 3. جلب النقدية الافتتاحية من الإعدادات
+            initial_cash_str = self.get_setting("initial_cash_balance", "0.0")
+            try:
+                initial_cash = float(initial_cash_str)
+            except ValueError:
+                initial_cash = 0.0
+
+            total_in = ledger_in + tx_in
+            total_out = ledger_out + tx_out
+
+            return {
+                "initial_cash": initial_cash,
+                "total_in":  total_in,
+                "total_out": total_out,
+                "balance":   initial_cash + total_in - total_out,
+                "tx_in":     tx_in,
+                "tx_out":    tx_out,
+                "ledger_in": ledger_in,
+                "ledger_out":ledger_out
+            }
+        except Exception as e:
+            logger.error(f"❌ Error getting cash summary: {e}")
+            return {
+                "initial_cash": 0.0,
+                "total_in": 0.0,
+                "total_out": 0.0,
+                "balance": 0.0,
+                "tx_in": 0.0,
+                "tx_out": 0.0,
+                "ledger_in": 0.0,
+                "ledger_out": 0.0
+            }
+
+    def get_cash_ledger(self, limit: int = 100, offset: int = 0) -> list:
+        """جلب سجل حركات النقدية مرتباً من الأحدث للأقدم"""
+        try:
+            rows = self._conn.execute(
+                "SELECT * FROM cash_ledger ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, offset)
+            ).fetchall()
+            return [dict(r) for r in rows]
+        except Exception as e:
+            logger.error(f"❌ Error getting cash ledger: {e}")
+            return []
+
+    def get_cash_ledger_count(self) -> int:
+        try:
+            r = self._conn.execute("SELECT COUNT(*) FROM cash_ledger").fetchone()
+            return r[0] if r else 0
+        except Exception:
+            return 0
 
     def close(self):
         if hasattr(self._local, "conn") and self._local.conn:

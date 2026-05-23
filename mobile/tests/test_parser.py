@@ -24,6 +24,14 @@ Transaction ID: 019995593948"""
         self.assertEqual(tx.transaction_id, "019995593948")
         self.assertGreaterEqual(tx.confidence, 0.9)
 
+    def test_sent_transfer_english_alternative(self):
+        msg = "100.0  L.E were successfully transferred to 01100362614. The transfer fee is 1.0 LE. Your current Vodafone Cash balance is 4.98 L.E.  Trx date: \u200e\u200e17-07-25 17:38 Trx ID 012797795647."
+        tx = SMSEngine.parse(msg, sender="VodafoneCash")
+        self.assertEqual(tx.type, TransactionType.SENT)
+        self.assertEqual(tx.amount, 100.0)
+        self.assertEqual(tx.counterpart, "01100362614")
+        self.assertEqual(tx.balance_after, 4.98)
+        self.assertEqual(tx.transaction_id, "012797795647")
         self.assertGreaterEqual(tx.confidence, 0.9)
 
     def test_sent_transfer_arabic_variation(self):
@@ -144,6 +152,25 @@ Transaction ID: 019995593948"""
         self.assertEqual(tx.sms_timestamp.day, 21)
         self.assertEqual(tx.sms_timestamp.hour, 14)
         self.assertEqual(tx.sms_timestamp.minute, 27)
+        self.assertGreaterEqual(tx.confidence, 0.7)
+
+    def test_wallet_atm_deposit(self):
+        msg = "تم إيداع مبلغ 5000.00 جنيه من صراف آلي في محفظتك. رصيد حسابك الحالي 5000.98 جنيه. تاريخ العملية ‎23-07-25 22:26؛ رقم العملية 012918985998."
+        tx = SMSEngine.parse(msg, sender="VodafoneCash")
+        self.assertEqual(tx.wallet_id, "vodafone_cash")
+        self.assertEqual(tx.type, TransactionType.ATM_DEPOSIT)
+        self.assertEqual(tx.amount, 5000.0)
+        self.assertEqual(tx.balance_after, 5000.98)
+        self.assertEqual(tx.transaction_id, "012918985998")
+        self.assertGreaterEqual(tx.confidence, 0.8)
+
+    def test_bank_atm_deposit(self):
+        msg = "تم إضافة 4200.00EGP لحسابكم من صراف آلي NBE ATM031 يوم 06/08 الساعه 18:33 المتاح 10413.45 للمزيد إتصل ب 19623"
+        tx = SMSEngine.parse(msg, sender="NBE")
+        self.assertEqual(tx.wallet_id, "bank")
+        self.assertEqual(tx.type, TransactionType.ATM_DEPOSIT)
+        self.assertEqual(tx.amount, 4200.0)
+        self.assertEqual(tx.balance_after, 10413.45)
         self.assertGreaterEqual(tx.confidence, 0.7)
 
 if __name__ == '__main__':

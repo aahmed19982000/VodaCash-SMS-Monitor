@@ -71,6 +71,14 @@ class SMSClassifier:
         if "من بطاقة" in text_lower and ("atm" in text_lower or "صراف" in text_lower):
             return TransactionType.ATM_WITHDRAWAL
 
+        # 0.5 ATM Deposit
+        # رسائل إيداع ATM في محفظة فودافون كاش
+        if "إيداع" in text_lower and ("صراف آلي" in text_lower or "atm" in text_lower) and "محفظة" in text_lower:
+            return TransactionType.ATM_DEPOSIT
+        # رسائل إيداع ATM ببطاقة من بنك/انستاباي
+        if ("إيداع" in text_lower or "إضافة" in text_lower or "اضافة" in text_lower or "ايداع" in text_lower) and ("atm" in text_lower or "صراف" in text_lower) and ("بطاقة" in text_lower or "حساب" in text_lower or "المتاح" in text_lower):
+            return TransactionType.ATM_DEPOSIT
+
         # 1. استلام (Received)
         if any(kw in text_lower for kw in [
             "تم استلام مبلغ", "received egp", "received from", "تم استلام عملية تحويل", 

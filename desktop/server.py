@@ -42,6 +42,7 @@ class DesktopServer:
         self._clients: Set[WebSocketServerProtocol] = set()
         self._running = False
         self._server = None
+        self.loop = None
 
         # Callbacks
         self._on_transaction: Optional[Callable] = None
@@ -91,6 +92,7 @@ class DesktopServer:
         """بدء السيرفر."""
         self._running = True
         self._start_time = datetime.now()
+        self.loop = asyncio.get_running_loop()
 
         self._server = await websockets.serve(
             self._handle_client,
@@ -175,7 +177,7 @@ class DesktopServer:
                 f"| {tx.counterpart} | conf: {tx.confidence:.0%}"
             )
             if self._on_transaction:
-                self._on_transaction(tx)
+                self._on_transaction(tx, is_live=False)
 
         # ── تحديث رصيد ───────────────────────────────────────────────
         elif msg_type == MessageType.BALANCE_UPDATE:
@@ -216,7 +218,7 @@ class DesktopServer:
                     f"| {tx.counterpart} | conf: {tx.confidence:.0%}"
                 )
                 if self._on_transaction:
-                    self._on_transaction(tx)
+                    self._on_transaction(tx, is_live=True)
             else:
                 logger.warning(f"📬 Raw SMS is unclassified (conf: {tx.confidence:.0%})")
                 if self._on_unclassified:
@@ -260,6 +262,20 @@ class DesktopServer:
             *[client.send(message) for client in self._clients],
             return_exceptions=True
         )
+
+    def broadcast_threadsafe(self, message: str):
+        """إرسال رسالة بشكل آمن من أي Thread إلى الموبايل."""
+        if self.loop and self.loop.is_running():
+            asyncio.run_coroutine_threadsafe(self._broadcast(message), self.loop)
+        else:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(self._broadcast(message))
+                else:
+                    loop.run_until_complete(self._broadcast(message))
+            except Exception as e:
+                logger.error(f"❌ Failed to broadcast threadsafe: {e}")
 
     # ═════════════════════════════════════════════════════════════════════
     # الحالة والإحصائيات

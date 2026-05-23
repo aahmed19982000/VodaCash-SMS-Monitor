@@ -69,6 +69,7 @@ class DashboardView(ft.Container):
 
         # KPI Controls
         self.balance_text = ft.Text("0.00 EGP", size=32, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE)
+        self.cash_balance_text = ft.Text("0.00 EGP", size=32, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE)
         self.income_text = ft.Text("0.00 EGP", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_400)
         self.expenses_text = ft.Text("0.00 EGP", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_400)
         self.count_text = ft.Text("0", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400)
@@ -122,13 +123,15 @@ class DashboardView(ft.Container):
                 ft.Row(
                     controls=[
                         self._build_kpi_card("Total Balance / الرصيد الإجمالي", self.balance_text, ft.Icons.ACCOUNT_BALANCE_WALLET_ROUNDED, ["#1E293B", "#0F172A"], ft.Colors.AMBER_500, width=230),
+                        self._build_kpi_card("Cash Balance / الرصيد النقدي", self.cash_balance_text, ft.Icons.MONETIZATION_ON_ROUNDED, ["#1E293B", "#0F172A"], ft.Colors.TEAL_400, width=230),
                         self._build_kpi_card("Period Income / دخل الفترة", self.income_text, ft.Icons.ARROW_DOWNWARD_ROUNDED, ["#064E3B", "#022C22"], ft.Colors.GREEN_400),
                         self._build_kpi_card("Period Expenses / مصاريف الفترة", self.expenses_text, ft.Icons.ARROW_UPWARD_ROUNDED, ["#7F1D1D", "#450A0A"], ft.Colors.RED_400),
                         self._build_kpi_card("Period Profit / أرباح الفترة", self.fees_text, ft.Icons.PERCENT, ["#78350F", "#451A03"], ft.Colors.AMBER_400),
                         self._build_kpi_card("Total TXs / إجمالي العمليات", self.count_text, ft.Icons.SYNC_ALT_ROUNDED, ["#1E3A8A", "#0F172A"], ft.Colors.BLUE_400),
                     ],
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                    wrap=True
+                    alignment=ft.MainAxisAlignment.START,
+                    wrap=True,
+                    spacing=15
                 ),
                 
                 ft.Divider(height=25, color=ft.Colors.WHITE24),
@@ -335,10 +338,15 @@ class DashboardView(ft.Container):
                 self.month_dropdown.value = current_month
 
         selected_period = self.month_dropdown.value
-        db_month = None if selected_period == "ALL" else selected_period
+        db_month = selected_period
 
         kpi = self.db.get_kpi_summary(month=db_month)
         self.balance_text.value = f"{kpi['current_balance']:,.2f} EGP"
+        
+        cash_summary = self.db.get_cash_summary()
+        self.cash_balance_text.value = f"{cash_summary['balance']:,.2f} EGP"
+        self.cash_balance_text.color = ft.Colors.WHITE if cash_summary['balance'] >= 0 else ft.Colors.RED_400
+
         self.income_text.value = f"+{kpi['income']:,.2f} EGP"
         self.expenses_text.value = f"-{kpi['expenses']:,.2f} EGP"
         self.count_text.value = str(kpi['transactions_count'])
@@ -423,6 +431,18 @@ class DashboardView(ft.Container):
                         border_radius=12
                     )
 
+                cp = tx.counterpart or "Unknown"
+                if tx_val == "RECEIVED":
+                    cp_label = f"المرسل / From: {cp}"
+                elif tx_val == "SENT":
+                    cp_label = f"المستلم / To: {cp}"
+                elif tx_val == "TOPUP":
+                    cp_label = f"رقم الشحن / Top-up: {cp}"
+                elif tx_val == "BILL":
+                    cp_label = f"المستلم / Merchant: {cp}"
+                else:
+                    cp_label = f"الطرف الآخر / Counterpart: {cp}"
+
                 new_activity.append(
                     ft.Container(
                         content=ft.Row(
@@ -446,7 +466,7 @@ class DashboardView(ft.Container):
                                             vertical_alignment=ft.CrossAxisAlignment.CENTER
                                         ),
                                         ft.Text(
-                                            f"Counterpart: {tx.counterpart or 'Unknown'} | Date: {tx.sms_timestamp.strftime('%Y-%m-%d %H:%M')}" + (f" | Bal: {tx.balance_after:,.2f} EGP" if tx.balance_after >= 0 else ""),
+                                            f"{cp_label} | Date: {tx.sms_timestamp.strftime('%Y-%m-%d %H:%M')}" + (f" | Bal: {tx.balance_after:,.2f} EGP" if tx.balance_after >= 0 else ""),
                                             color=ft.Colors.WHITE54,
                                             size=11
                                         ),
@@ -493,8 +513,8 @@ class DashboardView(ft.Container):
         import asyncio
         from shared.protocol import make_force_sms_scan
         try:
-            # إرسال أمر إعادة المزامنة لجميع العملاء المتصلين
-            asyncio.create_task(self.server._broadcast(make_force_sms_scan()))
+            # إرسال أمر إعادة المزامنة لجميع العملاء المتصلين بشكل آمن عبر الخيوط
+            self.server.broadcast_threadsafe(make_force_sms_scan())
             self.flet_page.snack_bar = ft.SnackBar(
                 content=ft.Text("تم إرسال طلب إعادة المزامنة وقراءة الرسائل التاريخية للموبايل بنجاح!", size=16, weight=ft.FontWeight.BOLD),
                 bgcolor=ft.Colors.GREEN_700,

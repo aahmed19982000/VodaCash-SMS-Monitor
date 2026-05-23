@@ -73,10 +73,10 @@ PATTERNS = [
         "id": "sent_en",
         "type": TransactionType.SENT,
         "regex": re.compile(
-            r"EGP\s+" + AMOUNT + r"\s+were successfully transferred to\s+" + PHONE +
-            r".*balance is EGP\s+" + AMOUNT +
-            r".*Transaction date:\s+" + DATE + r"\s+" + TIME +
-            r".*Transaction ID:\s+" + TRX_ID,
+            r"(?:EGP\s+)?" + AMOUNT + r"\s*(?:L\.?E\.?|EGP)?\s+were successfully transferred to\s+" + PHONE +
+            r".*your current Vodafone Cash balance is\s+(?:EGP\s+)?" + AMOUNT + r"\s*(?:L\.?E\.?)?" +
+            r".*(?:Transaction|Trx)\s+date:\s*[^\d]*?" + DATE + r"\s+" + TIME +
+            r".*(?:Transaction\s+ID|Trx\s+ID)[^\d]*?" + TRX_ID,
             re.IGNORECASE | re.DOTALL
         ),
         "groups": {"amount": 1, "counterpart": 2, "balance": 3, "date": 4, "time": 5, "trx_id": 6}
@@ -190,6 +190,36 @@ PATTERNS = [
         "type": TransactionType.ATM_WITHDRAWAL,
         "regex": re.compile(
             r"تم خصم\s+" + AMOUNT + r"EGP\s+من بطاقة.*?(?:ATM|صراف)" +
+            r".*?(?:يوم|تاريخ)\s+(?P<date_slash>\d{2}/\d{2})\s+(?:الساعه?|الساعة)?\s*" + TIME +
+            r".*?(?:المتاح|الرصيد|المتاح:?)\s+" + AMOUNT,
+            re.IGNORECASE | re.DOTALL
+        ),
+        "groups": {"amount": 1, "date_slash": "date_slash", "time": 3, "balance": 4}
+    },
+
+    # 10. إيداع ATM في محفظة (Wallet ATM Deposit) - عربي
+    # تم إيداع مبلغ 200.00 جنيه من صراف آلي في محفظتك. رصيد حسابك الحالي 200.98 جنيه. تاريخ العملية ‎23-07-25 22:26؛ رقم العملية 012918985998.
+    {
+        "id": "atm_deposit_wallet",
+        "type": TransactionType.ATM_DEPOSIT,
+        "regex": re.compile(
+            r"تم (?:إيداع|ايداع)\s+(?:مبلغ\s+)?" + AMOUNT + r"\s*جني[هة]\s+من\s+(?:صراف آلي|ATM|فرع)" +
+            r".*(?:رصيد حسابك الحالي|رصيدك الحالي)\s+" + AMOUNT +
+            r".*(?:تاريخ العملية|تاريخ العملية\s+‎?)\s*" + r"(?:" + TIME + r"\s+" + DATE + r"|" + DATE + r"\s+" + TIME + r")" +
+            r".*(?:رقم العملية[;؛]?\s*)" + TRX_ID,
+            re.IGNORECASE | re.DOTALL
+        ),
+        "groups": {"amount": 1, "balance": 2, "time_a": 3, "date_a": 4, "date_b": 5, "time_b": 6, "trx_id": 7}
+    },
+
+    # 11. إيداع ATM بطاقة بنكية / انستاباي (Bank/Instapay Card ATM Deposit)
+    # تم إيداع 4200.00EGP في بطاقة الخصم المباشر عند NBE ATM031 يوم 06/08 الساعه 18:33 المتاح 10413.45
+    # تم إضافة 1000.00EGP لحسابكم من صراف آلي NBE ATM031 يوم 06/08 الساعه 18:33 المتاح 10413.45
+    {
+        "id": "atm_deposit_bank",
+        "type": TransactionType.ATM_DEPOSIT,
+        "regex": re.compile(
+            r"تم (?:إيداع|ايداع|إضافة|اضافة)\s+" + AMOUNT + r"\s*EGP\s+(?:في|إلى|لـ|لحسابكم)?.*?(?:ATM|صراف)" +
             r".*?(?:يوم|تاريخ)\s+(?P<date_slash>\d{2}/\d{2})\s+(?:الساعه?|الساعة)?\s*" + TIME +
             r".*?(?:المتاح|الرصيد|المتاح:?)\s+" + AMOUNT,
             re.IGNORECASE | re.DOTALL

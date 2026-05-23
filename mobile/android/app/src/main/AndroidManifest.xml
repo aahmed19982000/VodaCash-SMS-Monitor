@@ -21,6 +21,10 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- طلب استثناء من تحسين البطارية -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <!-- الاتصال المباشر لإرسال أوامر الـ USSD للتحويل -->
+    <uses-permission android:name="android.permission.CALL_PHONE"/>
+    <!-- قراءة حالة الهاتف لتحديد شريحة الاتصال في الهواتف ثنائية الشريحة -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
 
     <application
         android:allowBackup="true"

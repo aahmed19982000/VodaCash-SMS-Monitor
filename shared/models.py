@@ -32,6 +32,8 @@ class Transaction:
     sms_timestamp  : datetime        = field(default_factory=datetime.now)
     confidence     : float           = 0.0       # 0.0 → 1.0
     wallet_id      : str             = "unspecified"
+    profit_status  : str             = "UNSET"   # IN_WALLET | CASH | NONE | UNSET (desktop-only)
+
 
     def is_valid(self) -> bool:
         """العملية صالحة لو confidence فوق الحد المسموح"""
