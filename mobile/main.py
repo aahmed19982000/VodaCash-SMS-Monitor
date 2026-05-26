@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s │ %(name)-18s │ 
 logger = logging.getLogger("VodaCash.Mobile")
 
 def main(page: ft.Page):
-    page.title = "VodaCash Monitor"
+    page.title = "دفتر كاش - Daftar Cash"
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 0
     
@@ -42,4 +42,4 @@ def main(page: ft.Page):
     broadcaster.start()
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.app(target=main, assets_dir="mobile/assets")

@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+
+{% block title %}لوحة التحكم - دفتر كاش (Daftar Cash){% endblock %}
+
+{% block extra_head %}
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        align-items: start;
+        margin-top: 20px;
+    }
+    
+    .license-card {
+        background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+        border: 1px solid rgba(139, 92, 246, 0.15);
+    }
+    
+    .key-box {
+        background: #F1F5F9;
+        border: 1px dashed rgba(0,0,0,0.15);
+        border-radius: 12px;
+        padding: 15px;
+        font-family: 'Outfit', 'Courier New', monospace;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        color: var(--text-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 20px 0;
+        direction: ltr;
+    }
+    
+    .copy-btn {
+        background: #FFFFFF;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        color: var(--text-secondary);
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition-smooth);
+    }
+    
+    .copy-btn:hover {
+        background: var(--accent-blue);
+        color: white;
+        border-color: transparent;
+    }
+
+    .instructions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .instruction-step {
+        display: flex;
+        gap: 15px;
+        align-items: flex-start;
+    }
+    
+    .step-number {
+        background: var(--primary-gradient);
+        color: white;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+
+    @media (max-width: 992px) {
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px;">
+    <div>
+        <h1 style="font-size: 32px; font-weight: 800;">لوحة تحكم المشترك</h1>
+        <p style="color: var(--text-secondary); font-size: 15px;">مرحباً بك مجدداً، {{ user.username }}! أدر اشتراكك وحمل أدوات التشغيل هنا.</p>
+    </div>
+    <div>
+        <a href="{% url 'landing' %}#pricing" class="btn-primary"><i class="fa-solid fa-cart-plus"></i> شراء اشتراك جديد</a>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <!-- License Status Card -->
+    <div class="glass-card license-card">
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-blue);">
+            <i class="fa-solid fa-key"></i> الاشتراك الحالي (License Status)
+        </h3>
+        
+        {% if active_license %}
+            <p style="color: var(--text-secondary); font-size: 14px;">بيانات حساب التفعيل الخاص بك (سجل الدخول بها في تطبيق الديسكتوب):</p>
+            <div class="key-box" style="font-size: 16px; letter-spacing: 0.5px;">
+                <button class="copy-btn" onclick="copyKey('{{ user.username }}')" title="نسخ اسم المستخدم">
+                    <i class="fa-regular fa-copy"></i>
+                </button>
+                <span>اسم المستخدم: <strong>{{ user.username }}</strong></span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 14px; margin-bottom: 25px;">
+                <div>
+                    <span style="color: var(--text-secondary);">نوع الاشتراك:</span>
+                    <strong style="color: var(--text-primary); display: block; margin-top: 4px;">{{ active_license.get_type_display }}</strong>
+                </div>
+                <div>
+                    <span style="color: var(--text-secondary);">تاريخ الانتهاء:</span>
+                    <strong style="color: var(--text-primary); display: block; margin-top: 4px;">{{ active_license.expires_at|date:"Y-m-d H:i" }}</strong>
+                </div>
+                <div>
+                    <span style="color: var(--text-secondary);">حالة التفعيل:</span>
+                    <span style="display: block; margin-top: 4px;">
+                        <span class="badge badge-active">نشط (Active)</span>
+                    </span>
+                </div>
+                <div>
+                    <span style="color: var(--text-secondary);">الجهاز المرتبط (MAC):</span>
+                    <strong style="color: var(--accent-pink); font-family: monospace; display: block; margin-top: 4px;">
+                        {% if active_license.mac_address %}{{ active_license.mac_address }}{% else %}لم يتم الربط بعد{% endif %}
+                    </strong>
+                </div>
+            </div>
+            
+            {% if active_license.mac_address %}
+                <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; padding: 15px; font-size: 13px;">
+                    <i class="fa-solid fa-circle-info" style="color: var(--error-red); margin-left: 5px;"></i>
+                    الترخيص مغلق ومربوط حالياً بجهازك الكمبيوتر. إذا قمت بتغيير الجهاز أو واجهت مشكلة، يرجى الاتصال بالإدارة لإعادة تعيين قفل الـ MAC.
+                </div>
+            {% else %}
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 15px; font-size: 13px;">
+                    <i class="fa-solid fa-circle-info" style="color: var(--success-green); margin-left: 5px;"></i>
+                    حسابك جاهز لتفعيل التطبيق! قم بتسجيل الدخول في تطبيق سطح المكتب وسيتم ربط رخصتك بجهازك تلقائياً عند تسجيل الدخول الأول.
+                </div>
+            {% endif %}
+        {% else %}
+            <div style="text-align: center; padding: 30px 10px;">
+                <i class="fa-solid fa-triangle-exclamation" style="font-size: 48px; color: var(--warning-amber); margin-bottom: 15px;"></i>
+                <h4>لا يوجد اشتراك نشط حالياً</h4>
+                <p style="color: var(--text-secondary); font-size: 14px; margin-top: 10px; margin-bottom: 20px;">لم تقم بالاشتراك بعد أو انتهت صلاحية اشتراكك القديم.</p>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <a href="{% url 'landing' %}#pricing" class="btn-primary"><i class="fa-solid fa-cart-shopping"></i> اشترك الآن</a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Instructions / Setup Card -->
+    <div class="glass-card">
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-purple);">
+            <i class="fa-solid fa-circle-info"></i> خطوات التحميل والإعداد للتشغيل
+        </h3>
+        
+        <div class="instructions-list">
+            <div class="instruction-step">
+                <div class="step-number">1</div>
+                <div>
+                    <h5 style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">تحميل ملفات التشغيل</h5>
+                    <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 10px;">قم بتحميل تطبيق سطح المكتب للكمبيوتر وتثبيت تطبيق الموبايل (APK) المخصص لهاتفك.</p>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <a href="{% url 'download_file' 'desktop' %}" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;"><i class="fa-brands fa-windows"></i> تطبيق الكمبيوتر (.exe)</a>
+                        <a href="{% url 'download_file' 'mobile' %}" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;"><i class="fa-brands fa-android"></i> تطبيق الموبايل (.apk)</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="instruction-step">
+                <div class="step-number">2</div>
+                <div>
+                    <h5 style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">تسجيل الدخول والتفعيل</h5>
+                    <p style="font-size: 13px; color: var(--text-secondary);">افتح البرنامج على الكمبيوتر، وسجل الدخول باستخدام اسم المستخدم أو البريد الإلكتروني وكلمة مرور هذا الحساب لتفعيل الترخيص فوراً.</p>
+                </div>
+            </div>
+            
+            <div class="instruction-step">
+                <div class="step-number">3</div>
+                <div>
+                    <h5 style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">الربط والمزامنة</h5>
+                    <p style="font-size: 13px; color: var(--text-secondary);">تأكد من اتصال الهاتف والحاسوب بنفس شبكة الإنترنت، واكتب عنوان الـ IP المحلي في إعدادات الموبايل لبدء استقبال الرسائل.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Subscription History Table -->
+<div class="glass-card" style="margin-top: 40px;">
+    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px;">
+        <i class="fa-solid fa-clock-rotate-left"></i> سجل مفاتيح التفعيل والعمليات السابقة
+    </h3>
+    
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>كود الاشتراك</th>
+                    <th>نوع الاشتراك</th>
+                    <th>تاريخ الإنشاء</th>
+                    <th>تاريخ الانتهاء</th>
+                    <th>الحالة</th>
+                    <th>الـ MAC المقترن</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lic in licenses %}
+                    <tr>
+                        <td class="ltr" style="font-family: monospace; font-weight: bold;">{{ lic.key }}</td>
+                        <td>{{ lic.get_type_display }}</td>
+                        <td>{{ lic.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>{{ lic.expires_at|date:"Y-m-d H:i" }}</td>
+                        <td>
+                            {% if lic.status == 'ACTIVE' and lic.expires_at > timezone.now %}
+                                <span class="badge badge-active">نشط</span>
+                            {% elif lic.status == 'SUSPENDED' %}
+                                <span class="badge badge-suspended">معطل</span>
+                            {% else %}
+                                <span class="badge badge-expired">منتهي</span>
+                            {% endif %}
+                        </td>
+                        <td class="ltr" style="font-family: monospace; font-size: 12px; color: var(--text-muted);">
+                            {% if lic.mac_address %}{{ lic.mac_address }}{% else %}-{% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            لا يوجد لديك أي أكواد تفعيل أو اشتراكات سابقة بعد.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+</div>
+
+<!-- Payment & Billing History Table -->
+<div class="glass-card" style="margin-top: 40px;">
+    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--success-green);">
+        <i class="fa-solid fa-receipt"></i> سجل عمليات الدفع وفواتير الاشتراك
+    </h3>
+    
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>رمز العملية (Tx ID)</th>
+                    <th>كود التفعيل المرتبط</th>
+                    <th>طريقة الدفع</th>
+                    <th>المبلغ المدفوع</th>
+                    <th>الحالة</th>
+                    <th>تاريخ العملية</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                    <tr>
+                        <td class="ltr" style="font-family: monospace; font-size: 13px;">{{ p.transaction_id }}</td>
+                        <td class="ltr" style="font-family: monospace; font-weight: bold; color: var(--accent-blue);">{{ p.license_key.key }}</td>
+                        <td>{{ p.payment_method }}</td>
+                        <td style="font-family: Outfit; font-weight: bold; color: var(--success-green);">{{ p.amount }} ج.م</td>
+                        <td>
+                            <span class="badge badge-active">{{ p.status }}</span>
+                        </td>
+                        <td>{{ p.created_at|date:"Y-m-d H:i" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            لا توجد أي فواتير أو عمليات دفع مسجلة حتى الآن.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function copyKey(keyText) {
+        navigator.clipboard.writeText(keyText).then(function() {
+            alert("✅ تم نسخ كود التفعيل إلى الحافظة بنجاح!");
+        }, function(err) {
+            console.error('Failed to copy text: ', err);
+        });
+    }
+</script>
+{% endblock %}

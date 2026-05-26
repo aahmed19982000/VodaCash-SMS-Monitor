@@ -37,6 +37,9 @@ class SMSClassifier:
             for wallet, senders in WALLET_SENDERS.items():
                 for official in senders:
                     if clean_sender == official.lower():
+                        # Map instapay directly to bank
+                        if wallet == "instapay":
+                            return "bank"
                         return wallet
         
         # فحص الكلمات المفتاحية في النص كخطة بديلة
@@ -50,7 +53,7 @@ class SMSClassifier:
         elif any(kw in text_lower for kw in ["وي باي", "we pay", "wepay", "we_pay"]):
             return "we_pay"
         elif any(kw in text_lower for kw in ["انستاباي", "instapay", "ipn", "19623", "تحويل لحظي"]):
-            return "instapay"
+            return "bank"
         elif any(kw in text_lower for kw in ["cib", "nbe", "البنك الأهلي", "بنك مصر", "qnb", "حسابكم", "حسابك"]):
             return "bank"
             

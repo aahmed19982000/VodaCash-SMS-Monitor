@@ -183,14 +183,14 @@ PATTERNS = [
         "groups": {"amount": 1, "balance": 2, "time_a": 3, "date_a": 4, "date_b": 5, "time_b": 6, "trx_id": 7}
     },
 
-    # 9. سحب ATM بطاقة بنكية / انستاباي (Bank/Instapay Card ATM Withdrawal)
-    # تم خصم 4200.00EGP من بطاقة الخصم المباشر رقم 1950 عند NBE ATM031 يوم 06/08 الساعه 18:33 المتاح 10413.45 للمزيد إتصل ب 19623
+    # 9. سحب ATM أو خصم من بطاقة بنكية / انستاباي (Bank/Instapay Card ATM/POS Debit)
+    # تم خصم 3000.00EGP من بطاقة الخصم المباشر رقم 1950 عند EL SHEKH ZEN EL DIN SOH يوم 24/05 الساعه 19:23 المتاح 665.37 للمزيد إتصل ب 19623
     {
         "id": "atm_withdrawal_bank",
         "type": TransactionType.ATM_WITHDRAWAL,
         "regex": re.compile(
-            r"تم خصم\s+" + AMOUNT + r"EGP\s+من بطاقة.*?(?:ATM|صراف)" +
-            r".*?(?:يوم|تاريخ)\s+(?P<date_slash>\d{2}/\d{2})\s+(?:الساعه?|الساعة)?\s*" + TIME +
+            r"تم خصم\s+" + AMOUNT + r"EGP\s+من بطاقة.*?" +
+            r"(?:يوم|تاريخ)\s+(?P<date_slash>\d{2}/\d{2})\s+(?:الساعه?|الساعة)?\s*" + TIME +
             r".*?(?:المتاح|الرصيد|المتاح:?)\s+" + AMOUNT,
             re.IGNORECASE | re.DOTALL
         ),
@@ -225,6 +225,32 @@ PATTERNS = [
             re.IGNORECASE | re.DOTALL
         ),
         "groups": {"amount": 1, "date_slash": "date_slash", "time": 3, "balance": 4}
+    },
+
+    # 12. تحويل لحظي صادر من حساب بنكي / انستاباي (Instapay Sent Transfer)
+    # تم تنفيذ تحويل لحظي من حسابكم رقم 0140 بمبلغ 7800.00 جم إلى ديفيد ب* ط* ش**** رقم مرجعي 328546435221 يوم 05-24 الساعة 12:20 للمزيد اتصل بـ 19623
+    {
+        "id": "instapay_sent_ar",
+        "type": TransactionType.SENT,
+        "regex": re.compile(
+            r"تم تنفيذ تحويل لحظي من حسابكم(?: رقم \d+)? بمبلغ\s+" + AMOUNT + r"\s*(?:جم|EGP)\s+إلى\s+(?P<recipient>.*?)\s+رقم مرجعي\s+" + TRX_ID +
+            r".*?يوم\s+(?P<date_dash>\d{2}-\d{2})\s+(?:الساعه?|الساعة)?\s*" + TIME,
+            re.IGNORECASE | re.DOTALL
+        ),
+        "groups": {"amount": 1, "counterpart": "recipient", "trx_id": 3, "date_dash": "date_dash", "time": 5}
+    },
+
+    # 13. تحويل لحظي وارد لحساب بنكي / انستاباي (Instapay Received Transfer)
+    # تم إضافة تحويل لحظي لحسابكم رقم 0140 بمبلغ 7882.00 جم من ايمان ابو السعود محمد على القاضى رقم مرجعي 040016907221 يوم 05-24 الساعة 12:18 للمزيد اتصل بـ 19623
+    {
+        "id": "instapay_received_ar",
+        "type": TransactionType.RECEIVED,
+        "regex": re.compile(
+            r"تم (?:إضافة|اضافة) تحويل لحظي لحسابكم(?: رقم \d+)? بمبلغ\s+" + AMOUNT + r"\s*(?:جم|EGP)\s+من\s+(?P<sender_name>.*?)\s+رقم مرجعي\s+" + TRX_ID +
+            r".*?يوم\s+(?P<date_dash>\d{2}-\d{2})\s+(?:الساعه?|الساعة)?\s*" + TIME,
+            re.IGNORECASE | re.DOTALL
+        ),
+        "groups": {"amount": 1, "counterpart": "sender_name", "trx_id": 3, "date_dash": "date_dash", "time": 5}
     },
 ]
 

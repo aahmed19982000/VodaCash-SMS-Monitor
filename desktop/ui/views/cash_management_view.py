@@ -65,7 +65,7 @@ class CashManagementView(ft.Container):
             "إضافة / Add",
             icon=ft.Icons.ADD_ROUNDED,
             color=ft.Colors.WHITE,
-            bgcolor="#1E3A8A",
+            bgcolor="#0F3C6D",
             on_click=self._add_entry,
             style=ft.ButtonStyle(
                 shape=ft.RoundedRectangleBorder(radius=12),
@@ -87,7 +87,7 @@ class CashManagementView(ft.Container):
             "حفظ / Save",
             icon=ft.Icons.SAVE_ROUNDED,
             color=ft.Colors.WHITE,
-            bgcolor="#1E3A8A",
+            bgcolor="#0F3C6D",
             on_click=self._save_initial_cash,
             style=ft.ButtonStyle(
                 shape=ft.RoundedRectangleBorder(radius=12),
@@ -143,7 +143,7 @@ class CashManagementView(ft.Container):
                 # ── KPI Row ──
                 ft.Row(
                     controls=[
-                        self._kpi("النقدية الافتتاحية / Initial", self.initial_cash_text, ft.Icons.ACCOUNT_BALANCE_ROUNDED, ["#1E3A8A","#1E1B4B"], ft.Colors.BLUE_400),
+                        self._kpi("النقدية الافتتاحية / Initial", self.initial_cash_text, ft.Icons.ACCOUNT_BALANCE_ROUNDED, ["#0F3C6D","#0A2545"], ft.Colors.BLUE_400),
                         self._kpi("نقدية داخلة / Cash In",    self.cash_in_text,  ft.Icons.ARROW_DOWNWARD_ROUNDED,  ["#064E3B","#022C22"], ft.Colors.GREEN_400),
                         self._kpi("نقدية خارجة / Cash Out",   self.cash_out_text, ft.Icons.ARROW_UPWARD_ROUNDED,    ["#7F1D1D","#450A0A"], ft.Colors.RED_400),
                         self._kpi("الرصيد النقدي / Balance",  self.balance_text,  ft.Icons.WALLET_ROUNDED,          ["#78350F","#451A03"], ft.Colors.AMBER_300, width=220),

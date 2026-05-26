@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}تسجيل الدخول - دفتر كاش (Daftar Cash){% endblock %}
+
+{% block content %}
+<div style="max-width: 450px; margin: 40px auto; padding: 20px;">
+    <div class="glass-card">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <i class="fa-solid fa-lock" style="font-size: 40px; color: var(--accent-purple); margin-bottom: 15px;"></i>
+            <h2>تسجيل الدخول</h2>
+            <p style="color: var(--text-secondary); font-size: 14px; margin-top: 5px;">ادخل اسم المستخدم وكلمة المرور لمتابعة اشتراكك</p>
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="username">اسم المستخدم (Username)</label>
+                <input type="text" id="username" name="username" class="form-control" placeholder="ادخل اسم المستخدم" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">كلمة المرور (Password)</label>
+                <input type="password" id="password" name="password" class="form-control" placeholder="ادخل كلمة المرور" required>
+            </div>
+
+            <button type="submit" class="btn-primary" style="width: 100%; margin-top: 15px; padding: 14px;">
+                <i class="fa-solid fa-right-to-bracket"></i> تسجيل الدخول
+            </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 25px; font-size: 14px; color: var(--text-secondary);">
+            ليس لديك حساب بعد؟ <a href="{% url 'register' %}" style="color: var(--accent-blue); text-decoration: none; font-weight: bold;">سجل حساباً جديداً</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

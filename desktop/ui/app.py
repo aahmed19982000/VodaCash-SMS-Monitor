@@ -10,10 +10,12 @@ from desktop.ui.views.top_contacts_view import TopContactsView
 from desktop.ui.views.calculator_view import CalculatorView
 from desktop.ui.views.cash_management_view import CashManagementView
 from desktop.ui.views.transfer_view import TransferView
+from desktop.ui.views.login_view import LoginView
 
 class DesktopApp:
     def __init__(self, page: ft.Page, db: DesktopDatabase, server):
         self.page = page
+        self.page.ui_app = self
         self.db = db
         self.server = server
         self.active_dialog = None
@@ -67,8 +69,8 @@ class DesktopApp:
             min_extended_width=200,
             group_alignment=-0.9,
             bgcolor=ft.Colors.TRANSPARENT,
-            indicator_color=ft.Colors.with_opacity(0.12, ft.Colors.BLUE_400),
-            selected_label_text_style=ft.TextStyle(weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400, size=12),
+            indicator_color=ft.Colors.with_opacity(0.12, "#1E8F8B"),
+            selected_label_text_style=ft.TextStyle(weight=ft.FontWeight.BOLD, color="#1E8F8B", size=12),
             unselected_label_text_style=ft.TextStyle(color=ft.Colors.WHITE54, size=11),
             destinations=[
                 ft.NavigationRailDestination(
@@ -122,12 +124,25 @@ class DesktopApp:
             padding=15
         )
 
+        # Banner container for notifications/warnings
+        self.banner_container = ft.Container(visible=False)
+
+        # Right column containing banner + view
+        self.right_column = ft.Column(
+            [
+                self.banner_container,
+                self.view_container
+            ],
+            expand=True,
+            spacing=0
+        )
+
         # Layout
         self.main_layout = ft.Row(
             [
                 self.rail,
                 ft.VerticalDivider(width=1, color="#1E293B"),
-                self.view_container,
+                self.right_column,
             ],
             expand=True,
         )
@@ -143,16 +158,142 @@ class DesktopApp:
         self.page.show_dialog_overlay = self.show_dialog_overlay
         self.page.close_dialog_overlay = self.close_dialog_overlay
 
+        # Callback for license logout/deactivation
+        self.page.on_license_deactivated = self.show_login_screen
 
-        # تحميل البيانات الأولية في الخلفية لضمان سرعة إقلاع التطبيق
+        # Check license key state
+        self.check_license_on_startup()
+
+    def check_license_on_startup(self):
+        from datetime import datetime
+        lic_key = self.db.get_setting("license_key", "")
+        lic_expiry_str = self.db.get_setting("license_expiry", "")
+        lic_status = self.db.get_setting("license_status", "EXPIRED")
+
+        is_valid_local = False
+        if lic_key and lic_status == "ACTIVE" and lic_expiry_str:
+            try:
+                expiry = datetime.fromisoformat(lic_expiry_str.replace("Z", "+00:00"))
+                now_utc = datetime.now(expiry.tzinfo) if expiry.tzinfo else datetime.now()
+                if expiry > now_utc:
+                    is_valid_local = True
+            except Exception:
+                pass
+
+        if not is_valid_local:
+            self.show_login_screen()
+        else:
+            self.show_main_screen()
+            self.check_expiry_warning()
+            # Start background thread to verify key online
+            import threading
+            threading.Thread(target=self.verify_license_online_background, daemon=True).start()
+
+    def verify_license_online_background(self):
+        from desktop.utils.licensing import LicensingManager, get_mac_address
+        lic_mgr = LicensingManager(db=self.db)
+        lic_key = self.db.get_setting("license_key", "")
+        mac = get_mac_address()
+        
+        res = lic_mgr.validate_license(lic_key, mac)
+        
+        def apply_status():
+            if not res["success"]:
+                self.db.set_setting("license_key", "")
+                self.db.set_setting("license_expiry", "")
+                self.db.set_setting("license_status", "EXPIRED")
+                
+                self.page.snack_bar = ft.SnackBar(
+                    content=ft.Text(f"⚠️ توقف التفعيل: {res['message']}", size=14, weight=ft.FontWeight.BOLD),
+                    bgcolor=ft.Colors.RED_700,
+                    duration=6000
+                )
+                self.page.snack_bar.open = True
+                self.show_login_screen()
+            else:
+                lic = res["license"]
+                self.db.set_setting("license_expiry", lic["expires_at"])
+                self.db.set_setting("license_status", "ACTIVE")
+                self.check_expiry_warning()
+                
+        if self.page:
+            self.page.run_thread(apply_status)
+
+    def show_login_screen(self):
+        from desktop.ui.views.login_view import LoginView
+        self.login_view = LoginView(self.page, self.db, self.on_license_activated_success)
+        self.root_stack.controls = [self.login_view]
+        self.page.update()
+
+    def show_main_screen(self):
+        self.root_stack.controls = [self.main_layout]
         threading.Thread(target=self.refresh_views, daemon=True).start()
+        self.page.update()
+
+    def on_license_activated_success(self):
+        self.show_main_screen()
+        self.check_expiry_warning()
+
+    def check_expiry_warning(self):
+        from datetime import datetime
+        lic_expiry_str = self.db.get_setting("license_expiry", "")
+        if not lic_expiry_str:
+            self.banner_container.visible = False
+            self.page.update()
+            return
+
+        try:
+            expiry = datetime.fromisoformat(lic_expiry_str.replace("Z", "+00:00"))
+            now_utc = datetime.now(expiry.tzinfo) if expiry.tzinfo else datetime.now()
+            
+            self.banner_container.visible = False
+            self.banner_container.content = None
+
+            if now_utc >= expiry:
+                self.banner_container.visible = True
+                self.banner_container.content = ft.Container(
+                    content=ft.Row(
+                        [
+                            ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=ft.Colors.YELLOW_300, size=20),
+                            ft.Text("⚠️ انتهى اشتراكك. تم إيقاف استقبال العمليات الجديدة وتجميد الخدمة. يمكنك تصفح السجل التاريخي فقط.", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD, size=13),
+                        ],
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        spacing=10
+                    ),
+                    bgcolor=ft.Colors.RED_900,
+                    padding=ft.Padding(10, 8, 10, 8),
+                    alignment=ft.alignment.Alignment.CENTER
+                )
+            else:
+                days_left = (expiry - now_utc).days
+                if days_left <= 5:
+                    self.banner_container.visible = True
+                    self.banner_container.content = ft.Container(
+                        content=ft.Row(
+                            [
+                                ft.Icon(ft.Icons.WARNING_ROUNDED, color=ft.Colors.WHITE, size=18),
+                                ft.Text(f"⚠️ ينتهي اشتراكك خلال {days_left + 1} أيام. يرجى تجديد الاشتراك لتفادي توقف الخدمة.", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD, size=13),
+                            ],
+                            alignment=ft.MainAxisAlignment.CENTER,
+                            spacing=10
+                        ),
+                        bgcolor=ft.Colors.AMBER_800,
+                        padding=ft.Padding(10, 8, 10, 8),
+                        alignment=ft.alignment.Alignment.CENTER
+                    )
+        except Exception as e:
+            print(f"Error checking expiry warning: {e}")
+
+        
+        self.page.update()
 
     def setup_page(self):
-        self.page.title = "VodaCash SMS Monitor"
+
+        self.page.title = "دفتر كاش - Daftar Cash"
         self.page.theme_mode = ft.ThemeMode.DARK
         self.page.bgcolor = "#080C14"
         self.page.theme = ft.Theme(
-            color_scheme_seed=ft.Colors.BLUE,
+            color_scheme_seed="#1E8F8B",
             font_family="Segoe UI, Tahoma, Geneva, Verdana, sans-serif"
         )
         self.page.padding = 0
@@ -163,9 +304,9 @@ class DesktopApp:
 
         # Add AppBar
         self.page.appbar = ft.AppBar(
-            leading=ft.Icon(ft.Icons.MONITOR_HEART_OUTLINED, color=ft.Colors.BLUE_400, size=24),
-            leading_width=45,
-            title=ft.Text("VodaCash SMS Monitor", weight=ft.FontWeight.BOLD, size=18, color=ft.Colors.WHITE),
+            leading=ft.Container(content=ft.Image(src="/logo.png", fit="contain"), padding=ft.Padding(left=8, top=5, right=0, bottom=5)),
+            leading_width=50,
+            title=ft.Text("دفتر كاش - Daftar Cash", weight=ft.FontWeight.BOLD, size=18, color=ft.Colors.WHITE),
             center_title=False,
             bgcolor="#0B0F19",
             elevation=0,
@@ -339,23 +480,15 @@ class DesktopApp:
         self.refresh_all_views()
         self.page.update()
 
-        # التحقق من أن العملية ليست قديمة أو تمت معالجتها بالفعل لتجنب تراكم النوافذ المنبثقة
-        if not is_live:
-            from datetime import datetime
-            try:
-                # 1. إذا كانت العملية أقدم من 5 دقائق (300 ثانية)، لا تعرض النافذة
-                time_diff = (datetime.now() - tx.sms_timestamp).total_seconds()
-                if abs(time_diff) > 300:
-                    print(f"Skipping profit popup for historical transaction {tx.transaction_id} (age: {time_diff:.1f}s)")
-                    return
-
-                # 2. إذا كانت العملية موجودة بالفعل وحالة أرباحها ليست معلقة (UNSET)
-                existing_status = self.db.get_transaction_profit_status(tx.transaction_id)
-                if existing_status != "UNSET":
-                    print(f"Skipping profit popup for already processed transaction {tx.transaction_id} (status: {existing_status})")
-                    return
-            except Exception as ex:
-                print(f"Error checking transaction age/status: {ex}")
+        # التحقق من أن العملية تمت معالجتها بالفعل لتجنب تراكم النوافذ المنبثقة
+        try:
+            # إذا كانت العملية موجودة بالفعل وحالة أرباحها ليست معلقة (UNSET)
+            existing_status = self.db.get_transaction_profit_status(tx.transaction_id)
+            if existing_status != "UNSET":
+                print(f"Skipping profit popup for already processed transaction {tx.transaction_id} (status: {existing_status})")
+                return
+        except Exception as ex:
+            print(f"Error checking transaction status: {ex}")
 
         # التحقق من الرسوم أولاً لتفادي غلق نافذة مفتوحة إذا كانت العملية الجديدة لا تحمل أرباحاً
         fee = self.db.calculate_fee(tx)
@@ -372,6 +505,19 @@ class DesktopApp:
                 return
 
             self._show_new_tx_dialog(tx, fee)
+
+    def handle_new_unclassified(self, payload):
+        """التعامل مع رسالة جديدة غير مصنفة وتنبيه المستخدم وتحديث الواجهة"""
+        try:
+            self.refresh_all_views()
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text("📬 تم استقبال رسالة غير مصنفة جديدة. يرجى مراجعتها وتصنيفها يدوياً.", size=14, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.Colors.BLUE_900,
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+        except Exception as e:
+            print(f"Error handling new unclassified SMS: {e}")
 
     def _show_new_tx_dialog(self, tx, fee):
         amount_val = tx.amount if tx.amount is not None else 0.0

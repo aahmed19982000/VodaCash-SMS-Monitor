@@ -619,7 +619,7 @@ public class SmsMonitorService extends Service {
         String wsStatus = (wsManager != null && wsManager.isConnected()) ? "🟢" : "🔴";
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(wsStatus + " VodaCash Monitor")
+            .setContentTitle(wsStatus + " دفتر كاش - Daftar Cash")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(pendingTap)
@@ -847,7 +847,7 @@ public class SmsMonitorService extends Service {
         if (s.contains("we") || b.contains("وي باي") || b.contains("we pay"))
             return "we_pay";
         if (s.contains("instapay") || b.contains("انستاباي") || b.contains("instapay"))
-            return "instapay";
+            return "bank";
         if (s.contains("bank") || s.contains("cib") || s.contains("nbe") ||
             s.contains("qnb") || s.contains("bdc") || s.contains("alex") ||
             b.contains("حسابك") || b.contains("رصيد حسابك"))

@@ -86,7 +86,17 @@ class MainApplication:
 
     def handle_transaction(self, tx: Transaction, is_live: bool = False):
         """عند استقبال عملية من الموبايل"""
+        if not self.db.is_license_active():
+            logger.warning(f"🚫 Transaction {tx.transaction_id} ignored: Subscription has expired or is inactive.")
+            return
+
+        # Check if transaction was already processed/read before
+        if self.db.transaction_exists(tx.transaction_id, tx.raw_sms):
+            logger.info(f"ℹ️ Transaction {tx.transaction_id} already read before. Ignoring completely.")
+            return
+
         logger.info(f"💰 Received Transaction: {tx.type.value} | {tx.amount} EGP | Live: {is_live}")
+
         
         # 0. تشغيل صوت مميز مخصص للعمليات المباشرة
         sound_enabled = self.db.get_setting("sound_enabled", "true") == "true"
@@ -153,12 +163,38 @@ class MainApplication:
         # سيتم تحديثه في الـ Dashboard تلقائياً مع العمليات
 
     def handle_unclassified(self, payload: dict):
-        logger.warning("📬 Received Unclassified SMS")
+        logger.warning(f"📬 Received Unclassified SMS from {payload.get('sender', '')}")
+        self.db.save_unclassified_sms(payload)
+        if self.ui_app:
+            self.ui_app.page.run_thread(self.ui_app.handle_new_unclassified, payload)
+
+        # Report telemetry to Django for future analysis
+        try:
+            from desktop.utils.licensing import LicensingManager
+            lic_mgr = LicensingManager(db=self.db)
+            import threading
+            threading.Thread(
+                target=lic_mgr.report_unclassified_sms,
+                args=(
+                    payload.get("sender", "Unknown"),
+                    payload.get("raw_sms", payload.get("body", "")),
+                    payload.get("received_at", "")
+                ),
+                daemon=True
+            ).start()
+        except Exception as e:
+            logger.error(f"⚠️ Failed to report unclassified SMS to Django: {e}")
+
 
     def handle_connected(self, client: str):
         logger.info(f"📱 Mobile connected: {client}")
+        if not self.db.is_license_active():
+            logger.warning("🚫 Connection sync blocked: Subscription has expired or is inactive.")
+            return
+        
         # طلب مزامنة العمليات التي لم تصل
         asyncio.create_task(self.server.request_sync())
+
 
         # إرسال الرصيد الحالي للعميل الجديد
         kpi = self.db.get_kpi_summary()
@@ -216,7 +252,7 @@ class MainApplication:
         def main_flet(page: ft.Page):
             self.ui_app = DesktopApp(page, self.db, self.server)
 
-        ft.app(target=main_flet)
+        ft.app(target=main_flet, assets_dir="desktop/assets")
 
 if __name__ == "__main__":
     app = MainApplication()

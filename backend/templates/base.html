@@ -1,0 +1,126 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}دفتر كاش - Daftar Cash{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=1.4">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="rtl">
+    <!-- Glowing background blobs -->
+    <div class="glow-blob blob-1"></div>
+    <div class="glow-blob blob-2"></div>
+    <div class="glow-blob blob-3"></div>
+
+    <!-- Header / Navbar -->
+    <header>
+        <div class="nav-container">
+            <a href="{% url 'landing' %}" class="logo-link">
+                <img src="{% static 'logo.png' %}" alt="شعار دفتر كاش" class="logo-img">
+            </a>
+            <nav>
+                <ul class="nav-links">
+                    <li class="desktop-only"><a href="{% url 'landing' %}"><i class="fa-solid fa-house"></i> الرئيسية</a></li>
+                    
+                    {% if user.is_authenticated %}
+                        <li><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> لوحة التحكم</a></li>
+                        {% if user.is_staff or user.is_superuser %}
+                            <li><a href="{% url 'admin_panel' %}" style="color: var(--accent-pink);"><i class="fa-solid fa-user-shield"></i> الإدارة</a></li>
+                        {% endif %}
+                        <li><a href="{% url 'logout' %}"><i class="fa-solid fa-right-from-bracket"></i> خروج <span class="desktop-only">({{ user.username }})</span></a></li>
+                    {% else %}
+                        <li><a href="{% url 'login' %}"><i class="fa-solid fa-right-to-bracket"></i> دخول</a></li>
+                        <li><a href="{% url 'register' %}" class="btn-primary" style="padding: 8px 16px; box-shadow: none; font-size: 13px;"><i class="fa-solid fa-user-plus"></i> تجربة مجانية</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Wrapper -->
+    <main class="main-content">
+        <!-- Message Alerts -->
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li class="alert alert-{% if message.tags == 'error' %}error{% else %}success{% endif %}">
+                        {% if message.tags == 'error' %}
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                        {% else %}
+                            <i class="fa-solid fa-circle-check"></i>
+                        {% endif %}
+                        {{ message }}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="premium-footer">
+        <div class="footer-container">
+            <!-- Brand Info Column -->
+            <div class="footer-brand">
+                <a href="{% url 'landing' %}" class="footer-brand-logo">
+                    <img src="{% static 'logo.png' %}" alt="شعار دفتر كاش">
+                    <span class="footer-brand-title">دفتر كاش</span>
+                </a>
+                <p class="footer-brand-desc">
+                    النظام الأقوى والمساعد الذكي لمراقبة ومزامنة رسائل محافظ الكاش القصيرة (فودافون كاش، اتصالات كاش، انستاباي، وغيرها) وحساب الأرباح وعمليات الدفع لحظياً وبسهولة تامة.
+                </p>
+                <div class="footer-socials">
+                    <a href="#" class="footer-social-btn" title="تواصل عبر واتساب"><i class="fa-brands fa-whatsapp"></i></a>
+                    <a href="#" class="footer-social-btn" title="تليجرام"><i class="fa-brands fa-telegram"></i></a>
+                    <a href="#" class="footer-social-btn" title="فيسبوك"><i class="fa-brands fa-facebook-f"></i></a>
+                </div>
+            </div>
+
+            <!-- Quick Links Column -->
+            <div class="footer-column">
+                <h4 class="footer-column-title">روابط سريعة</h4>
+                <ul class="footer-links">
+                    <li><a href="{% url 'landing' %}"><i class="fa-solid fa-chevron-left"></i> الرئيسية</a></li>
+                    <li><a href="{% url 'landing' %}#features"><i class="fa-solid fa-chevron-left"></i> مميزات الخدمة</a></li>
+                    <li><a href="{% url 'landing' %}#pricing"><i class="fa-solid fa-chevron-left"></i> خطط الأسعار</a></li>
+                    <li><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chevron-left"></i> لوحة تحكم المشترك</a></li>
+                </ul>
+            </div>
+
+            <!-- Downloads Column -->
+            <div class="footer-column">
+                <h4 class="footer-column-title">تحميل البرامج</h4>
+                <ul class="footer-links">
+                    <li><a href="{% url 'download_file' 'desktop' %}"><i class="fa-brands fa-windows"></i> نسخة الكمبيوتر (.exe)</a></li>
+                    <li><a href="{% url 'download_file' 'mobile' %}"><i class="fa-brands fa-android"></i> نسخة الأندرويد (.apk)</a></li>
+                </ul>
+            </div>
+
+            <!-- Contact Column -->
+            <div class="footer-column">
+                <h4 class="footer-column-title">الدعم الفني</h4>
+                <ul class="footer-links">
+                    <li><a href="mailto:support@daftarcash.com"><i class="fa-regular fa-envelope"></i> support@daftarcash.com</a></li>
+                    <li><a href="tel:+201000000000"><i class="fa-solid fa-phone"></i> +20 100 000 0000</a></li>
+                    <li><a href="{% url 'privacy_policy' %}"><i class="fa-solid fa-shield-halved"></i> سياسة الخصوصية</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <div>
+                جميع الحقوق محفوظة &copy; دفتر كاش 2026
+            </div>
+            <div class="footer-bottom-links">
+                <a href="{% url 'privacy_policy' %}">سياسة الخصوصية (Privacy Policy)</a>
+                <a href="{% url 'landing' %}#pricing">الاشتراكات</a>
+            </div>
+        </div>
+    </footer>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

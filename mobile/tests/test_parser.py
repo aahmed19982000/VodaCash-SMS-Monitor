@@ -123,7 +123,7 @@ Transaction ID: 019995593948"""
     def test_instapay_received(self):
         msg = """InstaPay: EGP 150.00 received from Mohamed Ali to your CIB account. Trx Ref: 602345678901"""
         tx = SMSEngine.parse(msg, sender="InstaPay")
-        self.assertEqual(tx.wallet_id, "instapay")
+        self.assertEqual(tx.wallet_id, "bank")
         self.assertEqual(tx.type, TransactionType.RECEIVED)
         self.assertEqual(tx.amount, 150.0)
         self.assertEqual(tx.transaction_id, "602345678901")
@@ -171,6 +171,47 @@ Transaction ID: 019995593948"""
         self.assertEqual(tx.type, TransactionType.ATM_DEPOSIT)
         self.assertEqual(tx.amount, 4200.0)
         self.assertEqual(tx.balance_after, 10413.45)
+        self.assertGreaterEqual(tx.confidence, 0.7)
+
+    def test_user_provided_card_debit(self):
+        msg = "تم خصم 3000.00EGP من بطاقة الخصم المباشر رقم 1950 عند EL SHEKH ZEN EL DIN SOH يوم 24/05 الساعه 19:23 المتاح 665.37 للمزيد إتصل ب 19623"
+        tx = SMSEngine.parse(msg, sender="NBE")
+        self.assertEqual(tx.wallet_id, "bank")
+        self.assertEqual(tx.type, TransactionType.ATM_WITHDRAWAL)
+        self.assertEqual(tx.amount, 3000.0)
+        self.assertEqual(tx.balance_after, 665.37)
+        self.assertEqual(tx.sms_timestamp.month, 5)
+        self.assertEqual(tx.sms_timestamp.day, 24)
+        self.assertEqual(tx.sms_timestamp.hour, 19)
+        self.assertEqual(tx.sms_timestamp.minute, 23)
+        self.assertGreaterEqual(tx.confidence, 0.7)
+
+    def test_user_provided_instapay_sent(self):
+        msg = "تم تنفيذ تحويل لحظي من حسابكم رقم 0140 بمبلغ 7800.00 جم إلى ديفيد ب* ط* ش**** رقم مرجعي 328546435221 يوم 05-24 الساعة 12:20 للمزيد اتصل بـ 19623"
+        tx = SMSEngine.parse(msg, sender="InstaPay")
+        self.assertEqual(tx.wallet_id, "bank")
+        self.assertEqual(tx.type, TransactionType.SENT)
+        self.assertEqual(tx.amount, 7800.0)
+        self.assertEqual(tx.counterpart, "ديفيد ب* ط* ش****")
+        self.assertEqual(tx.transaction_id, "328546435221")
+        self.assertEqual(tx.sms_timestamp.month, 5)
+        self.assertEqual(tx.sms_timestamp.day, 24)
+        self.assertEqual(tx.sms_timestamp.hour, 12)
+        self.assertEqual(tx.sms_timestamp.minute, 20)
+        self.assertGreaterEqual(tx.confidence, 0.7)
+
+    def test_user_provided_instapay_received(self):
+        msg = "تم إضافة تحويل لحظي لحسابكم رقم 0140 بمبلغ 7882.00 جم من ايمان ابو السعود محمد على القاضى رقم مرجعي 040016907221 يوم 05-24 الساعة 12:18 للمزيد اتصل بـ 19623"
+        tx = SMSEngine.parse(msg, sender="InstaPay")
+        self.assertEqual(tx.wallet_id, "bank")
+        self.assertEqual(tx.type, TransactionType.RECEIVED)
+        self.assertEqual(tx.amount, 7882.0)
+        self.assertEqual(tx.counterpart, "ايمان ابو السعود محمد على القاضى")
+        self.assertEqual(tx.transaction_id, "040016907221")
+        self.assertEqual(tx.sms_timestamp.month, 5)
+        self.assertEqual(tx.sms_timestamp.day, 24)
+        self.assertEqual(tx.sms_timestamp.hour, 12)
+        self.assertEqual(tx.sms_timestamp.minute, 18)
         self.assertGreaterEqual(tx.confidence, 0.7)
 
 if __name__ == '__main__':

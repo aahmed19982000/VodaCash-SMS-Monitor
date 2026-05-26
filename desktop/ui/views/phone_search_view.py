@@ -32,16 +32,9 @@ WALLET_STYLING = {
         "accent_color": "#A855F7",
         "icon": ft.Icons.PAYMENT,
     },
-    "instapay": {
-        "name": "InstaPay",
-        "name_ar": "انستاباي",
-        "colors": ["#1E1B4B", "#311042"],
-        "accent_color": "#EC008C",
-        "icon": ft.Icons.SWIPE_RIGHT_OUTLINED,
-    },
     "bank": {
-        "name": "Bank Account",
-        "name_ar": "حساب بنكي",
+        "name": "Bank / InstaPay",
+        "name_ar": "حساب بنكي / انستاباي",
         "colors": ["#115E59", "#0B0F19"],
         "accent_color": "#06B6D4",
         "icon": ft.Icons.ACCOUNT_BALANCE,

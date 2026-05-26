@@ -1,0 +1,445 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}الرئيسية - دفتر كاش (Daftar Cash){% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Custom style overrides for landing hero and grids */
+    .hero-section {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 40px;
+        align-items: center;
+        padding: 40px 0 80px 0;
+    }
+    
+    .hero-content h1 {
+        font-size: 48px;
+        font-weight: 800;
+        line-height: 1.2;
+        margin-bottom: 20px;
+    }
+    
+    .hero-content h1 span {
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .hero-content p {
+        font-size: 18px;
+        color: var(--text-secondary);
+        margin-bottom: 35px;
+    }
+    
+    .hero-buttons {
+        display: flex;
+        gap: 15px;
+    }
+    
+    .hero-image {
+        position: relative;
+        display: flex;
+        justify-content: center;
+    }
+    
+    .hero-graphic {
+        width: 100%;
+        max-width: 400px;
+        background: #FFFFFF;
+        border: 1px solid var(--border-color);
+        border-radius: 30px;
+        padding: 25px;
+        box-shadow: var(--shadow-premium);
+        animation: float 6s ease-in-out infinite;
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-15px); }
+    }
+
+    /* Features section */
+    .section-title {
+        text-align: center;
+        margin-bottom: 60px;
+    }
+    
+    .section-title h2 {
+        font-size: 36px;
+        font-weight: 800;
+        margin-bottom: 10px;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .section-title p {
+        color: var(--text-secondary);
+        font-size: 16px;
+    }
+    
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 25px;
+        margin-bottom: 80px;
+    }
+    
+    .feature-card {
+        text-align: center;
+        padding: 40px 25px;
+    }
+    
+    .feature-icon {
+        font-size: 36px;
+        margin-bottom: 20px;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
+    }
+
+    /* Steps Section */
+    .steps-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 30px;
+        margin-bottom: 80px;
+        position: relative;
+    }
+    
+    .step-card {
+        padding: 30px;
+        text-align: right;
+    }
+    
+    .step-num {
+        font-family: 'Outfit', sans-serif;
+        font-size: 40px;
+        font-weight: 800;
+        color: rgba(15, 60, 109, 0.08);
+        position: absolute;
+        top: 15px;
+        left: 20px;
+    }
+
+    /* Pricing Section */
+    .pricing-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 30px;
+        margin-bottom: 60px;
+    }
+    
+    .price-card {
+        border-radius: 24px;
+        padding: 40px 30px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+    }
+    
+    .price-card.popular {
+        border-color: var(--accent-purple);
+        box-shadow: 0 0 30px rgba(139, 92, 246, 0.15);
+    }
+    
+    .popular-badge {
+        position: absolute;
+        top: -15px;
+        right: 30px;
+        background: var(--primary-gradient);
+        color: white;
+        padding: 4px 14px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 700;
+        box-shadow: 0 4px 10px rgba(109, 40, 217, 0.2);
+    }
+    
+    .price-header h3 {
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+    
+    .price-header .price {
+        font-family: 'Outfit', sans-serif;
+        font-size: 44px;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin: 15px 0;
+    }
+    
+    .price-header .price span {
+        font-size: 16px;
+        font-weight: 400;
+        color: var(--text-secondary);
+    }
+    
+    .price-features {
+        list-style: none;
+        margin: 30px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .price-features li {
+        font-size: 14px;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .price-features li i {
+        color: var(--success-green);
+    }
+
+    @media (max-width: 992px) {
+        .hero-section {
+            grid-template-columns: 1fr;
+            text-align: center;
+        }
+        
+        .hero-buttons {
+            justify-content: center;
+        }
+        
+        .hero-graphic {
+            max-width: 300px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .hero-section {
+            padding: 20px 0 40px 0;
+            gap: 25px;
+        }
+        
+        .hero-content h1 {
+            font-size: 28px !important;
+            line-height: 1.35;
+            margin-bottom: 15px;
+        }
+        
+        .hero-content p {
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        
+        .hero-graphic {
+            max-width: 280px;
+            padding: 15px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="hero-content">
+        <h1>مراقبة رسائل الكاش <br><span>بشكل ذكي وتلقائي</span></h1>
+        <p>تطبيق ديسكتوب وموبايل يقوم بالتقاط رسائل الكاش القصيرة (فودافون كاش، اتصالات، أورنج، وي باي، انستاباي) ومزامنتها على شاشتك لحساب صافي الأرباح، الرصيد الفعلي، وحجم النشاط اليومي بدقة متناهية.</p>
+        <div class="hero-buttons">
+            {% if user.is_authenticated %}
+                <a href="{% url 'dashboard' %}" class="btn-primary"><i class="fa-solid fa-chart-line"></i> لوحة التحكم الخاصة بك</a>
+            {% else %}
+                <a href="{% url 'register' %}" class="btn-primary"><i class="fa-solid fa-circle-play"></i> ابدأ تجربتك المجانية</a>
+                <a href="#pricing" class="btn-secondary"><i class="fa-solid fa-tags"></i> أسعار الاشتراكات</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="hero-image">
+        <div class="hero-graphic">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div style="display: flex; gap: 6px;">
+                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #EF4444;"></div>
+                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #F59E0B;"></div>
+                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #10B981;"></div>
+                </div>
+                <span style="font-size: 11px; color: var(--text-muted); font-family: 'Outfit';">Daftar Cash Live Status</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">فودافون كاش (سحب)</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #10B981;">+ 1,500.00 ج.م</div>
+                    </div>
+                    <i class="fa-solid fa-phone-flip" style="color: #EF4444; font-size: 18px;"></i>
+                </div>
+                <div style="background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">انستاباي (إيداع)</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #EF4444;">- 500.00 ج.م</div>
+                    </div>
+                    <i class="fa-solid fa-building-columns" style="color: #EC008C; font-size: 18px;"></i>
+                </div>
+                <div style="text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 10px;">
+                    <i class="fa-solid fa-circle-dot" style="color: var(--success-green); animation: pulse 2s infinite;"></i> متصل ومزامن حالياً
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section id="features" style="padding: 60px 0;">
+    <div class="section-title">
+        <h2>أبرز مميزات التطبيق</h2>
+        <p>كل ما تحتاجه لإدارة عمليات الدفع والتحويل في متجرك أو عملك الصغير</p>
+    </div>
+    
+    <div class="features-grid">
+        <div class="glass-card feature-card">
+            <i class="fa-solid fa-bolt feature-icon"></i>
+            <h3 style="margin-bottom: 12px;">مزامنة فورية حية</h3>
+            <p style="font-size: 14px; color: var(--text-secondary);">بمجرد استلام الهاتف لرسالة التحويل، تظهر في شاشة الديسكتوب خلال أقل من ثانية واحدة مصحوبة بنغمة تنبيه وصوت مميز.</p>
+        </div>
+        
+        <div class="glass-card feature-card">
+            <i class="fa-solid fa-calculator feature-icon"></i>
+            <h3 style="margin-bottom: 12px;">حساب تلقائي للأرباح</h3>
+            <p style="font-size: 14px; color: var(--text-secondary);">يقوم البرنامج بحساب العمولة والرسوم والحد الأدنى ديناميكياً لكل عملية سحب أو إيداع، وتحديث صافي الأرباح لحظة بلحظة.</p>
+        </div>
+        
+        <div class="glass-card feature-card">
+            <i class="fa-solid fa-lock feature-icon"></i>
+            <h3 style="margin-bottom: 12px;">أمان محلي 100%</h3>
+            <p style="font-size: 14px; color: var(--text-secondary);">تُحفظ سجلاتك وبيانات عملياتك محلياً بالكامل على حاسوبك الشخصي. لا يتم إرسال أي تفاصيل مالية أو رسائل إلى سيرفر خارجي.</p>
+        </div>
+    </div>
+</section>
+
+<!-- How it works Section -->
+<section id="how-it-works" style="padding: 60px 0; background: #FFFFFF; border-radius: 30px; border: 1px solid var(--border-color); padding: 40px; margin-bottom: 80px; box-shadow: var(--shadow-soft);">
+    <div class="section-title">
+        <h2>خطوات بسيطة للربط والتشغيل</h2>
+        <p>كيف تبدأ بالعمل الفعلي في أقل من 5 دقائق</p>
+    </div>
+    
+    <div class="steps-container">
+        <div class="glass-card step-card">
+            <div class="step-num">01</div>
+            <h3 style="margin-bottom: 10px; color: var(--accent-blue);">تحميل البرنامج</h3>
+            <p style="font-size: 13px; color: var(--text-secondary);">سجل حساباً مجانياً ثم قم بتحميل ملف الديسكتوب وتثبيت تطبيق الأندرويد (.APK) على هاتفك المخصص لاستقبال الرسائل.</p>
+        </div>
+        <div class="glass-card step-card">
+            <div class="step-num">02</div>
+            <h3 style="margin-bottom: 10px; color: var(--accent-purple);">تفعيل كود الترخيص</h3>
+            <p style="font-size: 13px; color: var(--text-secondary);">انسخ كود التفعيل التجريبي أو كود الاشتراك من لوحة التحكم، واكتبه في نافذة الديسكتوب لتفعيل البرنامج.</p>
+        </div>
+        <div class="glass-card step-card">
+            <div class="step-num">03</div>
+            <h3 style="margin-bottom: 10px; color: var(--accent-pink);">إقران الموبايل والكمبيوتر</h3>
+            <p style="font-size: 13px; color: var(--text-secondary);">تأكد من وجود الجهازين على نفس شبكة الواي فاي، واكتب عنوان الـ IP المعروض في الديسكتوب داخل إعدادات الموبايل.</p>
+        </div>
+    </div>
+</section>
+
+<!-- App Downloads Section -->
+<section id="download" style="padding: 60px 0; text-align: center;">
+    <div class="section-title">
+        <h2>روابط تحميل التطبيقات</h2>
+        <p>ابدأ التشغيل الفوري بتحميل الأدوات المتوافقة مع أجهزتك</p>
+    </div>
+    
+    <div style="display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; margin-bottom: 50px; direction: rtl;">
+        <!-- Windows Desktop Download Card -->
+        <div class="glass-card" style="padding: 40px; width: 300px; border-radius: 20px; text-align: center; border: 1px solid rgba(30, 143, 139, 0.15); display: flex; flex-direction: column; justify-content: space-between; align-items: center; box-shadow: var(--shadow-premium);">
+            <i class="fa-brands fa-windows" style="font-size: 50px; color: var(--accent-blue); margin-bottom: 20px;"></i>
+            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 10px;">نسخة الكمبيوتر (Windows)</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 25px; min-height: 50px;">تطبيق ديسكتوب خفيف وسريع لمراقبة ومزامنة رسائل التحويل وعرض صافي الأرباح.</p>
+            <a href="{% url 'download_file' 'desktop' %}" class="btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i class="fa-solid fa-download"></i> تحميل لنظام ويندوز
+            </a>
+        </div>
+
+        <!-- Android Mobile Download Card -->
+        <div class="glass-card" style="padding: 40px; width: 300px; border-radius: 20px; text-align: center; border: 1px solid rgba(30, 143, 139, 0.15); display: flex; flex-direction: column; justify-content: space-between; align-items: center; box-shadow: var(--shadow-premium);">
+            <i class="fa-brands fa-android" style="font-size: 50px; color: var(--success-green); margin-bottom: 20px;"></i>
+            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 10px;">نسخة الهاتف (Android APK)</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 25px; min-height: 50px;">تطبيق موبايل خفيف جداً (6.5 ميجا بايت) لالتقاط رسائل الكاش وتحويلها فوراً.</p>
+            <a href="{% url 'download_file' 'mobile' %}" class="btn-secondary" style="width: 100%; border-color: var(--success-green); color: var(--success-green); display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i class="fa-solid fa-download"></i> تحميل ملف الـ APK
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Pricing Section -->
+<section id="pricing" style="padding: 60px 0;">
+    <div class="section-title">
+        <h2>خطط الأسعار والاشتراكات</h2>
+        <p>اختر الخطة المناسبة لحجم أعمالك، لا توجد أي رسوم خفية</p>
+    </div>
+    
+    <div class="pricing-grid">
+        <!-- Plan 1 -->
+        <div class="glass-card price-card">
+            <div class="price-header">
+                <h3>الفترة التجريبية</h3>
+                <p style="color: var(--text-secondary); font-size: 13px;">تفعيل فوري لتجربة التطبيق</p>
+                <div class="price">ميجاناً <span>/ 3 أيام</span></div>
+            </div>
+            <ul class="price-features">
+                <li><i class="fa-solid fa-check"></i> ربط هاتف واحد</li>
+                <li><i class="fa-solid fa-check"></i> شاشة مراقبة حية</li>
+                <li><i class="fa-solid fa-check"></i> تنبيهات وصوت فوري</li>
+                <li><i class="fa-solid fa-check"></i> تصفير السجل وتجربة كاملة</li>
+            </ul>
+            {% if user.is_authenticated %}
+                <a href="{% url 'dashboard' %}" class="btn-secondary" style="text-align: center;"><i class="fa-solid fa-circle-info"></i> تفعيل من لوحة التحكم</a>
+            {% else %}
+                <a href="{% url 'register' %}" class="btn-secondary" style="text-align: center;"><i class="fa-solid fa-user-plus"></i> سجل للحصول على الكود</a>
+            {% endif %}
+        </div>
+        
+        <!-- Plan 2 -->
+        <div class="glass-card price-card popular">
+            <div class="popular-badge">الأكثر شعبية</div>
+            <div class="price-header">
+                <h3>الاشتراك الشهري</h3>
+                <p style="color: var(--text-secondary); font-size: 13px;">مناسب للمتاجر المتوسطة واليومية</p>
+                <div class="price">150 ج.م <span>/ شهرياً</span></div>
+            </div>
+            <ul class="price-features">
+                <li><i class="fa-solid fa-check"></i> تفعيل كامل للمميزات</li>
+                <li><i class="fa-solid fa-check"></i> ربط غير محدود للهواتف</li>
+                <li><i class="fa-solid fa-check"></i> دعم فني ومزامنة كاملة</li>
+                <li><i class="fa-solid fa-check"></i> تحديثات مستمرة للنظام</li>
+            </ul>
+            {% if user.is_authenticated %}
+                <a href="{% url 'checkout' 'MONTHLY' %}" class="btn-primary" style="text-align: center;"><i class="fa-solid fa-credit-card"></i> اشترك الآن</a>
+            {% else %}
+                <a href="{% url 'login' %}?next=/checkout/MONTHLY/" class="btn-primary" style="text-align: center;"><i class="fa-solid fa-right-to-bracket"></i> سجل دخول للاشتراك</a>
+            {% endif %}
+        </div>
+        
+        <!-- Plan 3 -->
+        <div class="glass-card price-card">
+            <div class="price-header">
+                <h3>الاشتراك السنوي</h3>
+                <p style="color: var(--text-secondary); font-size: 13px;">توفير بقيمة شهرين كاملين</p>
+                <div class="price">1,200 ج.م <span>/ سنوياً</span></div>
+            </div>
+            <ul class="price-features">
+                <li><i class="fa-solid fa-check"></i> توفير كبير (حتى 600 ج.م)</li>
+                <li><i class="fa-solid fa-check"></i> جميع مميزات الاشتراك الشهري</li>
+                <li><i class="fa-solid fa-check"></i> أولوية في الدعم الفني</li>
+                <li><i class="fa-solid fa-check"></i> إمكانية نقل الترخيص لجهاز آخر</li>
+            </ul>
+            {% if user.is_authenticated %}
+                <a href="{% url 'checkout' 'YEARLY' %}" class="btn-secondary" style="text-align: center; border-color: var(--accent-pink); color: var(--accent-pink);"><i class="fa-solid fa-credit-card"></i> اشترك سنوياً ووفر</a>
+            {% else %}
+                <a href="{% url 'login' %}?next=/checkout/YEARLY/" class="btn-secondary" style="text-align: center;"><i class="fa-solid fa-right-to-bracket"></i> سجل دخول ووفر</a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

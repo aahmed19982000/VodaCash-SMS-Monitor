@@ -1,14 +1,17 @@
 # desktop/ui/views/transactions_view.py
 import flet as ft
+from datetime import datetime
+import uuid
 from desktop.db.database import DesktopDatabase
+from shared.models import Transaction, TransactionType
+from mobile.parser.engine import SMSEngine
 
 WALLET_BADGES = {
     "vodafone_cash": {"name": "Vodafone Cash", "colors": ["#450A0A", "#0B0F19"], "accent_color": "#EF4444"},
     "orange_cash":   {"name": "Orange Cash",   "colors": ["#431407", "#0B0F19"], "accent_color": "#F97316"},
     "etisalat_cash": {"name": "Etisalat Cash", "colors": ["#14532D", "#0B0F19"], "accent_color": "#22C55E"},
     "we_pay":        {"name": "WE Pay",        "colors": ["#3B0764", "#0B0F19"], "accent_color": "#A855F7"},
-    "instapay":      {"name": "InstaPay",      "colors": ["#1E1B4B", "#311042"], "accent_color": "#EC008C"},
-    "bank":          {"name": "Bank Account",  "colors": ["#115E59", "#0B0F19"], "accent_color": "#06B6D4"},
+    "bank":          {"name": "Bank / InstaPay", "colors": ["#115E59", "#0B0F19"], "accent_color": "#06B6D4"},
     "unspecified":   {"name": "Unspecified",   "colors": ["#1E293B", "#0F172A"], "accent_color": "#64748B"},
 }
 
@@ -40,6 +43,14 @@ class TransactionsView(ft.Container):
             "filled": True
         }
 
+        self.dialog_input_style = {
+            "border_radius": 10,
+            "bgcolor": "#151B2E",
+            "border_color": ft.Colors.WHITE24,
+            "focused_border_color": ft.Colors.BLUE_ACCENT,
+            "filled": True
+        }
+
         self.search_field = ft.TextField(
             label="Search (Number, Text...) / البحث",
             width=220,
@@ -54,13 +65,13 @@ class TransactionsView(ft.Container):
             width=155,
             options=[
                 ft.dropdown.Option("ALL", "All / الكل"),
-                ft.dropdown.Option("RECEIVED", "✅ RECEIVED"),
-                ft.dropdown.Option("SENT", "📤 SENT"),
-                ft.dropdown.Option("ATM_WITHDRAWAL", "🏧 ATM Withdrawal"),
-                ft.dropdown.Option("ATM_DEPOSIT", "🏦 ATM Deposit"),
-                ft.dropdown.Option("BILL", "🧾 BILL"),
-                ft.dropdown.Option("PURCHASE", "🛒 PURCHASE"),
-                ft.dropdown.Option("TOPUP", "📱 TOPUP"),
+                ft.dropdown.Option("RECEIVED", "RECEIVED"),
+                ft.dropdown.Option("SENT", "SENT"),
+                ft.dropdown.Option("ATM_WITHDRAWAL", "ATM Withdrawal"),
+                ft.dropdown.Option("ATM_DEPOSIT", "ATM Deposit"),
+                ft.dropdown.Option("BILL", "BILL"),
+                ft.dropdown.Option("PURCHASE", "PURCHASE"),
+                ft.dropdown.Option("TOPUP", "TOPUP"),
             ],
             value="ALL",
             on_select=self.apply_filters,
@@ -76,8 +87,7 @@ class TransactionsView(ft.Container):
                 ft.dropdown.Option("orange_cash", "Orange Cash"),
                 ft.dropdown.Option("etisalat_cash", "Etisalat Cash"),
                 ft.dropdown.Option("we_pay", "WE Pay"),
-                ft.dropdown.Option("instapay", "InstaPay"),
-                ft.dropdown.Option("bank", "Bank Account"),
+                ft.dropdown.Option("bank", "Bank / InstaPay"),
                 ft.dropdown.Option("unspecified", "Unspecified"),
             ],
             value="ALL",
@@ -102,10 +112,10 @@ class TransactionsView(ft.Container):
             width=180,
             options=[
                 ft.dropdown.Option("ALL",       "All / الكل"),
-                ft.dropdown.Option("UNSET",     "🟡 غير محددة"),
-                ft.dropdown.Option("IN_WALLET", "💳 في المحفظة"),
-                ft.dropdown.Option("CASH",      "💵 نقداً"),
-                ft.dropdown.Option("NONE",      "⬜ لا ربح"),
+                ft.dropdown.Option("UNSET",     "غير محددة"),
+                ft.dropdown.Option("IN_WALLET", "في المحفظة"),
+                ft.dropdown.Option("CASH",      "نقداً"),
+                ft.dropdown.Option("NONE",      "لا ربح"),
             ],
             value="ALL",
             on_select=self.apply_filters,
@@ -145,7 +155,7 @@ class TransactionsView(ft.Container):
             on_click=self.apply_filters, 
             icon=ft.Icons.FILTER_ALT,
             color=ft.Colors.WHITE,
-            bgcolor="#1E3A8A",
+            bgcolor="#0F3C6D",
             style=ft.ButtonStyle(
                 shape=ft.RoundedRectangleBorder(radius=12),
                 padding=ft.Padding(15, 18, 15, 18),
@@ -172,6 +182,7 @@ class TransactionsView(ft.Container):
                 ft.DataColumn(ft.Text("Status / الحالة",              weight=ft.FontWeight.BOLD, color=ft.Colors.AMBER_400)),
                 ft.DataColumn(ft.Text("Balance / الرصيد",             weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT)),
                 ft.DataColumn(ft.Text("Counterpart / الطرف الآخر",   weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT)),
+                ft.DataColumn(ft.Text("Actions / إجراءات",            weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_ACCENT)),
             ],
             rows=[],
             expand=True,
@@ -221,6 +232,42 @@ class TransactionsView(ft.Container):
             vertical_alignment=ft.CrossAxisAlignment.CENTER
         )
 
+        # Setup Tabs & Main Layout
+        classified_content = self.create_classified_tab_content()
+        unclassified_content = self.create_unclassified_tab_content()
+
+        self.tabs = ft.Tabs(
+            length=2,
+            selected_index=0,
+            animation_duration=300,
+            content=ft.Column(
+                expand=True,
+                controls=[
+                    ft.TabBar(
+                        tabs=[
+                            ft.Tab(
+                                label="Classified Transactions / العمليات المصنفة",
+                                icon=ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
+                            ),
+                            ft.Tab(
+                                label="Unclassified SMS / رسائل غير مصنفة",
+                                icon=ft.Icons.MARKUNREAD_MAILBOX_OUTLINED,
+                            ),
+                        ]
+                    ),
+                    ft.TabBarView(
+                        expand=True,
+                        controls=[
+                            classified_content,
+                            unclassified_content,
+                        ],
+                    ),
+                ],
+            ),
+            expand=True,
+            on_change=self.on_tab_change
+        )
+
         self.content = ft.Column(
             controls=[
                 ft.Row(
@@ -232,7 +279,14 @@ class TransactionsView(ft.Container):
                     vertical_alignment=ft.CrossAxisAlignment.CENTER
                 ),
                 ft.Divider(height=10, color=ft.Colors.WHITE24),
-                
+                self.tabs
+            ],
+            expand=True
+        )
+
+    def create_classified_tab_content(self):
+        return ft.Column(
+            controls=[
                 # Filters Row
                 ft.Container(
                     content=ft.Column([
@@ -266,7 +320,7 @@ class TransactionsView(ft.Container):
                     padding=15,
                     border_radius=15,
                     border=ft.Border.all(1, ft.Colors.WHITE10),
-                    margin=ft.Margin(left=0, top=0, right=0, bottom=10)
+                    margin=ft.Margin(left=0, top=10, right=0, bottom=10)
                 ),
                 
                 # Table
@@ -282,8 +336,29 @@ class TransactionsView(ft.Container):
                 ft.Divider(height=5, color=ft.Colors.TRANSPARENT),
                 # Pagination
                 self.pagination_row
-            ]
+            ],
+            expand=True
         )
+
+    def create_unclassified_tab_content(self):
+        self.unclassified_list = ft.Column(
+            scroll=ft.ScrollMode.ADAPTIVE,
+            expand=True,
+            spacing=10
+        )
+        return ft.Container(
+            content=self.unclassified_list,
+            expand=True,
+            padding=15,
+            bgcolor=ft.Colors.BLACK26,
+            border=ft.Border.all(1, ft.Colors.WHITE10),
+            border_radius=15,
+            margin=ft.Margin(left=0, top=10, right=0, bottom=0)
+        )
+
+    def on_tab_change(self, e):
+        self.current_page = 1
+        self.update_data()
 
     def go_prev_page(self, e):
         if self.current_page > 1:
@@ -340,7 +415,11 @@ class TransactionsView(ft.Container):
         self.update_data()
 
     def update_data(self, type_filter="ALL", start_date=None, end_date=None, min_amount=None, max_amount=None, search_query=None, wallet_filter="ALL", fee_filter="ALL", profit_status_filter="ALL"):
-        """تحديث بيانات الجدول مع الفلاتر"""
+        """تحديث كلاً من جدول العمليات المصنفة وقائمة الرسائل غير المصنفة"""
+        self._update_classified_table(type_filter, start_date, end_date, min_amount, max_amount, search_query, wallet_filter, fee_filter, profit_status_filter)
+        self.update_unclassified_list()
+
+    def _update_classified_table(self, type_filter="ALL", start_date=None, end_date=None, min_amount=None, max_amount=None, search_query=None, wallet_filter="ALL", fee_filter="ALL", profit_status_filter="ALL"):
         try:
             total_count = self.db.get_transactions_count(
                 type_filter=type_filter,
@@ -386,7 +465,6 @@ class TransactionsView(ft.Container):
         self.data_table.rows.clear()
         
         for idx, tx in enumerate(paginated_txs):
-            # Color coding per transaction type
             tx_val = tx.type.value
             if tx_val == "RECEIVED":
                 amount_color = ft.Colors.GREEN_400
@@ -397,7 +475,6 @@ class TransactionsView(ft.Container):
             else:
                 amount_color = ft.Colors.RED_400
             
-            # Wallet badge
             w_info = WALLET_BADGES.get(tx.wallet_id, WALLET_BADGES["unspecified"])
             wallet_cell = ft.DataCell(
                 ft.Container(
@@ -413,7 +490,6 @@ class TransactionsView(ft.Container):
             fee_color = ft.Colors.AMBER_400 if fee > 0 else ft.Colors.WHITE38
             fee_text = f"+{fee:,.2f}" if fee > 0 else "-"
 
-            # Profit status icon (clickable only when fee > 0)
             ps = getattr(tx, "profit_status", "UNSET") or "UNSET"
             ps_style = PROFIT_STATUS_STYLE.get(ps, PROFIT_STATUS_STYLE["UNSET"])
             if fee > 0:
@@ -431,7 +507,6 @@ class TransactionsView(ft.Container):
                     ft.Icon(ft.Icons.REMOVE_OUTLINED, color=ft.Colors.WHITE24, size=16)
                 )
 
-            # Alternate row background color
             row_color = ft.Colors.with_opacity(0.04, ft.Colors.WHITE) if idx % 2 != 0 else ft.Colors.TRANSPARENT
 
             cp = tx.counterpart or "—"
@@ -446,6 +521,23 @@ class TransactionsView(ft.Container):
                 elif tx_type_str == "BILL":
                     cp = f"🧾 لـ: {cp}"
 
+            # Edit Button Cell
+            edit_cell = ft.DataCell(
+                ft.Row(
+                    [
+                        ft.IconButton(
+                            icon=ft.Icons.EDIT_ROUNDED,
+                            icon_color=ft.Colors.BLUE_ACCENT,
+                            icon_size=18,
+                            tooltip="تعديل العملية / Edit Transaction",
+                            on_click=lambda ev, _tx=tx: self._show_edit_transaction_dialog(_tx)
+                        )
+                    ],
+                    spacing=5,
+                    alignment=ft.MainAxisAlignment.CENTER
+                )
+            )
+
             self.data_table.rows.append(
                 ft.DataRow(
                     color=row_color,
@@ -458,18 +550,484 @@ class TransactionsView(ft.Container):
                         status_cell,
                         ft.DataCell(ft.Text(f"{tx.balance_after:,.2f} EGP" if tx.balance_after >= 0 else "N/A", color=ft.Colors.WHITE70, weight=ft.FontWeight.W_500, text_align=ft.TextAlign.RIGHT)),
                         ft.DataCell(ft.Text(cp, color=ft.Colors.WHITE70)),
+                        edit_cell,
                     ]
                 )
             )
         
         self.flet_page.update()
 
+    def update_unclassified_list(self):
+        try:
+            sms_list = self.db.get_unclassified_sms()
+        except Exception as e:
+            print(f"Error fetching unclassified SMS: {e}")
+            sms_list = []
+
+        self.unclassified_list.controls.clear()
+        if not sms_list:
+            self.unclassified_list.controls.append(
+                ft.Container(
+                    content=ft.Column([
+                        ft.Icon(ft.Icons.MARK_EMAIL_READ_ROUNDED, size=64, color=ft.Colors.WHITE24),
+                        ft.Text("لا توجد رسائل معلقة / No unclassified SMS", size=16, color=ft.Colors.WHITE38, weight=ft.FontWeight.BOLD),
+                    ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    alignment=ft.alignment.Alignment.CENTER,
+                    expand=True,
+                    padding=40
+                )
+            )
+        else:
+            for sms in sms_list:
+                date_str = sms["received_at"]
+                try:
+                    dt = datetime.fromisoformat(date_str)
+                    date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    pass
+
+                self.unclassified_list.controls.append(
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Row([
+                                ft.Row([
+                                    ft.Icon(ft.Icons.MARK_AS_UNREAD_ROUNDED, color="#1E8F8B", size=18),
+                                    ft.Text(sms["sender"], weight=ft.FontWeight.BOLD, size=14, color=ft.Colors.WHITE),
+                                ], spacing=5),
+                                ft.Text(date_str, size=12, color=ft.Colors.WHITE54),
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                            ft.Divider(height=1, color=ft.Colors.WHITE10),
+                            ft.Container(
+                                content=ft.Text(sms["raw_sms"], size=13, color=ft.Colors.WHITE80, text_align=ft.TextAlign.RIGHT, selectable=True),
+                                alignment=ft.alignment.Alignment.TOP_RIGHT,
+                                padding=ft.Padding(0, 5, 0, 5)
+                            ),
+                            ft.Row([
+                                ft.ElevatedButton(
+                                    "تصنيف يدوياً / Classify",
+                                    icon=ft.Icons.SETTINGS_SUGGEST_ROUNDED,
+                                    bgcolor="#1E8F8B",
+                                    color=ft.Colors.WHITE,
+                                    style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+                                    on_click=lambda e, s=sms: self._show_classify_sms_dialog(s)
+                                ),
+                                ft.OutlinedButton(
+                                    "تجاهل / Dismiss",
+                                    icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
+                                    style=ft.ButtonStyle(
+                                        color=ft.Colors.RED_ACCENT,
+                                        shape=ft.RoundedRectangleBorder(radius=8),
+                                        border_side=ft.BorderSide(1, ft.Colors.RED_ACCENT)
+                                    ),
+                                    on_click=lambda e, s=sms: self._dismiss_unclassified_sms(s)
+                                )
+                            ], alignment=ft.MainAxisAlignment.END, spacing=10)
+                        ], spacing=10),
+                        bgcolor="#0B0F19",
+                        padding=15,
+                        border_radius=12,
+                        border=ft.Border.all(1, ft.Colors.WHITE10),
+                    )
+                )
+        self.flet_page.update()
+
     # ────────────────────────────────────────────────────────────────────────
-    # Profit Status Dialog
+    # Action Dialogs: Edit & Classify
+    # ────────────────────────────────────────────────────────────────────────
+
+    def _show_edit_transaction_dialog(self, tx):
+        type_dropdown = ft.Dropdown(
+            label="Type / النوع",
+            options=[
+                ft.dropdown.Option("RECEIVED", "RECEIVED"),
+                ft.dropdown.Option("SENT", "SENT"),
+                ft.dropdown.Option("ATM_WITHDRAWAL", "ATM Withdrawal"),
+                ft.dropdown.Option("ATM_DEPOSIT", "ATM Deposit"),
+                ft.dropdown.Option("BILL", "BILL"),
+                ft.dropdown.Option("PURCHASE", "PURCHASE"),
+                ft.dropdown.Option("TOPUP", "TOPUP"),
+            ],
+            value=tx.type.value,
+            **self.dialog_input_style
+        )
+        
+        wallet_dropdown = ft.Dropdown(
+            label="Wallet / المحفظة",
+            options=[
+                ft.dropdown.Option("vodafone_cash", "Vodafone Cash"),
+                ft.dropdown.Option("orange_cash", "Orange Cash"),
+                ft.dropdown.Option("etisalat_cash", "Etisalat Cash"),
+                ft.dropdown.Option("we_pay", "WE Pay"),
+                ft.dropdown.Option("bank", "Bank / InstaPay"),
+                ft.dropdown.Option("unspecified", "Unspecified"),
+            ],
+            value=tx.wallet_id or "unspecified",
+            **self.dialog_input_style
+        )
+
+        amount_field = ft.TextField(
+            label="Amount / المبلغ",
+            value=str(tx.amount),
+            keyboard_type=ft.KeyboardType.NUMBER,
+            **self.dialog_input_style
+        )
+        
+        counterpart_field = ft.TextField(
+            label="Counterpart / الطرف الآخر",
+            value=tx.counterpart or "",
+            **self.dialog_input_style
+        )
+        
+        balance_after_field = ft.TextField(
+            label="Balance After / الرصيد بعد العملية",
+            value=str(tx.balance_after) if tx.balance_after >= 0 else "",
+            keyboard_type=ft.KeyboardType.NUMBER,
+            **self.dialog_input_style
+        )
+
+        custom_dlg = ft.Container(
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Row(
+                            controls=[
+                                ft.Icon(ft.Icons.EDIT_ROUNDED, color=ft.Colors.BLUE_ACCENT, size=24),
+                                ft.Text("تعديل العملية / Edit Transaction", weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE, size=16),
+                            ],
+                            spacing=10,
+                        ),
+                        ft.Divider(height=10, color=ft.Colors.WHITE10),
+                        
+                        ft.Text("رسالة العملية الخام / Raw SMS:", size=12, color=ft.Colors.WHITE54),
+                        ft.Container(
+                            content=ft.Text(tx.raw_sms, size=12, color=ft.Colors.WHITE70, text_align=ft.TextAlign.RIGHT, selectable=True),
+                            bgcolor="#151B2E",
+                            padding=10,
+                            border_radius=8,
+                            border=ft.Border.all(1, ft.Colors.WHITE10),
+                            width=460
+                        ),
+                        ft.Container(height=5),
+                        
+                        type_dropdown,
+                        wallet_dropdown,
+                        ft.Row([amount_field, balance_after_field], spacing=10),
+                        counterpart_field,
+                        
+                        ft.Divider(height=10, color=ft.Colors.WHITE10),
+                        ft.Row(
+                            controls=[
+                                ft.ElevatedButton(
+                                    "حفظ التغييرات / Save",
+                                    color=ft.Colors.WHITE,
+                                    bgcolor="#1E8F8B",
+                                    style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=10)),
+                                    on_click=lambda e: self._save_edited_transaction(
+                                        tx, type_dropdown.value, amount_field.value, counterpart_field.value, balance_after_field.value, wallet_dropdown.value, custom_dlg
+                                    ),
+                                ),
+                                ft.TextButton(
+                                    "إلغاء / Cancel",
+                                    style=ft.ButtonStyle(color=ft.Colors.WHITE54),
+                                    on_click=lambda e: self._close_dialog(custom_dlg),
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.END,
+                            spacing=10,
+                        )
+                    ],
+                    tight=True,
+                    spacing=12,
+                ),
+                bgcolor="#0B0F19",
+                border_radius=18,
+                padding=20,
+                width=500,
+                border=ft.Border.all(1, ft.Colors.WHITE10),
+            ),
+            alignment=ft.alignment.Alignment.CENTER,
+            bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.BLACK),
+            left=0,
+            top=0,
+            right=0,
+            bottom=0,
+        )
+        self.flet_page.show_dialog_overlay(custom_dlg)
+
+    def _save_edited_transaction(self, tx, type_val, amount_str, counterpart_val, balance_after_str, wallet_id, dlg):
+        try:
+            amount = float(amount_str)
+        except ValueError:
+            self.flet_page.snack_bar = ft.SnackBar(content=ft.Text("❌ الرجاء إدخال مبلغ صحيح / Invalid amount", color=ft.Colors.WHITE), bgcolor=ft.Colors.RED_700)
+            self.flet_page.snack_bar.open = True
+            self.flet_page.update()
+            return
+
+        try:
+            balance_after = float(balance_after_str) if balance_after_str else -1.0
+        except ValueError:
+            balance_after = -1.0
+
+        ok = self.db.update_transaction_fields(
+            tx.transaction_id,
+            type_val,
+            amount,
+            counterpart_val.strip(),
+            balance_after,
+            wallet_id
+        )
+
+        if ok:
+            self._close_dialog(dlg)
+            self.flet_page.snack_bar = ft.SnackBar(
+                content=ft.Text("✅ تم تحديث العملية بنجاح / Transaction updated successfully", size=14, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.Colors.GREEN_800,
+            )
+            self.flet_page.snack_bar.open = True
+            
+            # Refresh UI
+            if hasattr(self.flet_page, "ui_app") and self.flet_page.ui_app:
+                self.flet_page.ui_app.refresh_all_views()
+            else:
+                self.apply_filters()
+        else:
+            self.flet_page.snack_bar = ft.SnackBar(
+                content=ft.Text("❌ فشل تحديث العملية / Failed to update transaction", size=14),
+                bgcolor=ft.Colors.RED_700,
+            )
+            self.flet_page.snack_bar.open = True
+            self.flet_page.update()
+
+    def _show_classify_sms_dialog(self, sms):
+        # Pre-populate heuristics
+        try:
+            parsed_tx = SMSEngine.parse(sms["raw_sms"])
+        except Exception as e:
+            print(f"Error parsing SMS in classification: {e}")
+            parsed_tx = None
+
+        tx_type = parsed_tx.type.value if parsed_tx and parsed_tx.type and parsed_tx.type != TransactionType.UNKNOWN else "RECEIVED"
+        
+        wallet_val = parsed_tx.wallet_id if parsed_tx and parsed_tx.wallet_id else "unspecified"
+        if wallet_val == "unspecified" or not wallet_val:
+            sender_lower = sms["sender"].lower()
+            if "vodafone" in sender_lower or "vf" in sender_lower:
+                wallet_val = "vodafone_cash"
+            elif "orange" in sender_lower:
+                wallet_val = "orange_cash"
+            elif "etisalat" in sender_lower:
+                wallet_val = "etisalat_cash"
+            elif "we" in sender_lower or "wepay" in sender_lower:
+                wallet_val = "we_pay"
+            elif any(x in sender_lower for x in ["nbe", "instapay", "cib", "ahli", "alex", "banque"]):
+                wallet_val = "bank"
+
+        amount_val = str(parsed_tx.amount) if parsed_tx and parsed_tx.amount > 0 else ""
+        counterpart_val = parsed_tx.counterpart if parsed_tx and parsed_tx.counterpart else ""
+        balance_after_val = str(parsed_tx.balance_after) if parsed_tx and parsed_tx.balance_after >= 0 else ""
+
+        type_dropdown = ft.Dropdown(
+            label="Type / النوع",
+            options=[
+                ft.dropdown.Option("RECEIVED", "RECEIVED"),
+                ft.dropdown.Option("SENT", "SENT"),
+                ft.dropdown.Option("ATM_WITHDRAWAL", "ATM Withdrawal"),
+                ft.dropdown.Option("ATM_DEPOSIT", "ATM Deposit"),
+                ft.dropdown.Option("BILL", "BILL"),
+                ft.dropdown.Option("PURCHASE", "PURCHASE"),
+                ft.dropdown.Option("TOPUP", "TOPUP"),
+            ],
+            value=tx_type,
+            **self.dialog_input_style
+        )
+        
+        wallet_dropdown = ft.Dropdown(
+            label="Wallet / المحفظة",
+            options=[
+                ft.dropdown.Option("vodafone_cash", "Vodafone Cash"),
+                ft.dropdown.Option("orange_cash", "Orange Cash"),
+                ft.dropdown.Option("etisalat_cash", "Etisalat Cash"),
+                ft.dropdown.Option("we_pay", "WE Pay"),
+                ft.dropdown.Option("bank", "Bank / InstaPay"),
+                ft.dropdown.Option("unspecified", "Unspecified"),
+            ],
+            value=wallet_val,
+            **self.dialog_input_style
+        )
+
+        amount_field = ft.TextField(
+            label="Amount / المبلغ",
+            value=amount_val,
+            keyboard_type=ft.KeyboardType.NUMBER,
+            **self.dialog_input_style
+        )
+        
+        counterpart_field = ft.TextField(
+            label="Counterpart / الطرف الآخر",
+            value=counterpart_val,
+            **self.dialog_input_style
+        )
+        
+        balance_after_field = ft.TextField(
+            label="Balance After / الرصيد بعد العملية",
+            value=balance_after_val,
+            keyboard_type=ft.KeyboardType.NUMBER,
+            **self.dialog_input_style
+        )
+
+        custom_dlg = ft.Container(
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Row(
+                            controls=[
+                                ft.Icon(ft.Icons.SETTINGS_SUGGEST_ROUNDED, color=ft.Colors.BLUE_ACCENT, size=24),
+                                ft.Text("تصنيف رسالة يدوياً / Classify SMS", weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE, size=16),
+                            ],
+                            spacing=10,
+                        ),
+                        ft.Divider(height=10, color=ft.Colors.WHITE10),
+                        
+                        ft.Text("نص الرسالة غير المصنفة / Raw SMS:", size=12, color=ft.Colors.WHITE54),
+                        ft.Container(
+                            content=ft.Text(sms["raw_sms"], size=12, color=ft.Colors.WHITE70, text_align=ft.TextAlign.RIGHT, selectable=True),
+                            bgcolor="#151B2E",
+                            padding=10,
+                            border_radius=8,
+                            border=ft.Border.all(1, ft.Colors.WHITE10),
+                            width=460
+                        ),
+                        ft.Container(height=5),
+                        
+                        type_dropdown,
+                        wallet_dropdown,
+                        ft.Row([amount_field, balance_after_field], spacing=10),
+                        counterpart_field,
+                        
+                        ft.Divider(height=10, color=ft.Colors.WHITE10),
+                        ft.Row(
+                            controls=[
+                                ft.ElevatedButton(
+                                    "تصنيف وحفظ / Classify & Save",
+                                    color=ft.Colors.WHITE,
+                                    bgcolor="#1E8F8B",
+                                    style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=10)),
+                                    on_click=lambda e: self._save_classified_sms(
+                                        sms, type_dropdown.value, amount_field.value, counterpart_field.value, balance_after_field.value, wallet_dropdown.value, custom_dlg
+                                    ),
+                                ),
+                                ft.TextButton(
+                                    "إلغاء / Cancel",
+                                    style=ft.ButtonStyle(color=ft.Colors.WHITE54),
+                                    on_click=lambda e: self._close_dialog(custom_dlg),
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.END,
+                            spacing=10,
+                        )
+                    ],
+                    tight=True,
+                    spacing=12,
+                ),
+                bgcolor="#0B0F19",
+                border_radius=18,
+                padding=20,
+                width=500,
+                border=ft.Border.all(1, ft.Colors.WHITE10),
+            ),
+            alignment=ft.alignment.Alignment.CENTER,
+            bgcolor=ft.Colors.with_opacity(0.8, ft.Colors.BLACK),
+            left=0,
+            top=0,
+            right=0,
+            bottom=0,
+        )
+        self.flet_page.show_dialog_overlay(custom_dlg)
+
+    def _save_classified_sms(self, sms, type_val, amount_str, counterpart_val, balance_after_str, wallet_id, dlg):
+        try:
+            amount = float(amount_str)
+        except ValueError:
+            self.flet_page.snack_bar = ft.SnackBar(content=ft.Text("❌ الرجاء إدخال مبلغ صحيح / Invalid amount", color=ft.Colors.WHITE), bgcolor=ft.Colors.RED_700)
+            self.flet_page.snack_bar.open = True
+            self.flet_page.update()
+            return
+
+        try:
+            balance_after = float(balance_after_str) if balance_after_str else -1.0
+        except ValueError:
+            balance_after = -1.0
+
+        # Try parsing date
+        sms_ts = datetime.now()
+        if "received_at" in sms and sms["received_at"]:
+            try:
+                sms_ts = datetime.fromisoformat(sms["received_at"])
+            except ValueError:
+                pass
+
+        new_tx = Transaction(
+            transaction_id=str(uuid.uuid4()),
+            type=TransactionType(type_val),
+            amount=amount,
+            balance_after=balance_after,
+            counterpart=counterpart_val.strip(),
+            raw_sms=sms["raw_sms"],
+            sms_timestamp=sms_ts,
+            confidence=1.0,
+            wallet_id=wallet_id,
+            profit_status="UNSET"
+        )
+
+        ok = self.db.save_transaction(new_tx)
+        if ok:
+            # Delete from unclassified list
+            self.db.delete_unclassified_sms(sms["id"])
+            self._close_dialog(dlg)
+            self.flet_page.snack_bar = ft.SnackBar(
+                content=ft.Text("✅ تم تصنيف وحفظ العملية بنجاح / SMS Classified successfully", size=14, weight=ft.FontWeight.BOLD),
+                bgcolor=ft.Colors.GREEN_800,
+            )
+            self.flet_page.snack_bar.open = True
+            
+            # Refresh views
+            if hasattr(self.flet_page, "ui_app") and self.flet_page.ui_app:
+                self.flet_page.ui_app.refresh_all_views()
+            else:
+                self.apply_filters()
+                self.update_unclassified_list()
+        else:
+            self.flet_page.snack_bar = ft.SnackBar(
+                content=ft.Text("❌ فشل حفظ العملية المصنفة / Failed to save classified transaction", size=14),
+                bgcolor=ft.Colors.RED_700,
+            )
+            self.flet_page.snack_bar.open = True
+            self.flet_page.update()
+
+    def _dismiss_unclassified_sms(self, sms):
+        ok = self.db.delete_unclassified_sms(sms["id"])
+        if ok:
+            self.flet_page.snack_bar = ft.SnackBar(
+                content=ft.Text("🗑️ تم تجاهل الرسالة / SMS Dismissed", size=14),
+                bgcolor=ft.Colors.BLUE_GREY_800,
+            )
+            self.flet_page.snack_bar.open = True
+            
+            # Refresh views
+            if hasattr(self.flet_page, "ui_app") and self.flet_page.ui_app:
+                self.flet_page.ui_app.refresh_all_views()
+            else:
+                self.update_unclassified_list()
+        else:
+            self.flet_page.snack_bar = ft.SnackBar(content=ft.Text("❌ فشل حذف الرسالة / Failed to delete SMS"), bgcolor=ft.Colors.RED_700)
+            self.flet_page.snack_bar.open = True
+            self.flet_page.update()
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Profit Status Dialog (Existing functionality preserved)
     # ────────────────────────────────────────────────────────────────────────
 
     def _show_profit_dialog(self, tx, fee: float):
-        """نافذة حوار: تحديد حالة الربح لعملية معينة"""
         ps = getattr(tx, "profit_status", "UNSET") or "UNSET"
         ps_style = PROFIT_STATUS_STYLE.get(ps, PROFIT_STATUS_STYLE["UNSET"])
 
@@ -576,13 +1134,11 @@ class TransactionsView(ft.Container):
         self.flet_page.close_dialog_overlay(dlg)
 
     def _set_profit_status(self, tx, fee: float, status: str, dlg):
-        """حفظ حالة الربح وتسجيل إدخال نقدي إن كانت نقداً"""
         tx_id  = tx.transaction_id
         raw_sms = tx.raw_sms
 
         ok = self.db.mark_profit_status(tx_id, raw_sms, status)
         if ok and status == "CASH":
-            # تسجيل الربح في سجل النقدية تلقائياً
             desc = f"ربح من {tx.type.value} — {tx.wallet_id or ''} — {tx.amount:,.2f} EGP"
             self.db.add_cash_entry("PROFIT_IN", fee, desc, source_tx_id=str(tx_id or ""))
 
@@ -601,5 +1157,4 @@ class TransactionsView(ft.Container):
             )
         self.flet_page.snack_bar.open = True
         self.flet_page.update()
-        # إعادة رسم الجدول لتحديث الأيقونة
         self.apply_filters()

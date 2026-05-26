@@ -1,6 +1,7 @@
 # desktop/ui/views/settings_view.py
 import socket
 import flet as ft
+from desktop.utils.licensing import get_mac_address
 
 class SettingsView(ft.Container):
     def __init__(self, page: ft.Page, db=None, server=None, on_clear_success=None):
@@ -17,8 +18,7 @@ class SettingsView(ft.Container):
             "orange_cash": "أورنج كاش (Orange Cash)",
             "etisalat_cash": "اتصالات كاش (Etisalat Cash)",
             "we_pay": "وي باي (WE Pay)",
-            "instapay": "انستاباي (InstaPay)",
-            "bank": "حساب بنكي (Bank Account)"
+            "bank": "حساب بنكي / انستاباي (Bank / InstaPay)"
         }
         self.balance_inputs = {}
 
@@ -229,11 +229,203 @@ class SettingsView(ft.Container):
                 self.notif_panel,
                 self.build_balances_section(),
                 self.build_fees_section(),
+                self.build_license_section(),
                 self.system_panel
             ]
         )
 
+    def build_license_section(self):
+        mac = get_mac_address()
+
+        # Backend Type Dropdown
+        current_backend = self.db.get_setting("license_backend", "MOCK")
+        
+        self.backend_type_dropdown = ft.Dropdown(
+            label="نوع خادم الترخيص (License Server Type)",
+            value=current_backend,
+            options=[
+                ft.dropdown.Option("MOCK", "نظام تجريبي محلي (Offline Mock)"),
+                ft.dropdown.Option("SUPABASE", "خادم سحابي Supabase"),
+                ft.dropdown.Option("DJANGO", "خادم ويب Django مخصص"),
+            ],
+            width=500,
+            on_select=self.on_backend_change,
+            **self.input_style
+        )
+
+        self.supabase_url_input = ft.TextField(
+            label="Supabase Project URL (رابط المشروع السحابي)",
+            value=self.db.get_setting("supabase_url", ""),
+            width=500,
+            text_size=13,
+            **self.input_style
+        )
+        
+        self.supabase_key_input = ft.TextField(
+            label="Supabase Anon Key (المفتاح السحابي)",
+            value=self.db.get_setting("supabase_key", ""),
+            width=500,
+            text_size=13,
+            password=True,
+            can_reveal_password=True,
+            **self.input_style
+        )
+
+        self.django_url_input = ft.TextField(
+            label="Django API Base URL (رابط خادم ديجانجو)",
+            value=self.db.get_setting("django_api_url", "http://localhost:8000/api"),
+            width=500,
+            text_size=13,
+            **self.input_style
+        )
+
+        # Containers for conditional settings
+        self.supabase_settings_container = ft.Column(
+            controls=[
+                ft.Text("إعدادات الاتصال بـ Supabase:", size=13, weight=ft.FontWeight.BOLD),
+                self.supabase_url_input,
+                self.supabase_key_input,
+            ],
+            spacing=10,
+            visible=(current_backend == "SUPABASE")
+        )
+
+        self.django_settings_container = ft.Column(
+            controls=[
+                ft.Text("إعدادات الاتصال بـ Django:", size=13, weight=ft.FontWeight.BOLD),
+                self.django_url_input,
+            ],
+            spacing=10,
+            visible=(current_backend == "DJANGO")
+        )
+
+        self.license_info_text = ft.Text(
+            size=14,
+            weight=ft.FontWeight.BOLD,
+            color=ft.Colors.WHITE
+        )
+
+        self.deactivate_btn = ft.ElevatedButton(
+            "تسجيل الخروج وإلغاء تفعيل الترخيص / Logout & Deactivate",
+            icon=ft.Icons.LOGOUT,
+            bgcolor=ft.Colors.RED_900,
+            color=ft.Colors.WHITE,
+            on_click=self.on_deactivate_license,
+            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=10))
+        )
+
+        # Update initial values
+        lic_key = self.db.get_setting("license_key", "")
+        lic_expiry = self.db.get_setting("license_expiry", "")
+        lic_status = self.db.get_setting("license_status", "")
+        
+        if lic_key:
+            self.license_info_text.value = (
+                f"🔑 كود التفعيل: {lic_key}\n"
+                f"📅 تاريخ الانتهاء: {lic_expiry}\n"
+                f"🟢 الحالة: {lic_status}"
+            )
+            self.deactivate_btn.visible = True
+        else:
+            self.license_info_text.value = "❌ لا يوجد كود تفعيل نشط حالياً."
+            self.deactivate_btn.visible = False
+
+        license_panel = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text(
+                        "نظام الترخيص والاشتراك (Subscription & Licensing System)",
+                        size=16,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.BLUE_200
+                    ),
+                    ft.Text(
+                        f"معرف الجهاز الفريد (MAC Address): {mac}",
+                        size=12,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.BLUE_400,
+                        selectable=True
+                    ),
+                    ft.Divider(height=10, color=ft.Colors.WHITE10),
+                    self.backend_type_dropdown,
+                    ft.Container(height=5),
+                    self.supabase_settings_container,
+                    self.django_settings_container,
+                    ft.Container(height=5),
+                    ft.ElevatedButton(
+                        "حفظ إعدادات خادم الترخيص / Save Settings",
+                        icon=ft.Icons.SAVE,
+                        on_click=self.on_save_licensing_settings,
+                        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=10))
+                    ),
+                    ft.Divider(height=15, color=ft.Colors.WHITE10),
+                    # License Status
+                    ft.Text("حالة الترخيص الحالية (License Info):", size=13, weight=ft.FontWeight.BOLD),
+                    self.license_info_text,
+                    self.deactivate_btn
+                ],
+                spacing=12
+            ),
+            gradient=ft.LinearGradient(
+                colors=["#1E293B", "#0F172A"],
+                begin=ft.alignment.Alignment.TOP_LEFT,
+                end=ft.alignment.Alignment.BOTTOM_RIGHT
+            ),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.BLUE_ACCENT)),
+            border_radius=16,
+            padding=20,
+            margin=ft.Margin(0, 0, 0, 15)
+        )
+        return license_panel
+
+    def on_backend_change(self, e):
+        backend = self.backend_type_dropdown.value
+        self.supabase_settings_container.visible = (backend == "SUPABASE")
+        self.django_settings_container.visible = (backend == "DJANGO")
+        self.flet_page.update()
+
+    def on_save_licensing_settings(self, e):
+        backend = self.backend_type_dropdown.value
+        self.db.set_setting("license_backend", backend)
+        
+        if backend == "SUPABASE":
+            url = self.supabase_url_input.value.strip()
+            key = self.supabase_key_input.value.strip()
+            self.db.set_setting("supabase_url", url)
+            self.db.set_setting("supabase_key", key)
+        elif backend == "DJANGO":
+            django_url = self.django_url_input.value.strip()
+            self.db.set_setting("django_api_url", django_url)
+            
+        self.flet_page.snack_bar = ft.SnackBar(
+            content=ft.Text("✅ تم حفظ إعدادات خادم الترخيص بنجاح.", size=16, weight=ft.FontWeight.BOLD),
+            bgcolor=ft.Colors.GREEN_800
+        )
+        self.flet_page.snack_bar.open = True
+        self.update_data()
+
+    def on_save_supabase_settings(self, e):
+        # Fallback method in case it is called
+        self.on_save_licensing_settings(e)
+
+
+    def on_deactivate_license(self, e):
+        self.db.set_setting("license_key", "")
+        self.db.set_setting("license_expiry", "")
+        self.db.set_setting("license_status", "EXPIRED")
+        self.flet_page.snack_bar = ft.SnackBar(
+            content=ft.Text("ℹ تم تسجيل الخروج وإلغاء تفعيل الترخيص محلياً. يرجى إعادة تشغيل التطبيق.", size=16, weight=ft.FontWeight.BOLD),
+            bgcolor=ft.Colors.BLUE_800
+        )
+        self.flet_page.snack_bar.open = True
+        self.update_data()
+        
+        # Redirection if desktop app has reload capability (we will handle redirection in app.py)
+        if hasattr(self.flet_page, "on_license_deactivated"):
+            self.flet_page.on_license_deactivated()
+
     def show_clear_dialog(self, e):
+
         self.flet_page.show_dialog_overlay(self.confirm_dialog)
 
     def close_dialog(self, e):
@@ -361,7 +553,6 @@ class SettingsView(ft.Container):
                 "orange_cash": ft.Colors.ORANGE_ACCENT,
                 "etisalat_cash": ft.Colors.GREEN_ACCENT,
                 "we_pay": ft.Colors.PURPLE_ACCENT,
-                "instapay": ft.Colors.PINK_ACCENT,
                 "bank": ft.Colors.CYAN_ACCENT,
             }
             w_color = w_colors.get(w_id, ft.Colors.BLUE_ACCENT)
@@ -524,7 +715,6 @@ class SettingsView(ft.Container):
                 "orange_cash": ft.Colors.ORANGE_ACCENT,
                 "etisalat_cash": ft.Colors.GREEN_ACCENT,
                 "we_pay": ft.Colors.PURPLE_ACCENT,
-                "instapay": ft.Colors.PINK_ACCENT,
                 "bank": ft.Colors.CYAN_ACCENT,
             }
             w_color = w_colors.get(w_id, ft.Colors.BLUE_ACCENT)
@@ -672,4 +862,36 @@ class SettingsView(ft.Container):
                 if w_id in self.fee_withdraw_min_inputs:
                     self.fee_withdraw_min_inputs[w_id].value = wth_min
 
+        # 3. License Info
+        if hasattr(self, 'backend_type_dropdown'):
+            current_backend = self.db.get_setting("license_backend", "MOCK")
+            self.backend_type_dropdown.value = current_backend
+            
+            url = self.db.get_setting("supabase_url", "")
+            key = self.db.get_setting("supabase_key", "")
+            self.supabase_url_input.value = url
+            self.supabase_key_input.value = key
+            
+            django_url = self.db.get_setting("django_api_url", "http://localhost:8000/api")
+            self.django_url_input.value = django_url
+            
+            self.supabase_settings_container.visible = (current_backend == "SUPABASE")
+            self.django_settings_container.visible = (current_backend == "DJANGO")
+            
+            lic_key = self.db.get_setting("license_key", "")
+            lic_expiry = self.db.get_setting("license_expiry", "")
+            lic_status = self.db.get_setting("license_status", "")
+            
+            if lic_key:
+                self.license_info_text.value = (
+                    f"🔑 كود التفعيل: {lic_key}\n"
+                    f"📅 تاريخ الانتهاء: {lic_expiry}\n"
+                    f"🟢 الحالة: {lic_status}"
+                )
+                self.deactivate_btn.visible = True
+            else:
+                self.license_info_text.value = "❌ لا يوجد كود تفعيل نشط حالياً."
+                self.deactivate_btn.visible = False
+
         self.flet_page.update()
+

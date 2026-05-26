@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مرحباً بك في دفتر كاش</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F8FAFC;
+            color: #1E293B;
+            margin: 0;
+            padding: 0;
+            -webkit-text-size-adjust: none;
+            -ms-text-size-adjust: none;
+            text-align: right;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #FFFFFF;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(15, 60, 109, 0.05);
+            border: 1px solid #E2E8F0;
+        }
+        .header {
+            background: linear-gradient(135deg, #0F3C6D 0%, #1E8F8B 100%);
+            padding: 30px 20px;
+            text-align: center;
+            color: #FFFFFF;
+        }
+        .header h1 {
+            margin: 10px 0 0 0;
+            font-size: 24px;
+            font-weight: 800;
+        }
+        .content {
+            padding: 40px 30px;
+            line-height: 1.6;
+        }
+        .welcome-title {
+            color: #0F3C6D;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #0F3C6D 0%, #1E8F8B 100%);
+            color: #FFFFFF !important;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: bold;
+            margin: 25px 0;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(30, 143, 139, 0.25);
+        }
+        .footer {
+            background-color: #F1F5F9;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #64748B;
+            border-top: 1px solid #E2E8F0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>دفتر كاش - Daftar Cash</h1>
+        </div>
+        <div class="content">
+            <div class="welcome-title">مرحباً بك يا {{ user.username }}، 🚀</div>
+            <p>يسعدنا جداً انضمامك إلى <strong>دفتر كاش</strong> - النظام الأقوى والمساعد الذكي لإدارة ومراقبة عمليات ومحافط الكاش القصيرة بمحلك التجاري.</p>
+            <p>مع دفتر كاش، يمكنك الآن مزامنة ومراقبة الرسائل تلقائياً، حساب أرباحك وعمولاتك بدقة، وتوديع كتابة العمليات يدوياً في الدفاتر التقليدية!</p>
+            
+            <h3 style="color: #0F3C6D; margin-top: 30px;">خطوتك التالية لبدء العمل:</h3>
+            <ol style="padding-right: 20px; color: #475569; margin: 15px 0;">
+                <li style="margin-bottom: 10px;">قم بزيارة لوحة التحكم الخاصة بك.</li>
+                <li style="margin-bottom: 10px;">حمل تطبيق الكمبيوتر (Windows) وتطبيق الموبايل (Android).</li>
+                <li style="margin-bottom: 10px;">انسخ كود التفعيل التجريبي الخاص بك وقم بإقران الأجهزة لبدء العمل في دقيقة!</li>
+            </ol>
+            
+            <div style="text-align: center;">
+                <a href="http://127.0.0.1:8000/dashboard/" class="button">دخول لوحة التحكم الخاصة بك</a>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 30px 0;">
+            <p style="font-size: 13px; color: #64748B; text-align: center;">إذا كان لديك أي استفسار أو واجهت أي صعوبة في الإعداد، يسعدنا تواصلك مع الدعم الفني مباشرة.</p>
+        </div>
+        <div class="footer">
+            جميع الحقوق محفوظة لـ &copy; دفتر كاش 2026.
+        </div>
+    </div>
+</body>
+</html>

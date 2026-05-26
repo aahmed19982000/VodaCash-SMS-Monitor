@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}سياسة الخصوصية - Privacy Policy - دفتر كاش (Daftar Cash){% endblock %}
+
+{% block extra_head %}
+<style>
+    .privacy-container {
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 20px;
+    }
+    .lang-switcher {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+    .lang-btn {
+        background: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        padding: 8px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: var(--transition-smooth);
+    }
+    .lang-btn.active {
+        background: var(--primary-gradient);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 4px 12px rgba(30, 143, 139, 0.2);
+    }
+    .policy-content {
+        line-height: 1.8;
+    }
+    .policy-section {
+        margin-bottom: 35px;
+    }
+    .policy-section h2 {
+        color: var(--accent-blue);
+        font-size: 22px;
+        margin-bottom: 15px;
+        border-bottom: 2px solid var(--border-color);
+        padding-bottom: 8px;
+    }
+    .policy-section h3 {
+        color: var(--accent-purple);
+        font-size: 18px;
+        margin-top: 20px;
+        margin-bottom: 10px;
+    }
+    .permission-badge {
+        background: rgba(30, 143, 139, 0.08);
+        border: 1px solid rgba(30, 143, 139, 0.2);
+        color: var(--accent-purple);
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 14px;
+        display: inline-block;
+        margin-top: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="privacy-container">
+    <div class="lang-switcher">
+        <button class="lang-btn active" id="btn-ar" onclick="switchLang('ar')">العربية</button>
+        <button class="lang-btn" id="btn-en" onclick="switchLang('en')">English</button>
+    </div>
+
+    <!-- Arabic Content -->
+    <div id="content-ar" class="policy-content" style="direction: rtl; text-align: right;">
+        <h1 style="font-size: 28px; font-weight: 800; color: var(--accent-blue); margin-bottom: 15px; text-align: center;">سياسة الخصوصية لتطبيق "دفتر كاش"</h1>
+        <p style="color: var(--text-secondary); text-align: center; margin-bottom: 40px;">آخر تحديث: 25 مايو 2026</p>
+
+        <div class="glass-card" style="padding: 30px; margin-bottom: 30px;">
+            <div class="policy-section">
+                <h2>1. مقدمة</h2>
+                <p>نحن في <strong>دفتر كاش (Daftar Cash)</strong> نلتزم التزاماً كاملاً بحماية خصوصية بياناتك المالية والشخصية. توضح هذه السياسة كيفية تعامل تطبيقات الهاتف المحمول وتطبيقات سطح المكتب والموقع الإلكتروني مع البيانات والرسائل والخصوصية.</p>
+            </div>
+
+            <div class="policy-section">
+                <h2>2. الأذونات الحساسة المطلوبة في الموبايل</h2>
+                <p>لكي يقوم تطبيق الأندرويد لـ "دفتر كاش" بأداء وظيفته الأساسية المتمثلة في الكشف عن رسائل الدفع الكاش، يطلب التطبيق بعض الأذونات الحساسة من نظام التشغيل:</p>
+                
+                <h3>أ. إذن قراءة واستقبل الرسائل النصية القصيرة (SMS Permissions):</h3>
+                <span class="permission-badge">android.permission.RECEIVE_SMS</span>
+                <span class="permission-badge">android.permission.READ_SMS</span>
+                <p style="margin-top: 10px;"><strong>الغرض المحدود والوحيد:</strong> يتم استخدام هذا الإذن لالتقاط رسائل إشعارات التحويل الواردة تلقائياً من مزودي خدمات محافظ الهاتف المحمول بمصر (مثل فودافون كاش، اتصالات كاش، أورنج كاش، وي باي، انستاباي). بمجرد تلقي الرسالة، يقوم التطبيق بقراءتها محلياً على جهازك لتحديد أرقام العمليات وقيمة المبالغ المحولة، تمهيداً لإرسالها وتحديث شاشة الكمبيوتر الخاصة بك.</p>
+                <p>⚠️ <strong>ملاحظة هامة جداً:</strong> لا يتم قراءة رسائلك الشخصية الأخرى أو أي رسائل خارج نطاق إشعارات المحافظ المالية المحددة مسبقاً.</p>
+
+                <h3>ب. إذن العمل في الخلفية والإشعارات المستمرة:</h3>
+                <span class="permission-badge">android.permission.FOREGROUND_SERVICE</span>
+                <p style="margin-top: 10px;"><strong>الغرض:</strong> لضمان عمل الخدمة واستمرار التقاط الرسائل المالية للمحفظة فور وصولها حتى لو كان التطبيق مغلقاً أو الشاشة مطفأة.</p>
+            </div>
+
+            <div class="policy-section">
+                <h2>3. حماية البيانات ومكان تخزينها</h2>
+                <p>تعتمد فلسفة الأمان الخاصة بنا على مبدأ <strong>المحليّة بالكامل (100% Local Data Processing)</strong>:</p>
+                <ul>
+                    <li>يتم إرسال محتوى العمليات الرقمية مباشرة من هاتفك المحمول إلى تطبيق الكمبيوتر (الديسكتوب) الخاص بك عبر الشبكة المحلية (Wi-Fi Local Network) بشكل مباشر ومشفر.</li>
+                    <li>لا نقوم بحفظ أو إرسال أو الاحتفاظ بأي تفاصيل مالية، أو أرقام هواتف عملائك، أو قيم معاملاتك على أي خوادم سحابية أو قواعد بيانات خارجية.</li>
+                    <li>كافة التقارير، الرصيد الفعلي وصافي أرباحك يتم حفظها بالكامل محلياً على جهازك الكمبيوتر ولا نملك أي حق وصول إليها.</li>
+                </ul>
+            </div>
+
+            <div class="policy-section">
+                <h2>4. مشاركة البيانات</h2>
+                <p>نحن لا نبيع، ولا نتاجر، ولا ننقل بياناتك الشخصية أو المالية إلى أي أطراف خارجية على الإطلاق. نظراً لعدم تخزيننا لبياناتك، فإنها غير معرضة للمشاركة.</p>
+            </div>
+
+            <div class="policy-section">
+                <h2>5. التحديثات والتواصل</h2>
+                <p>قد نقوم بتحديث سياسة الخصوصية هذه من وقت لآخر لمواكبة التحديثات في نظام التشغيل أو متطلبات المتاجر. إذا كان لديك أي استفسار حول سياسة الخصوصية، يمكنك التواصل معنا عبر البريد الإلكتروني المخصص للدعم الفني.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- English Content -->
+    <div id="content-en" class="policy-content" style="display: none; direction: ltr; text-align: left;">
+        <h1 style="font-size: 28px; font-weight: 800; color: var(--accent-blue); margin-bottom: 15px; text-align: center;">Privacy Policy for "Daftar Cash"</h1>
+        <p style="color: var(--text-secondary); text-align: center; margin-bottom: 40px;">Last updated: May 25, 2026</p>
+
+        <div class="glass-card" style="padding: 30px; margin-bottom: 30px;">
+            <div class="policy-section">
+                <h2>1. Introduction</h2>
+                <p>We at <strong>Daftar Cash</strong> are fully committed to protecting the privacy of your financial and personal data. This privacy policy explains how our mobile app, desktop app, and website handle data, messages, and privacy.</p>
+            </div>
+
+            <div class="policy-section">
+                <h2>2. Sensitive Permissions Required on Mobile</h2>
+                <p>To enable the "Daftar Cash" Android application to perform its primary function of detecting incoming cash wallet SMS notifications, it requests specific sensitive permissions from the OS:</p>
+                
+                <h3>A. Read & Receive SMS Permissions:</h3>
+                <span class="permission-badge">android.permission.RECEIVE_SMS</span>
+                <span class="permission-badge">android.permission.READ_SMS</span>
+                <p style="margin-top: 10px;"><strong>Sole and Limited Purpose:</strong> These permissions are used to capture incoming mobile wallet notification messages automatically from Egyptian wallet providers (e.g., Vodafone Cash, Etisalat Cash, Orange Cash, WE Pay, InstaPay). Once a message is received, the app parses the transaction number and amount locally on your device to synchronize it with your desktop application.</p>
+                <p>⚠️ <strong>Important Note:</strong> The app does not read your personal SMS messages or any other messages outside of the designated mobile cash wallet alerts.</p>
+
+                <h3>B. Foreground Service Permission:</h3>
+                <span class="permission-badge">android.permission.FOREGROUND_SERVICE</span>
+                <p style="margin-top: 10px;"><strong>Purpose:</strong> To ensure the service continues running in the background and intercepts cash transactions instantly even when the app is closed or the device screen is off.</p>
+            </div>
+
+            <div class="policy-section">
+                <h2>3. Data Protection and Processing</h2>
+                <p>Our security design is built around the principle of **100% Local Processing**:</p>
+                <ul>
+                    <li>Financial transaction details are transmitted directly from your mobile phone to your desktop application over your local Wi-Fi network, securely and directly.</li>
+                    <li>We do not upload, store, or transmit any financial data, client phone numbers, or transaction values to external cloud servers or databases.</li>
+                    <li>All metrics, active balance sheets, and profit reports are saved strictly locally on your own computer. We have zero access to your data.</li>
+                </ul>
+            </div>
+
+            <div class="policy-section">
+                <h2>4. Data Sharing</h2>
+                <p>We do not sell, trade, or transfer your personal or financial data to outside parties. Since we do not host or store your financial data, sharing is impossible.</p>
+            </div>
+
+            <div class="policy-section">
+                <h2>5. Contact Us</h2>
+                <p>We may update this Privacy Policy from time to time to align with new system permissions or store guidelines. For any inquiries regarding our policy, feel free to contact our support email.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function switchLang(lang) {
+        document.getElementById('btn-ar').classList.remove('active');
+        document.getElementById('btn-en').classList.remove('active');
+        
+        document.getElementById('content-ar').style.display = 'none';
+        document.getElementById('content-en').style.display = 'none';
+        
+        document.getElementById('btn-' + lang).classList.add('active');
+        document.getElementById('content-' + lang).style.display = 'block';
+    }
+</script>
+{% endblock %}

@@ -274,6 +274,20 @@ class SMSEngine:
                                             int(time_str[:2]), int(time_str[3:5]))
                 except Exception:
                     pass
+            elif "date_dash" in groups and "time" in groups:
+                # تنسيق DD-MM أو MM-DD من رسائل البنك: مثل 05-24 نفترض مع السنة الحالية
+                date_dash_str = match.group(groups["date_dash"])
+                time_str = match.group(groups["time"])
+                current_year = datetime.now().year
+                parts = date_dash_str.split("-")
+                month_c, day_c = int(parts[0]), int(parts[1])
+                if month_c > 12:
+                    day_c, month_c = month_c, day_c
+                try:
+                    sms_timestamp = datetime(current_year, month_c, day_c,
+                                            int(time_str[:2]), int(time_str[3:5]))
+                except Exception:
+                    pass
             elif "time_a" in groups or "date_a" in groups:
                 # نمط ATM للمحفظة: التاريخ والوقت قد يكونان بترتيبين مختلفين
                 # time_a/date_a = TIME DATE (وقت ثم تاريخ)

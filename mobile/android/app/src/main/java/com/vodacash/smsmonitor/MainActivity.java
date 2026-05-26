@@ -312,8 +312,8 @@ public class MainActivity extends AppCompatActivity {
                             icon = "⚡";
                             break;
                         case "bank":
-                            nameEn = "Bank Account";
-                            nameAr = "حساب بنكي";
+                            nameEn = "Bank / InstaPay";
+                            nameAr = "حساب بنكي / انستاباي";
                             startColor = "#005A70";
                             endColor = "#003A48";
                             icon = "🏦";

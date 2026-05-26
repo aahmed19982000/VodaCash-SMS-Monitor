@@ -100,6 +100,16 @@ class DesktopDatabase:
                 source_tx_id TEXT    DEFAULT '',
                 created_at   TEXT    DEFAULT (datetime('now'))
             );
+
+            -- الرسائل غير المصنفة
+            CREATE TABLE IF NOT EXISTS unclassified_sms (
+                id            TEXT PRIMARY KEY,
+                raw_sms       TEXT NOT NULL,
+                sender        TEXT NOT NULL,
+                received_at   TEXT NOT NULL,
+                confidence    REAL NOT NULL,
+                reviewed      INTEGER DEFAULT 0
+            );
         """)
         conn.commit()
 
@@ -112,6 +122,14 @@ class DesktopDatabase:
                 logger.info("✅ Added profit_status column to transactions table")
         except Exception as e:
             logger.warning(f"profit_status migration warning: {e}")
+
+        # هجرة: تحويل محفظة instapay إلى bank لتوحيد الحسابات
+        try:
+            conn.execute("UPDATE transactions SET wallet_id = 'bank' WHERE wallet_id = 'instapay'")
+            conn.commit()
+            logger.info("✅ Migrated instapay transactions to bank wallet")
+        except Exception as e:
+            logger.warning(f"instapay to bank migration warning: {e}")
 
         # تشغيل الهجرة لإعادة تحليل العمليات وتصحيح المحفظة والرصيد
         try:
@@ -188,8 +206,19 @@ class DesktopDatabase:
                 logger.warning(f"⚠️ Ignoring saving transaction {tx.transaction_id} because wallet/account is unspecified/unknown")
                 return False
 
+            # Check if transaction already exists to preserve its profit_status and details
+            if tx.transaction_id:
+                cursor = self._conn.execute(
+                    "SELECT profit_status FROM transactions WHERE transaction_id = ?",
+                    (tx.transaction_id,)
+                )
+                row = cursor.fetchone()
+                if row is not None:
+                    logger.info(f"ℹ️ Transaction {tx.transaction_id} already exists in database (status: {row[0]}). Skipping insert.")
+                    return False
+
             self._conn.execute("""
-                INSERT OR REPLACE INTO transactions
+                INSERT INTO transactions
                     (transaction_id, type, amount, balance_after, counterpart,
                      raw_sms, parsed_at, sms_timestamp, confidence, wallet_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -202,6 +231,27 @@ class DesktopDatabase:
             return True
         except Exception as e:
             logger.error(f"❌ Failed to save transaction to desktop DB: {e}")
+            return False
+
+    def transaction_exists(self, tx_id: str, raw_sms: str = None) -> bool:
+        """التحقق من وجود المعاملة مسبقاً في قاعدة البيانات لتفادي تكرار معالجتها"""
+        try:
+            if tx_id:
+                row = self._conn.execute(
+                    "SELECT 1 FROM transactions WHERE transaction_id = ?",
+                    (tx_id,)
+                ).fetchone()
+                if row is not None:
+                    return True
+            if raw_sms:
+                row = self._conn.execute(
+                    "SELECT 1 FROM transactions WHERE raw_sms = ?",
+                    (raw_sms,)
+                ).fetchone()
+                return row is not None
+            return False
+        except Exception as e:
+            logger.error(f"❌ Error checking if transaction exists: {e}")
             return False
 
     def get_all_transactions(self,
@@ -374,7 +424,7 @@ class DesktopDatabase:
         
         # حساب رصيد كل محفظة
         wallet_balances = {}
-        supported_wallets = ["vodafone_cash", "orange_cash", "etisalat_cash", "we_pay", "instapay", "bank"]
+        supported_wallets = ["vodafone_cash", "orange_cash", "etisalat_cash", "we_pay", "bank"]
         
         for w_id in supported_wallets:
             # 1. تحقق مما إذا كان هناك رصيد ابتدائي يدوي في الإعدادات
@@ -819,8 +869,7 @@ class DesktopDatabase:
             # 2. حساب حركات النقدية التلقائية من العمليات بعد توقيت النقدية الافتتاحية
             tx_rows = self._conn.execute("""
                 SELECT *
-                FROM transactions
-                WHERE wallet_id IS NOT NULL AND wallet_id NOT IN ('unspecified', '', 'instapay', 'bank')
+                WHERE wallet_id IS NOT NULL AND wallet_id NOT IN ('unspecified', '', 'bank')
                   AND datetime(sms_timestamp) >= datetime(?)
             """, (initial_cash_ts,)).fetchall()
 
@@ -906,3 +955,78 @@ class DesktopDatabase:
         if hasattr(self._local, "conn") and self._local.conn:
             self._local.conn.close()
             self._local.conn = None
+
+    def save_unclassified_sms(self, sms: dict) -> bool:
+        """حفظ رسالة واردة غير مصنفة لمراجعتها يدوياً"""
+        try:
+            from datetime import datetime
+            self._conn.execute("""
+                INSERT OR REPLACE INTO unclassified_sms
+                    (id, raw_sms, sender, received_at, confidence, reviewed)
+                VALUES (?, ?, ?, ?, ?, 0)
+            """, (
+                sms.get("id"),
+                sms.get("raw_sms", sms.get("body", "")),
+                sms.get("sender", "Unknown"),
+                sms.get("received_at", datetime.now().isoformat() if isinstance(datetime.now().isoformat(), str) else str(datetime.now().isoformat())),
+                sms.get("confidence", 0.0)
+            ))
+            self._conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"❌ Failed to save unclassified SMS: {e}")
+            return False
+
+    def get_unclassified_sms(self) -> list:
+        """جلب جميع الرسائل غير المصنفة المراد مراجعتها"""
+        try:
+            rows = self._conn.execute(
+                "SELECT * FROM unclassified_sms WHERE reviewed = 0 ORDER BY received_at DESC"
+            ).fetchall()
+            return [dict(r) for r in rows]
+        except Exception as e:
+            logger.error(f"❌ Failed to get unclassified SMS list: {e}")
+            return []
+
+    def delete_unclassified_sms(self, sms_id: str) -> bool:
+        """حذف رسالة غير مصنفة بعد معالجتها أو تجاهلها"""
+        try:
+            self._conn.execute("DELETE FROM unclassified_sms WHERE id = ?", (sms_id,))
+            self._conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"❌ Failed to delete unclassified SMS: {e}")
+            return False
+
+    def update_transaction_fields(self, tx_id: str, type_val: str, amount: float, counterpart: str, balance_after: float, wallet_id: str) -> bool:
+        """تحديث حقول عملية موجودة لتعديلها وتصحيحها يدوياً"""
+        try:
+            self._conn.execute("""
+                UPDATE transactions
+                SET type = ?, amount = ?, counterpart = ?, balance_after = ?, wallet_id = ?
+                WHERE transaction_id = ?
+            """, (type_val, amount, counterpart, balance_after, wallet_id, tx_id))
+            self._conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"❌ Failed to update transaction fields: {e}")
+            return False
+
+    def is_license_active(self) -> bool:
+        """Check if cached license is active and not expired."""
+        try:
+            lic_key = self.get_setting("license_key", "")
+            lic_expiry_str = self.get_setting("license_expiry", "")
+            lic_status = self.get_setting("license_status", "EXPIRED")
+            
+            if not lic_key or lic_status != "ACTIVE":
+                return False
+                
+            from datetime import datetime
+            expiry = datetime.fromisoformat(lic_expiry_str.replace("Z", "+00:00"))
+            now_utc = datetime.now(expiry.tzinfo) if expiry.tzinfo else datetime.now()
+            return expiry > now_utc
+        except Exception as e:
+            logger.error(f"Error checking is_license_active: {e}")
+            return False
+

@@ -213,12 +213,19 @@ class DesktopServer:
                 if not w_id or w_id == "unspecified" or w_id not in ["vodafone_cash", "orange_cash", "etisalat_cash", "we_pay", "instapay", "bank"]:
                     logger.warning(f"⚠️ Ignoring parsed SMS because wallet is unspecified/unknown: {tx.transaction_id}")
                     return
+                
+                # Check if this SMS was received recently (within 3 minutes / 180 seconds)
+                is_live_sms = False
+                if tx.sms_timestamp:
+                    time_diff = (datetime.now() - tx.sms_timestamp).total_seconds()
+                    is_live_sms = (abs(time_diff) <= 180)
+                
                 logger.info(
                     f"💰 Parse Success - {tx.type.value}: {tx.amount} EGP "
-                    f"| {tx.counterpart} | conf: {tx.confidence:.0%}"
+                    f"| {tx.counterpart} | conf: {tx.confidence:.0%} | Live SMS: {is_live_sms}"
                 )
                 if self._on_transaction:
-                    self._on_transaction(tx, is_live=True)
+                    self._on_transaction(tx, is_live=is_live_sms)
             else:
                 logger.warning(f"📬 Raw SMS is unclassified (conf: {tx.confidence:.0%})")
                 if self._on_unclassified:

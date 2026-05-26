@@ -24,7 +24,7 @@ public class SmsService extends Service {
         super.onCreate();
         createNotificationChannel();
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("VodaCash Monitor")
+                .setContentTitle("دفتر كاش - Daftar Cash")
                 .setContentText("المراقبة تعمل في الخلفية...")
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .build();
@@ -70,7 +70,7 @@ public class SmsService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel serviceChannel = new NotificationChannel(
                     CHANNEL_ID,
-                    "VodaCash Service Channel",
+                    "قناة خدمة دفتر كاش - Daftar Cash Service",
                     NotificationManager.IMPORTANCE_LOW
             );
             NotificationManager manager = getSystemService(NotificationManager.class);

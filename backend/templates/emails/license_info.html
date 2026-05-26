@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تفاصيل رخصة تفعيل دفتر كاش</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F8FAFC;
+            color: #1E293B;
+            margin: 0;
+            padding: 0;
+            -webkit-text-size-adjust: none;
+            -ms-text-size-adjust: none;
+            text-align: right;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #FFFFFF;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(15, 60, 109, 0.05);
+            border: 1px solid #E2E8F0;
+        }
+        .header {
+            background: linear-gradient(135deg, #0F3C6D 0%, #1E8F8B 100%);
+            padding: 30px 20px;
+            text-align: center;
+            color: #FFFFFF;
+        }
+        .header h1 {
+            margin: 10px 0 0 0;
+            font-size: 24px;
+            font-weight: 800;
+        }
+        .content {
+            padding: 40px 30px;
+            line-height: 1.6;
+        }
+        .title {
+            color: #0F3C6D;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+        .key-container {
+            background-color: #F1F5F9;
+            border: 2px dashed #1E8F8B;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: #0F3C6D;
+            margin: 25px 0;
+            font-family: monospace;
+        }
+        .info-grid {
+            margin: 20px 0;
+            background-color: #F8FAFC;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #E2E8F0;
+        }
+        .info-item {
+            margin-bottom: 8px;
+        }
+        .info-item strong {
+            color: #0F3C6D;
+        }
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #0F3C6D 0%, #1E8F8B 100%);
+            color: #FFFFFF !important;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: bold;
+            margin: 15px 0;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(30, 143, 139, 0.25);
+        }
+        .footer {
+            background-color: #F1F5F9;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #64748B;
+            border-top: 1px solid #E2E8F0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>دفتر كاش - Daftar Cash</h1>
+        </div>
+        <div class="content">
+            <div class="title">تهانينا يا {{ user.username }}، 🎉</div>
+            <p>تم إصدار وتفعيل رخصتك البرمجية الجديدة لبرنامج <strong>دفتر كاش</strong> بنجاح. إليك كود التفعيل الخاص بك وتفاصيل صلاحية الاشتراك:</p>
+            
+            <div class="key-container">
+                {{ license_key }}
+            </div>
+            
+            <div class="info-grid">
+                <div class="info-item"><strong>نوع الاشتراك:</strong> {{ plan_type }}</div>
+                <div class="info-item"><strong>تاريخ انتهاء الصلاحية:</strong> {{ expires_at }}</div>
+                <div class="info-item"><strong>حالة الترخيص:</strong> نشط (جاهز للربط على جهازك)</div>
+            </div>
+            
+            <h3 style="color: #0F3C6D; margin-top: 30px;">خطوات التفعيل والتشغيل السريع:</h3>
+            <ol style="padding-right: 20px; color: #475569; margin: 15px 0;">
+                <li style="margin-bottom: 10px;">افتح تطبيق ديسكتوب <strong>دفتر كاش</strong> على جهازك الكمبيوتر.</li>
+                <li style="margin-bottom: 10px;">انسخ كود التفعيل أعلاه والصقه في الحقل المخصص للتفعيل.</li>
+                <li style="margin-bottom: 10px;">سيتم ربط وقفل الاشتراك على جهازك تلقائياً وبدء العمل مباشرة!</li>
+            </ol>
+            
+            <div style="text-align: center;">
+                <a href="http://127.0.0.1:8000/dashboard/" class="button">لوحة تحكم المشترك</a>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 30px 0;">
+            <p style="font-size: 13px; color: #64748B; text-align: center;">الاشتراك مربوط بجهاز واحد فقط، إذا واجهت أي مشاكل في إقران الـ MAC أو تغيير جهازك، يرجى التواصل مع الإدارة فوراً لإلغاء القفل القديم.</p>
+        </div>
+        <div class="footer">
+            جميع الحقوق محفوظة لـ &copy; دفتر كاش 2026.
+        </div>
+    </div>
+</body>
+</html>
