@@ -62,7 +62,8 @@ class DashboardView(ft.Container):
 
         # KPI Controls
         self.balance_text = ft.Text("0.00 EGP", size=32, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE)
-        self.cash_balance_text = ft.Text("0.00 EGP", size=32, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE)
+        self.cash_balance_text = ft.Text("0.00 EGP", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE)
+        self.cash_profit_text = ft.Text("0.00 EGP", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.AMBER_300)
         self.income_text = ft.Text("0.00 EGP", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_400)
         self.expenses_text = ft.Text("0.00 EGP", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.RED_400)
         self.count_text = ft.Text("0", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400)
@@ -116,7 +117,7 @@ class DashboardView(ft.Container):
                 ft.Row(
                     controls=[
                         self._build_kpi_card("Total Balance / الرصيد الإجمالي", self.balance_text, ft.Icons.ACCOUNT_BALANCE_WALLET_ROUNDED, ["#1E293B", "#0F172A"], ft.Colors.AMBER_500, width=230),
-                        self._build_kpi_card("Cash Balance / الرصيد النقدي", self.cash_balance_text, ft.Icons.MONETIZATION_ON_ROUNDED, ["#1E293B", "#0F172A"], ft.Colors.TEAL_400, width=230),
+                        self._build_cash_kpi_card("Cash Balance / الرصيد النقدي", self.cash_balance_text, self.cash_profit_text, ft.Icons.MONETIZATION_ON_ROUNDED, ["#1E293B", "#0F172A"], ft.Colors.TEAL_400, width=230),
                         self._build_kpi_card("Period Income / دخل الفترة", self.income_text, ft.Icons.ARROW_DOWNWARD_ROUNDED, ["#064E3B", "#022C22"], ft.Colors.GREEN_400),
                         self._build_kpi_card("Period Expenses / مصاريف الفترة", self.expenses_text, ft.Icons.ARROW_UPWARD_ROUNDED, ["#7F1D1D", "#450A0A"], ft.Colors.RED_400),
                         self._build_kpi_card("Period Profit / أرباح الفترة", self.fees_text, ft.Icons.PERCENT, ["#78350F", "#451A03"], ft.Colors.AMBER_400),
@@ -219,6 +220,77 @@ class DashboardView(ft.Container):
             on_hover=self._handle_card_hover
         )
 
+    def _build_cash_kpi_card(self, title: str, cash_text: ft.Text, profit_text: ft.Text, icon: str, gradient_colors: list, accent_color: str, width: int = 230):
+        title_parts = title.split(" / ")
+        title_en = title_parts[0] if len(title_parts) > 0 else title
+        title_ar = title_parts[1] if len(title_parts) > 1 else ""
+
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Container(
+                                content=ft.Icon(icon, color=accent_color, size=20),
+                                bgcolor=ft.Colors.with_opacity(0.12, accent_color),
+                                padding=8,
+                                border_radius=20,
+                                border=ft.Border.all(1, ft.Colors.with_opacity(0.2, accent_color)),
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Text(title_en, color=ft.Colors.WHITE, size=12, weight=ft.FontWeight.W_600, overflow=ft.TextOverflow.ELLIPSIS),
+                                    ft.Text(title_ar, color=ft.Colors.WHITE60, size=10, overflow=ft.TextOverflow.ELLIPSIS),
+                                ],
+                                spacing=1,
+                                horizontal_alignment=ft.CrossAxisAlignment.START,
+                                expand=True
+                            )
+                        ],
+                        alignment=ft.MainAxisAlignment.START,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER
+                    ),
+                    ft.Divider(height=10, color=ft.Colors.WHITE10),
+                    ft.Row(
+                        controls=[
+                            ft.Column(
+                                controls=[
+                                    ft.Text("Actual / الفعلي", size=9, color=ft.Colors.WHITE60, weight=ft.FontWeight.W_500),
+                                    cash_text
+                                ],
+                                spacing=1,
+                                expand=True
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Text("Profit / أرباح الدرج", size=9, color=ft.Colors.AMBER_400, weight=ft.FontWeight.W_500),
+                                    profit_text
+                                ],
+                                spacing=1,
+                                horizontal_alignment=ft.CrossAxisAlignment.END
+                            )
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                    )
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+            ),
+            width=width,
+            height=130,
+            gradient=ft.LinearGradient(
+                colors=gradient_colors,
+                begin=ft.alignment.Alignment.TOP_LEFT,
+                end=ft.alignment.Alignment.BOTTOM_RIGHT
+            ),
+            border_radius=16,
+            padding=12,
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.18, accent_color)),
+            shadow=ft.BoxShadow(spread_radius=0, blur_radius=12, color=ft.Colors.with_opacity(0.15, ft.Colors.BLACK)),
+            scale=1.0,
+            animate_scale=ft.Animation(250, ft.AnimationCurve.EASE_OUT_BACK),
+            on_hover=self._handle_card_hover
+        )
+
     def _handle_card_hover(self, e):
         e.control.scale = 1.04 if e.data == "true" else 1.0
         # If hovered, brighten the border color
@@ -229,7 +301,7 @@ class DashboardView(ft.Container):
             e.control.shadow = ft.BoxShadow(spread_radius=0, blur_radius=12, color=ft.Colors.with_opacity(0.15, ft.Colors.BLACK))
         e.control.update()
 
-    def _build_wallet_card(self, wallet_id: str, balance: float, active: bool):
+    def _build_wallet_card(self, wallet_id: str, balance: float, profit: float, active: bool):
         styling = WALLET_STYLING.get(wallet_id, WALLET_STYLING["unspecified"])
         name = styling["name"]
         name_ar = styling["name_ar"]
@@ -274,18 +346,32 @@ class DashboardView(ft.Container):
                         vertical_alignment=ft.CrossAxisAlignment.CENTER
                     ),
                     ft.Container(expand=True),
-                    ft.Column(
+                    ft.Row(
                         controls=[
-                            ft.Text("Balance / الرصيد", size=9, color=ft.Colors.WHITE60, weight=ft.FontWeight.W_500),
-                            ft.Text(f"{balance:,.2f} EGP", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE)
+                            ft.Column(
+                                controls=[
+                                    ft.Text("Actual Balance / الرصيد الفعلي", size=9, color=ft.Colors.WHITE60, weight=ft.FontWeight.W_500),
+                                    ft.Text(f"{balance:,.2f} EGP", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE)
+                                ],
+                                spacing=1,
+                                expand=True
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Text("Profit / الربح المحقق", size=9, color=ft.Colors.AMBER_400, weight=ft.FontWeight.W_500),
+                                    ft.Text(f"{profit:,.2f} EGP", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.AMBER_300)
+                                ],
+                                spacing=1,
+                                horizontal_alignment=ft.CrossAxisAlignment.END
+                            )
                         ],
-                        spacing=1
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                     )
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN
             ),
-            width=200,
-            height=125,
+            width=220,
+            height=140,
             gradient=ft.LinearGradient(
                 colors=colors,
                 begin=ft.alignment.Alignment.TOP_LEFT,
@@ -339,6 +425,7 @@ class DashboardView(ft.Container):
         cash_summary = self.db.get_cash_summary()
         self.cash_balance_text.value = f"{cash_summary['balance']:,.2f} EGP"
         self.cash_balance_text.color = ft.Colors.WHITE if cash_summary['balance'] >= 0 else ft.Colors.RED_400
+        self.cash_profit_text.value = f"{kpi.get('profit_cash', 0.0):,.2f} EGP"
 
         self.income_text.value = f"+{kpi['income']:,.2f} EGP"
         self.expenses_text.value = f"-{kpi['expenses']:,.2f} EGP"
@@ -347,6 +434,7 @@ class DashboardView(ft.Container):
 
         # تحديث قائمة المحافظ
         wallet_balances = kpi.get("wallet_balances", {})
+        wallet_fees = kpi.get("wallet_fees", {})
         new_wallets = []
         
         # نعرض فقط المحافظ التي يملكها العميل (توجد في wallet_balances)
@@ -354,8 +442,9 @@ class DashboardView(ft.Container):
             if w_id not in wallet_balances:
                 continue
             bal = wallet_balances.get(w_id, 0.0)
+            profit = wallet_fees.get(w_id, 0.0)
             new_wallets.append(
-                self._build_wallet_card(w_id, bal, True)
+                self._build_wallet_card(w_id, bal, profit, True)
             )
         self.wallets_row.controls = new_wallets
 

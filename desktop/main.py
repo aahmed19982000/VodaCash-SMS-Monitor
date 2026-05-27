@@ -5,6 +5,11 @@ import asyncio
 import logging
 import signal
 import sys
+import os
+
+# إضافة المجلد الرئيسي للمشروع إلى sys.path لتمكين التشغيل المباشر
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from datetime import datetime
 import threading
 import subprocess

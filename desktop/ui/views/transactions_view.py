@@ -326,7 +326,7 @@ class TransactionsView(ft.Container):
                 # Table
                 ft.Container(
                     content=self.table_container,
-                    expand=True,
+                    height=480,
                     border=ft.Border.all(1, ft.Colors.WHITE10),
                     border_radius=15,
                     bgcolor=ft.Colors.BLACK26,
@@ -337,6 +337,7 @@ class TransactionsView(ft.Container):
                 # Pagination
                 self.pagination_row
             ],
+            scroll=ft.ScrollMode.ADAPTIVE,
             expand=True
         )
 
@@ -348,7 +349,7 @@ class TransactionsView(ft.Container):
         )
         return ft.Container(
             content=self.unclassified_list,
-            expand=True,
+            height=480,
             padding=15,
             bgcolor=ft.Colors.BLACK26,
             border=ft.Border.all(1, ft.Colors.WHITE10),
@@ -598,7 +599,7 @@ class TransactionsView(ft.Container):
                             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                             ft.Divider(height=1, color=ft.Colors.WHITE10),
                             ft.Container(
-                                content=ft.Text(sms["raw_sms"], size=13, color=ft.Colors.WHITE80, text_align=ft.TextAlign.RIGHT, selectable=True),
+                                content=ft.Text(sms["raw_sms"], size=13, color=ft.Colors.WHITE70, text_align=ft.TextAlign.RIGHT, selectable=True),
                                 alignment=ft.alignment.Alignment.TOP_RIGHT,
                                 padding=ft.Padding(0, 5, 0, 5)
                             ),
@@ -617,7 +618,7 @@ class TransactionsView(ft.Container):
                                     style=ft.ButtonStyle(
                                         color=ft.Colors.RED_ACCENT,
                                         shape=ft.RoundedRectangleBorder(radius=8),
-                                        border_side=ft.BorderSide(1, ft.Colors.RED_ACCENT)
+                                        side=ft.BorderSide(1, ft.Colors.RED_ACCENT)
                                     ),
                                     on_click=lambda e, s=sms: self._dismiss_unclassified_sms(s)
                                 )
@@ -1076,19 +1077,19 @@ class TransactionsView(ft.Container):
                             border=ft.Border.all(1, ft.Colors.with_opacity(0.15, ft.Colors.AMBER_400)),
                         ),
                         ft.Container(height=10),
-                        ft.Text("اختر حالة الربح:", size=13, color=ft.Colors.WHITE70),
+                        ft.Text("حدد تصنيف أرباح المعاملة (أرباح في المحفظة أم أرباح مستلمة في الدرج)؟", size=13, color=ft.Colors.WHITE70),
                         ft.Divider(height=10, color=ft.Colors.WHITE10),
                         ft.Row(
                             controls=[
                                 ft.ElevatedButton(
-                                    "💳 في المحفظة",
+                                    "💳 أرباح في المحفظة",
                                     color=ft.Colors.WHITE,
                                     bgcolor="#14532D",
                                     style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=10)),
                                     on_click=lambda e: self._set_profit_status(tx, fee, "IN_WALLET", custom_dlg),
                                 ),
                                 ft.ElevatedButton(
-                                    "💵 نقداً",
+                                    "💵 أرباح مستلمة (في الدرج)",
                                     color=ft.Colors.WHITE,
                                     bgcolor="#78350F",
                                     style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=10)),
@@ -1137,14 +1138,12 @@ class TransactionsView(ft.Container):
         tx_id  = tx.transaction_id
         raw_sms = tx.raw_sms
 
+        # تحديث حالة الأرباح ومزامنة الخزينة في قاعدة البيانات تلقائياً
         ok = self.db.mark_profit_status(tx_id, raw_sms, status)
-        if ok and status == "CASH":
-            desc = f"ربح من {tx.type.value} — {tx.wallet_id or ''} — {tx.amount:,.2f} EGP"
-            self.db.add_cash_entry("PROFIT_IN", fee, desc, source_tx_id=str(tx_id or ""))
 
         self._close_dialog(dlg)
 
-        status_labels = {"IN_WALLET": "💳 في المحفظة", "CASH": "💵 نقداً", "NONE": "✖ لا ربح"}
+        status_labels = {"IN_WALLET": "💳 أرباح في المحفظة", "CASH": "💵 أرباح في الدرج", "NONE": "✖ لا ربح"}
         if ok:
             self.flet_page.snack_bar = ft.SnackBar(
                 content=ft.Text(f"✅ تم تحديد الربح كـ: {status_labels.get(status, status)}", size=14, weight=ft.FontWeight.BOLD),

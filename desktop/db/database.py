@@ -447,16 +447,6 @@ class DesktopDatabase:
                 """, (w_id,)).fetchone()
                 net_change = tx_sum["net_change"] if tx_sum else 0.0
 
-                # حساب الأرباح التي لا تزال في المحفظة (IN_WALLET)
-                wallet_tx_rows = self._conn.execute(
-                    "SELECT * FROM transactions WHERE wallet_id = ?", (w_id,)
-                ).fetchall()
-                wallet_in_wallet_fees = 0.0
-                for r in wallet_tx_rows:
-                    tx = self._row_to_transaction(r)
-                    if r["profit_status"] == "IN_WALLET":
-                        wallet_in_wallet_fees += self.calculate_fee(tx)
-                
                 if initial_bal_str is not None:
                     # إذا تم إدخال رصيد ابتدائي يدوي:
                     try:
@@ -479,10 +469,8 @@ class DesktopDatabase:
                         # إذا لم يوجد رصيد تلقائي في الرسائل، نبدأ من 0 + صافي المعاملات
                         balance_raw = 0.0 + net_change
                 
-                # طرح الأرباح التي لا تزال بالمحفظة مع ضمان عدم تخطي الرصيد أو جعله سالباً
-                wallet_in_wallet_fees = min(wallet_in_wallet_fees, max(0.0, balance_raw))
-                balance = balance_raw - wallet_in_wallet_fees
-                wallet_balances[w_id] = balance
+                # نعرض الرصيد الفعلي للمحفظة في الحسابات بالصفحة الرئيسية دون طرح الأرباح المعلقة
+                wallet_balances[w_id] = balance_raw
             
         current_balance = sum(wallet_balances.values())
 
@@ -494,9 +482,26 @@ class DesktopDatabase:
         """).fetchall()
         
         total_fees = 0.0
+        wallet_fees = {}
+        profit_cash = 0.0
+        profit_in_wallet = 0.0
+        profit_unset = 0.0
         for r in tx_rows:
             tx = self._row_to_transaction(r)
-            total_fees += self.calculate_fee(tx)
+            fee = self.calculate_fee(tx)
+            total_fees += fee
+            w_id = tx.wallet_id
+            if w_id:
+                w_id = w_id.strip().lower()
+                wallet_fees[w_id] = wallet_fees.get(w_id, 0.0) + fee
+            
+            p_status = r["profit_status"] if "profit_status" in r.keys() else "UNSET"
+            if p_status == "CASH":
+                profit_cash += fee
+            elif p_status == "IN_WALLET":
+                profit_in_wallet += fee
+            else:
+                profit_unset += fee
 
         return {
             "income": row["total_income"],
@@ -504,7 +509,11 @@ class DesktopDatabase:
             "transactions_count": row["total_transactions"],
             "current_balance": current_balance,
             "wallet_balances": wallet_balances,
-            "fees": total_fees
+            "fees": total_fees,
+            "wallet_fees": wallet_fees,
+            "profit_cash": profit_cash,
+            "profit_in_wallet": profit_in_wallet,
+            "profit_unset": profit_unset
         }
 
     def calculate_fee(self, tx: Transaction) -> float:
@@ -686,7 +695,7 @@ class DesktopDatabase:
             return False
 
     def get_wallet_net_change(self, wallet_id: str) -> float:
-        """حساب صافي التغير في الرصيد بناءً على المعاملات المسجلة (مع خصم الأرباح التي لا تزال بالمحفظة)"""
+        """حساب صافي التغير في الرصيد بناءً على المعاملات المسجلة دون طرح الأرباح"""
         try:
             tx_sum = self._conn.execute("""
                 SELECT 
@@ -695,20 +704,7 @@ class DesktopDatabase:
                 FROM transactions
                 WHERE wallet_id = ?
             """, (wallet_id,)).fetchone()
-            net_change = tx_sum["net_change"] if tx_sum else 0.0
-            
-            # طرح الأرباح التي لا تزال بالمحفظة من صافي التغيير
-            wallet_tx_rows = self._conn.execute(
-                "SELECT * FROM transactions WHERE wallet_id = ?", (wallet_id,)
-            ).fetchall()
-            wallet_in_wallet_fees = 0.0
-            for r in wallet_tx_rows:
-                tx = self._row_to_transaction(r)
-                if r["profit_status"] == "IN_WALLET":
-                    wallet_in_wallet_fees += self.calculate_fee(tx)
-            
-            wallet_in_wallet_fees = min(wallet_in_wallet_fees, max(0.0, net_change))
-            return net_change - wallet_in_wallet_fees
+            return tx_sum["net_change"] if tx_sum else 0.0
         except Exception as e:
             logger.error(f"Error getting net change for wallet {wallet_id}: {e}")
             return 0.0
@@ -745,7 +741,7 @@ class DesktopDatabase:
 
     def mark_profit_status(self, tx_id: str, raw_sms: str, status: str) -> bool:
         """
-        تحديث حالة الربح لعملية معينة.
+        تحديث حالة الربح لعملية معينة ومزامنة حركة الخزينة (النقدية) تلقائياً.
         status: 'IN_WALLET' | 'CASH' | 'NONE' | 'UNSET'
         """
         valid = {"IN_WALLET", "CASH", "NONE", "UNSET"}
@@ -753,6 +749,20 @@ class DesktopDatabase:
             logger.error(f"Invalid profit_status: {status}")
             return False
         try:
+            # 1. جلب بيانات العملية والرسوم
+            if tx_id:
+                row = self._conn.execute("SELECT * FROM transactions WHERE transaction_id = ?", (tx_id,)).fetchone()
+            else:
+                row = self._conn.execute("SELECT * FROM transactions WHERE transaction_id IS NULL AND raw_sms = ?", (raw_sms,)).fetchone()
+            
+            if not row:
+                logger.error("Transaction not found for marking profit status")
+                return False
+                
+            tx = self._row_to_transaction(row)
+            fee = self.calculate_fee(tx)
+            
+            # 2. تحديث حالة الأرباح
             if tx_id is not None:
                 self._conn.execute(
                     "UPDATE transactions SET profit_status=? WHERE transaction_id=?",
@@ -763,6 +773,20 @@ class DesktopDatabase:
                     "UPDATE transactions SET profit_status=? WHERE transaction_id IS NULL AND raw_sms=?",
                     (status, raw_sms)
                 )
+                
+            # 3. مزامنة سجل النقدية تلقائياً لمنع التكرار أو الفقدان
+            id_for_ledger = str(tx_id) if tx_id else raw_sms
+            self._conn.execute("DELETE FROM cash_ledger WHERE source_tx_id = ?", (id_for_ledger,))
+            
+            if status == "CASH" and fee > 0.0:
+                tx_type_str = tx.type.value if hasattr(tx.type, "value") else str(tx.type)
+                tx_amount_val = tx.amount if tx.amount is not None else 0.0
+                desc = f"ربح من {tx_type_str} — {tx.wallet_id or ''} — {tx_amount_val:,.2f} EGP"
+                self._conn.execute(
+                    "INSERT INTO cash_ledger (type, amount, description, source_tx_id) VALUES ('PROFIT_IN', ?, ?, ?)",
+                    (fee, desc, id_for_ledger)
+                )
+                
             self._conn.commit()
             return True
         except Exception as e:
@@ -868,7 +892,7 @@ class DesktopDatabase:
 
             # 2. حساب حركات النقدية التلقائية من العمليات بعد توقيت النقدية الافتتاحية
             tx_rows = self._conn.execute("""
-                SELECT *
+                SELECT * FROM transactions
                 WHERE wallet_id IS NOT NULL AND wallet_id NOT IN ('unspecified', '', 'bank')
                   AND datetime(sms_timestamp) >= datetime(?)
             """, (initial_cash_ts,)).fetchall()
@@ -885,14 +909,13 @@ class DesktopDatabase:
                 fee = self.calculate_fee(tx)
 
                 if t_type in ['SENT', 'BILL', 'PURCHASE', 'TOPUP']:
-                    if p_status == "CASH":
-                        tx_in += (amount + fee)
-                    else:
-                        tx_in += amount
+                    tx_in += amount
                 elif t_type == 'ATM_WITHDRAWAL':
                     tx_in += amount
                 elif t_type == 'RECEIVED':
-                    if p_status in ['IN_WALLET', 'CASH', 'UNSET']:
+                    if p_status == "CASH":
+                        tx_out += amount
+                    elif p_status in ['IN_WALLET', 'UNSET']:
                         tx_out += max(0.0, amount - fee)
                     else:
                         tx_out += amount

@@ -452,9 +452,28 @@ public class MainActivity extends AppCompatActivity {
 
     private void onAllPermissionsGranted() {
         requestBatteryOptimizationWhitelist();
+        requestOverlayPermission();
         if (!SmsMonitorService.isRunning()) {
             Toast.makeText(this, "✅ تم تفعيل مراقبة فودافون كاش", Toast.LENGTH_SHORT).show();
             SmsMonitorService.start(this);
+        }
+    }
+
+    private void requestOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!android.provider.Settings.canDrawOverlays(this)) {
+                try {
+                    Intent intent = new Intent(
+                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:" + getPackageName())
+                    );
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                    Toast.makeText(this, "⚠️ يرجى تفعيل إذن 'الظهور فوق التطبيقات الأخرى' لتمكين التحويل التلقائي", Toast.LENGTH_LONG).show();
+                } catch (Exception e) {
+                    android.util.Log.e("MainActivity", "Failed to start overlay settings intent", e);
+                }
+            }
         }
     }
 

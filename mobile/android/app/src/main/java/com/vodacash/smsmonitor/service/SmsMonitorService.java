@@ -477,15 +477,23 @@ public class SmsMonitorService extends Service {
                         
                         Log.i(TAG, "💸 Initiate transfer request: wallet=" + walletId + ", amount=" + amount + ", simSlot=" + simSlot);
                         
+                        String walletName = "فودافون كاش";
+                        if ("orange_cash".equals(walletId)) walletName = "أورنج كاش";
+                        else if ("etisalat_cash".equals(walletId)) walletName = "اتصالات كاش";
+                        else if ("we_pay".equals(walletId)) walletName = "وي باي";
+                        
+                        showAlertNotification("💸 طلب تحويل مالي وارد...", 
+                            "يرجى التحقق من شاشة الهاتف الآن وإدخال الرقم السري لإتمام تحويل " + (int)amount + " ج.م. عبر " + walletName + " إلى " + recipient);
+
                         String ussdCode = "";
                         if ("vodafone_cash".equals(walletId)) {
-                            ussdCode = "*9*7*" + recipient + "*" + (int)amount + "*" + pin + "#";
+                            ussdCode = "*9*7*" + recipient + "*" + (int)amount + "#";
                         } else if ("orange_cash".equals(walletId)) {
-                            ussdCode = "#7115*1*" + recipient + "*" + (int)amount + "*" + pin + "#";
+                            ussdCode = "#7115*1*" + recipient + "*" + (int)amount + "#";
                         } else if ("etisalat_cash".equals(walletId)) {
-                            ussdCode = "*777*1*" + recipient + "*" + (int)amount + "*" + pin + "#";
+                            ussdCode = "*777*1*" + recipient + "*" + (int)amount + "#";
                         } else if ("we_pay".equals(walletId)) {
-                            ussdCode = "*7*2*" + recipient + "*" + (int)amount + "*" + pin + "#";
+                            ussdCode = "*7*2*" + recipient + "*" + (int)amount + "#";
                         }
 
                         if (!ussdCode.isEmpty()) {

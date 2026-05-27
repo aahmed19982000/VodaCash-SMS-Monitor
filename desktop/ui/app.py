@@ -445,18 +445,13 @@ class DesktopApp:
 
     def _set_new_tx_profit_status(self, tx, fee: float, status: str, dlg):
         try:
-            # تحديث حالة الأرباح في قاعدة البيانات
+            # تحديث حالة الأرباح ومزامنة الخزينة في قاعدة البيانات تلقائياً
             ok = self.db.mark_profit_status(tx.transaction_id, tx.raw_sms, status)
-            if ok and status == "CASH":
-                tx_type_str = tx.type.value if hasattr(tx.type, "value") else str(tx.type)
-                tx_amount_val = tx.amount if tx.amount is not None else 0.0
-                desc = f"ربح من {tx_type_str} — {tx.wallet_id or ''} — {tx_amount_val:,.2f} EGP"
-                self.db.add_cash_entry("PROFIT_IN", fee, desc, source_tx_id=str(tx.transaction_id or ""))
             
             self._close_new_tx_dialog(dlg)
             
             # إظهار رسالة تأكيد للمستخدم
-            status_labels = {"IN_WALLET": "💳 في المحفظة", "CASH": "💵 نقداً", "NONE": "✖ لا ربح"}
+            status_labels = {"IN_WALLET": "💳 أرباح في المحفظة", "CASH": "💵 أرباح في الدرج", "NONE": "✖ لا ربح"}
             if ok:
                 self.page.snack_bar = ft.SnackBar(
                     content=ft.Text(f"✅ تم حفظ حالة الربح: {status_labels.get(status, status)}", size=14, weight=ft.FontWeight.BOLD),
@@ -596,19 +591,19 @@ class DesktopApp:
                             border=ft.Border.all(1, ft.Colors.with_opacity(0.15, ft.Colors.AMBER_400)),
                         ),
                         ft.Container(height=10),
-                        ft.Text("هل تم التحويل بالأرباح (في المحفظة) أم تم خصمها (نقداً)؟", size=14, color=ft.Colors.WHITE, weight=ft.FontWeight.W_500, text_align=ft.TextAlign.RIGHT),
+                        ft.Text("حدد تصنيف أرباح المعاملة (هل هي أرباح في المحفظة أم أرباح مستلمة في الدرج)؟", size=14, color=ft.Colors.WHITE, weight=ft.FontWeight.W_500, text_align=ft.TextAlign.RIGHT),
                         ft.Divider(height=10, color=ft.Colors.WHITE10),
                         ft.Row(
                             controls=[
                                 ft.ElevatedButton(
-                                    "💳 بالأرباح (في المحفظة)",
+                                    "💳 أرباح في المحفظة",
                                     color=ft.Colors.WHITE,
                                     bgcolor="#14532D",
                                     style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=10)),
                                     on_click=lambda e: self._set_new_tx_profit_status(tx, fee_val, "IN_WALLET", custom_dlg),
                                 ),
                                 ft.ElevatedButton(
-                                    "💵 تم خصمها (نقداً)",
+                                    "💵 أرباح مستلمة (في الدرج)",
                                     color=ft.Colors.WHITE,
                                     bgcolor="#78350F",
                                     style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=10)),

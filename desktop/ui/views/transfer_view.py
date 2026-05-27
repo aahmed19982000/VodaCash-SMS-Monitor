@@ -159,6 +159,40 @@ class TransferView(ft.Container):
             visible=True
         )
 
+        # 4b. Security restrictions notice banner
+        self.restriction_note = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.INFO_OUTLINE_ROUNDED, color=ft.Colors.BLUE_400, size=20),
+                    ft.Column(
+                        controls=[
+                            ft.Text(
+                                "تنويه: بعض شبكات الاتصالات (مثل Orange) لا تدعم التحويل التلقائي الكامل بسبب قيود الأمان، وتطلب تفاعل العميل مع القوائم على شاشة الهاتف.", 
+                                color=ft.Colors.BLUE_200, 
+                                size=12, 
+                                weight=ft.FontWeight.W_500
+                            ),
+                            ft.Text(
+                                "Note: Some carriers (e.g. Orange) block direct USSD chaining and require manual navigation step-by-step on the phone screen.", 
+                                color=ft.Colors.WHITE38, 
+                                size=11
+                            )
+                        ],
+                        spacing=2,
+                        expand=True
+                    )
+                ],
+                alignment=ft.MainAxisAlignment.START,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=10
+            ),
+            bgcolor="#0E1E38",
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.3, ft.Colors.BLUE_400)),
+            border_radius=10,
+            padding=15,
+            width=500
+        )
+
         # 5. Submit Button
         self.submit_btn = ft.Container(
             content=ft.ElevatedButton(
@@ -193,6 +227,7 @@ class TransferView(ft.Container):
                     ft.Container(height=5),
                     sim_slot_container,
                     ft.Container(height=5),
+                    self.restriction_note,
                     self.status_banner,
                     ft.Container(height=10),
                     self.submit_btn
@@ -338,6 +373,9 @@ class TransferView(ft.Container):
             self.server.broadcast_threadsafe(msg_payload)
             print(f"[DEBUG] Message successfully dispatched to broadcast threadsafe.")
             
+            # Show the instructions overlay dialog
+            self.show_transfer_instructions_dialog(self.selected_wallet, recipient, amount)
+
             # Show success and clear PIN field for security
             self.pin_field.value = ""
             self.recipient_field.value = ""
@@ -348,6 +386,123 @@ class TransferView(ft.Container):
             self.show_snack(f"❌ فشل إرسال الأمر: {ex}", True)
 
         self.flet_page.update()
+
+    def show_transfer_instructions_dialog(self, wallet_id: str, recipient: str, amount: float):
+        wallet_name = self.wallets.get(wallet_id, {}).get("name", wallet_id)
+        wallet_color = self.wallets.get(wallet_id, {}).get("color", ft.Colors.BLUE_400)
+        
+        dialog_container = None
+        
+        def close_dialog(e):
+            self.flet_page.close_dialog_overlay(dialog_container)
+            
+        dialog_container = ft.Container(
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[
+                        # Icon and Title
+                        ft.Row(
+                            [
+                                ft.Icon(ft.Icons.PHONELINK_RING_ROUNDED, color=wallet_color, size=48),
+                            ],
+                            alignment=ft.MainAxisAlignment.CENTER,
+                        ),
+                        ft.Container(height=5),
+                        ft.Text(
+                            "التحقق من الهاتف / Check Your Phone",
+                            size=18,
+                            weight=ft.FontWeight.BOLD,
+                            color=ft.Colors.WHITE,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                        ft.Divider(height=10, color=ft.Colors.WHITE10),
+                        
+                        # Instructions text
+                        ft.Text(
+                            "يرجى التحقق من شاشة الهاتف الخاص بك الآن وكتابة الرقم السري للمحفظة على شاشة الهاتف لمتابعة وإتمام عملية التحويل.",
+                            size=13,
+                            weight=ft.FontWeight.W_500,
+                            color=ft.Colors.WHITE,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                        ft.Text(
+                            "Please check your mobile phone screen now and enter the Wallet PIN on your phone to complete the transfer.",
+                            size=12,
+                            color=ft.Colors.WHITE54,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                        
+                        # Transfer Details Box
+                        ft.Container(
+                            content=ft.Column(
+                                controls=[
+                                    ft.Row(
+                                        [
+                                            ft.Text("المحفظة / Wallet:", size=12, color=ft.Colors.WHITE54, weight=ft.FontWeight.BOLD),
+                                            ft.Text(wallet_name, size=13, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+                                        ],
+                                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                                    ),
+                                    ft.Row(
+                                        [
+                                            ft.Text("المستلم / Recipient:", size=12, color=ft.Colors.WHITE54, weight=ft.FontWeight.BOLD),
+                                            ft.Text(recipient, size=13, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+                                        ],
+                                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                                    ),
+                                    ft.Row(
+                                        [
+                                            ft.Text("المبلغ / Amount:", size=12, color=ft.Colors.WHITE54, weight=ft.FontWeight.BOLD),
+                                            ft.Text(f"{amount:,.2f} EGP", size=14, color=wallet_color, weight=ft.FontWeight.BOLD),
+                                        ],
+                                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                                    ),
+                                ],
+                                spacing=8,
+                            ),
+                            bgcolor="#111827",
+                            padding=15,
+                            border_radius=10,
+                            border=ft.Border.all(1, ft.Colors.WHITE10),
+                            margin=ft.Margin(0, 10, 0, 10),
+                        ),
+                        
+                        # Action Button
+                        ft.Row(
+                            [
+                                ft.ElevatedButton(
+                                    "حسناً، متابعة / OK, Got It",
+                                    icon=ft.Icons.CHECK_ROUNDED,
+                                    bgcolor=wallet_color,
+                                    color=ft.Colors.WHITE,
+                                    style=ft.ButtonStyle(
+                                        shape=ft.RoundedRectangleBorder(radius=10),
+                                        padding=ft.Padding(20, 15, 20, 15),
+                                    ),
+                                    on_click=close_dialog,
+                                )
+                            ],
+                            alignment=ft.MainAxisAlignment.CENTER,
+                        )
+                    ],
+                    tight=True,
+                    spacing=12,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                bgcolor="#0B0F19",
+                border_radius=18,
+                padding=25,
+                width=450,
+                border=ft.Border.all(1, ft.Colors.WHITE10),
+            ),
+            alignment=ft.alignment.Alignment.CENTER,
+            bgcolor=ft.Colors.with_opacity(0.85, ft.Colors.BLACK),
+            left=0,
+            top=0,
+            right=0,
+            bottom=0,
+        )
+        self.flet_page.show_dialog_overlay(dialog_container)
 
     def show_snack(self, message: str, is_error: bool):
         self.flet_page.snack_bar = ft.SnackBar(
