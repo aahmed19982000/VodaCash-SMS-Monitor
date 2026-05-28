@@ -27,9 +27,6 @@
                     
                     {% if user.is_authenticated %}
                         <li><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> لوحة التحكم</a></li>
-                        {% if user.is_staff or user.is_superuser %}
-                            <li><a href="{% url 'admin_panel' %}" style="color: var(--accent-pink);"><i class="fa-solid fa-user-shield"></i> الإدارة</a></li>
-                        {% endif %}
                         <li><a href="{% url 'logout' %}"><i class="fa-solid fa-right-from-bracket"></i> خروج <span class="desktop-only">({{ user.username }})</span></a></li>
                     {% else %}
                         <li><a href="{% url 'login' %}"><i class="fa-solid fa-right-to-bracket"></i> دخول</a></li>

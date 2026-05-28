@@ -1,413 +1,985 @@
-{% extends 'base.html' %}
-
-{% block title %}لوحة الإدارة - دفتر كاش (Daftar Cash){% endblock %}
-
-{% block extra_head %}
+{% load static %}
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>لوحة الإدارة - دفتر كاش (Daftar Cash)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
 <style>
-    .admin-stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
-        margin-bottom: 40px;
+    body {
+        font-family: 'IBM Plex Sans Arabic', sans-serif;
     }
-    
-    .stat-card {
-        padding: 20px;
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid var(--border-color);
-        display: flex;
-        align-items: center;
-        gap: 15px;
+    .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        vertical-align: middle;
     }
-    
-    .stat-card i {
-        font-size: 28px;
-        background: var(--primary-gradient);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    
-    .stat-val {
-        font-family: 'Outfit', sans-serif;
-        font-size: 22px;
-        font-weight: 800;
-        color: var(--text-primary);
-    }
-
-    .admin-actions-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 30px;
-        margin-bottom: 40px;
-        align-items: start;
-    }
-
-    .tab-header-custom {
-        display: flex;
-        gap: 10px;
-        border-bottom: 1px solid var(--border-color);
-        margin-bottom: 25px;
-        padding-bottom: 10px;
-    }
-    
-    .tab-btn-custom {
-        background: transparent;
-        border: none;
-        color: var(--text-secondary);
-        font-size: 16px;
-        font-weight: 700;
-        cursor: pointer;
-        padding: 8px 16px;
-        transition: var(--transition-smooth);
-        border-radius: 8px;
-    }
-    
-    .tab-btn-custom.active {
-        color: var(--accent-purple);
-        background: rgba(79, 70, 229, 0.08);
-        box-shadow: 0 2px 10px rgba(79, 70, 229, 0.1);
+    .sidebar-active {
+        color: #71f8e4 !important;
+        background-color: rgba(0, 107, 95, 0.2);
+        border-right: 4px solid #71f8e4;
     }
 </style>
-{% endblock %}
+</head>
+<body class="bg-[#f8f9ff] min-h-screen text-[#0b1c30]">
 
-{% block content %}
-<div style="margin-bottom: 35px;">
-    <h1 style="font-size: 32px; font-weight: 800; color: var(--accent-pink);"><i class="fa-solid fa-user-shield"></i> لوحة الإدارة والتحكم بالتراخيص</h1>
-    <p style="color: var(--text-secondary); font-size: 15px;">أصدر مفاتيح جديدة، الغ قفل الأجهزة، تابع المبيعات والاشتراكات النشطة في النظام.</p>
-</div>
-
-<!-- Stats Widgets -->
-<div class="admin-stats-grid">
-    <div class="stat-card">
-        <i class="fa-solid fa-key"></i>
-        <div>
-            <div style="font-size: 12px; color: var(--text-secondary);">إجمالي التراخيص</div>
-            <div class="stat-val">{{ stats.total_keys }}</div>
-        </div>
-    </div>
-    <div class="stat-card">
-        <i class="fa-solid fa-circle-check" style="color: var(--success-green);"></i>
-        <div>
-            <div style="font-size: 12px; color: var(--text-secondary);">اشتراكات نشطة</div>
-            <div class="stat-val" style="color: var(--success-green);">{{ stats.active_keys }}</div>
-        </div>
-    </div>
-    <div class="stat-card">
-        <i class="fa-solid fa-circle-xmark" style="color: var(--error-red);"></i>
-        <div>
-            <div style="font-size: 12px; color: var(--text-secondary);">اشتراكات منتهية</div>
-            <div class="stat-val" style="color: var(--error-red);">{{ stats.expired_keys }}</div>
-        </div>
-    </div>
-    <div class="stat-card">
-        <i class="fa-solid fa-sack-dollar" style="color: var(--warning-amber);"></i>
-        <div>
-            <div style="font-size: 12px; color: var(--text-secondary);">صافي الإيرادات</div>
-            <div class="stat-val" style="color: var(--warning-amber);">{{ stats.total_revenue|floatformat:2 }} ج.م</div>
-        </div>
-    </div>
-    <div class="stat-card">
-        <i class="fa-solid fa-users"></i>
-        <div>
-            <div style="font-size: 12px; color: var(--text-secondary);">إجمالي المشتركين</div>
-            <div class="stat-val">{{ stats.total_users }}</div>
-        </div>
-    </div>
-</div>
-
-<!-- Generators forms Section -->
-<div class="admin-actions-grid">
-    <!-- Generate License Key -->
-    <div class="glass-card">
-        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-blue);">
-            <i class="fa-solid fa-plus"></i> توليد وإصدار مفتاح اشتراك جديد
-        </h3>
-        
-        <form method="POST">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="generate_key">
-            
-            <div class="form-group">
-                <label for="client_name">اسم العميل (Client Name) *</label>
-                <input type="text" id="client_name" name="client_name" class="form-control" placeholder="اكتب اسم العميل الثلاثي" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="client_phone">رقم الهاتف (Phone Number)</label>
-                <input type="text" id="client_phone" name="client_phone" class="form-control ltr" placeholder="01XXXXXXXXX">
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                <div class="form-group">
-                    <label for="key_type">نوع الترخيص (License Type)</label>
-                    <select id="key_type" name="key_type" class="form-control">
-                        <option value="MONTHLY">شهري (Monthly)</option>
-                        <option value="YEARLY">سنوي (Yearly)</option>
-                        <option value="TRIAL">تجريبي (Trial)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="custom_days">أو مدة مخصصة بالأيام (Days)</label>
-                    <input type="number" id="custom_days" name="custom_days" class="form-control ltr" placeholder="مثال: 45">
-                </div>
-            </div>
-            
-            <button type="submit" class="btn-primary" style="width: 100%; margin-top: 15px; padding: 12px;">
-                <i class="fa-solid fa-magic"></i> توليد المفتاح وحفظه
-            </button>
-        </form>
-    </div>
-
-    <!-- Create Coupon Form -->
-    <div class="glass-card">
-        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-purple);">
-            <i class="fa-solid fa-ticket"></i> إنشاء كوبون خصم جديد
-        </h3>
-        
-        <form method="POST">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create_coupon">
-            
-            <div class="form-group">
-                <label for="code">كود الكوبون (Coupon Code) *</label>
-                <input type="text" id="code" name="code" class="form-control" placeholder="مثال: OFF50" style="text-transform: uppercase;" required>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                <div class="form-group">
-                    <label for="discount_percent">نسبة الخصم % (Discount %)</label>
-                    <input type="number" step="0.1" id="discount_percent" name="discount_percent" class="form-control ltr" value="0.0">
-                </div>
-                <div class="form-group">
-                    <label for="trial_days">أو أيام تجريبية إضافية (Days)</label>
-                    <input type="number" id="trial_days" name="trial_days" class="form-control ltr" value="0">
-                </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                <div class="form-group">
-                    <label for="max_uses">الحد الأقصى للاستخدام (Max Uses)</label>
-                    <input type="number" id="max_uses" name="max_uses" class="form-control ltr" value="100" required>
-                </div>
-                <div class="form-group">
-                    <label for="expiry_days">أيام الصلاحية من الآن (Expiry Days)</label>
-                    <input type="number" id="expiry_days" name="expiry_days" class="form-control ltr" value="30" required>
-                </div>
-            </div>
-            
-            <button type="submit" class="btn-secondary" style="width: 100%; margin-top: 15px; padding: 12px; border-color: var(--accent-purple); color: var(--accent-purple);">
-                <i class="fa-solid fa-plus-circle"></i> حفظ وإنشاء الكوبون
-            </button>
-        </form>
-    </div>
-</div>
-
-<!-- Tabs & Tables Section -->
-<div class="glass-card">
-    <div class="tab-header-custom">
-        <button class="tab-btn-custom active" id="tab-btn-licenses" onclick="switchTab('licenses')"><i class="fa-solid fa-key"></i> مفاتيح الاشتراكات</button>
-        <button class="tab-btn-custom" id="tab-btn-coupons" onclick="switchTab('coupons')"><i class="fa-solid fa-ticket"></i> الكوبونات المتاحة</button>
-        <button class="tab-btn-custom" id="tab-btn-payments" onclick="switchTab('payments')"><i class="fa-solid fa-receipt"></i> السجلات والعمليات المالية</button>
+<div class="min-h-screen flex flex-col md:flex-row">
+  <!-- Sidebar -->
+  <aside class="w-full md:w-64 bg-[#00192d] text-white flex flex-col border-l border-white/10 z-30 shadow-xl">
+    <!-- Sidebar Brand -->
+    <div class="h-20 flex items-center px-6 gap-3 border-b border-white/10">
+      <img src="{% static 'logo.png' %}" alt="Logo" class="w-10 h-10 object-contain rounded-lg">
+      <span class="text-xl font-bold text-[#71f8e4]">دفتر كاش</span>
     </div>
     
-    <!-- Table 1: Licenses -->
-    <div id="table-container-licenses">
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>العميل</th>
-                        <th>كود الترخيص</th>
-                        <th>النوع</th>
-                        <th>تاريخ الانتهاء</th>
-                        <th>الحالة</th>
-                        <th>الـ MAC المرتبط</th>
-                        <th style="text-align: center;">إجراءات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for lic in licenses %}
-                        <tr>
-                            <td>
-                                <strong>{{ lic.client_name }}</strong>
-                                {% if lic.client_phone %}<br><span style="font-size: 11px; color: var(--text-secondary);">{{ lic.client_phone }}</span>{% endif %}
-                            </td>
-                            <td class="ltr" style="font-family: monospace; font-weight: bold; color: var(--accent-blue);">{{ lic.key }}</td>
-                            <td>{{ lic.get_type_display }}</td>
-                            <td>{{ lic.expires_at|date:"Y-m-d H:i" }}</td>
-                            <td>
-                                {% if lic.status == 'ACTIVE' and lic.expires_at > timezone.now %}
-                                    <span class="badge badge-active">نشط</span>
-                                {% elif lic.status == 'SUSPENDED' %}
-                                    <span class="badge badge-suspended">معطل</span>
-                                {% else %}
-                                    <span class="badge badge-expired">منتهي</span>
-                                {% endif %}
-                            </td>
-                            <td class="ltr" style="font-family: monospace; font-size: 12px;">
-                                {% if lic.mac_address %}{{ lic.mac_address }}{% else %}<span style="color: var(--text-muted);">غير مقترن</span>{% endif %}
-                            </td>
-                            <td>
-                                <div style="display: flex; gap: 8px; justify-content: center; align-items: center;">
-                                    {% if lic.mac_address %}
-                                        <form method="POST" style="display:inline;">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="action" value="reset_mac">
-                                            <input type="hidden" name="license_key" value="{{ lic.key }}">
-                                            <button type="submit" class="btn-secondary" style="padding: 5px 8px; font-size: 11px;" title="إعادة تعيين MAC Lock">
-                                                <i class="fa-solid fa-rotate-left"></i> فك القفل
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                    <form method="POST" style="display:inline;">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="toggle_status">
-                                        <input type="hidden" name="license_key" value="{{ lic.key }}">
-                                        <button type="submit" class="btn-secondary" style="padding: 5px 8px; font-size: 11px;" title="تعطيل / تفعيل">
-                                            <i class="fa-solid fa-power-off"></i> {% if lic.status == 'ACTIVE' %}تعطيل{% else %}تفعيل{% endif %}
-                                        </button>
-                                    </form>
-                                    <form method="POST" style="display:inline;">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="extend_expiry">
-                                        <input type="hidden" name="license_key" value="{{ lic.key }}">
-                                        <button type="submit" class="btn-secondary" style="padding: 5px 8px; font-size: 11px; border-color: var(--success-green); color: var(--success-green);" title="تمديد 30 يوماً">
-                                            <i class="fa-solid fa-calendar-plus"></i> +30 يوم
-                                        </button>
-                                    </form>
-                                    <form method="POST" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من حذف هذا الترخيص نهائياً؟')">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="delete_key">
-                                        <input type="hidden" name="license_key" value="{{ lic.key }}">
-                                        <button type="submit" class="btn-danger" style="padding: 5px 8px; font-size: 11px;" title="حذف">
-                                            <i class="fa-solid fa-trash-can"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 30px;">
-                                لا يوجد أي مفاتيح ترخيص في قاعدة البيانات حتى الآن.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <!-- Sidebar Nav Links -->
+    <nav class="flex-grow p-4 space-y-2">
+      <p class="text-xs text-gray-500 font-bold uppercase tracking-wider px-3 mb-4">التحكم والعمليات</p>
+      
+      <button onclick="switchTab('licenses')" id="sidebar-btn-licenses" 
+              class="w-full text-right px-4 py-3 rounded-xl font-semibold text-sm flex items-center gap-3 transition-all sidebar-active">
+        <span class="material-symbols-outlined text-lg">key</span>
+        مفاتيح التراخيص
+      </button>
+      
+      <button onclick="switchTab('coupons')" id="sidebar-btn-coupons" 
+              class="w-full text-right px-4 py-3 rounded-xl font-semibold text-sm flex items-center gap-3 transition-all text-gray-400 hover:bg-white/5 hover:text-white">
+        <span class="material-symbols-outlined text-lg">confirmation_number</span>
+        كوبونات الخصم
+      </button>
+      
+      <button onclick="switchTab('payments')" id="sidebar-btn-payments" 
+              class="w-full text-right px-4 py-3 rounded-xl font-semibold text-sm flex items-center gap-3 transition-all text-gray-400 hover:bg-white/5 hover:text-white">
+        <span class="material-symbols-outlined text-lg">receipt_long</span>
+        السجلات المالية
+      </button>
+
+      <button onclick="switchTab('subscribers')" id="sidebar-btn-subscribers" 
+              class="w-full text-right px-4 py-3 rounded-xl font-semibold text-sm flex items-center gap-3 transition-all text-gray-400 hover:bg-white/5 hover:text-white">
+        <span class="material-symbols-outlined text-lg">group</span>
+        إدارة المشتركين
+      </button>
+    </nav>
     
-    <!-- Table 2: Coupons -->
-    <div id="table-container-coupons" style="display: none;">
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>الكود</th>
-                        <th>نسبة الخصم</th>
-                        <th>أيام مجانية</th>
-                        <th>حالة النشاط</th>
-                        <th>عدد الاستخدامات</th>
-                        <th>تاريخ الانتهاء</th>
-                        <th style="text-align: center;">إجراءات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for c in coupons %}
-                        <tr>
-                            <td class="ltr" style="font-weight: bold; color: var(--accent-purple);">{{ c.code }}</td>
-                            <td style="font-family: Outfit;">{{ c.discount_percent }}%</td>
-                            <td>{{ c.trial_days }} يوم</td>
-                            <td>
-                                {% if c.is_active %}
-                                    <span class="badge badge-active">نشط</span>
-                                {% else %}
-                                    <span class="badge badge-expired">معطل</span>
-                                {% endif %}
-                            </td>
-                            <td style="font-family: Outfit;">{{ c.uses_count }} / {{ c.max_uses }}</td>
-                            <td>{{ c.expires_at|date:"Y-m-d H:i" }}</td>
-                            <td style="text-align: center;">
-                                <form method="POST" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من حذف هذا الكوبون؟')">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="action" value="delete_coupon">
-                                    <input type="hidden" name="code" value="{{ c.code }}">
-                                    <button type="submit" class="btn-danger" style="padding: 6px 12px; font-size: 12px;">
-                                        <i class="fa-solid fa-trash-can"></i> حذف الكوبون
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 30px;">
-                                لا يوجد كوبونات مسجلة حالياً.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <!-- Sidebar Footer -->
+    <div class="p-4 border-t border-white/10 space-y-3">
+      <div class="px-3 flex items-center gap-2">
+        <span class="material-symbols-outlined text-gray-400 text-sm">person</span>
+        <span class="text-xs text-gray-400">المشرف: <strong class="text-white">{{ user.username }}</strong></span>
+      </div>
+      <a href="{% url 'backend_logout' %}" class="w-full bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-bold text-sm block transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-900/10">
+        <span class="material-symbols-outlined text-sm">logout</span>
+        تسجيل الخروج
+      </a>
+    </div>
+  </aside>
+  
+  <!-- Main Content -->
+  <main class="flex-grow p-6 md:p-8 space-y-8 overflow-y-auto">
+    <!-- Topbar Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-100">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-[#00192d]">لوحة الإدارة والتحكم بالتراخيص</h1>
+        <p class="text-sm text-gray-500 mt-1">أصدر مفاتيح جديدة، ألغِ قفل الأجهزة، وتابع مبيعات النظام الموحد.</p>
+      </div>
+      
+      <!-- Instant Search Bar -->
+      <div class="flex items-center gap-2 bg-white rounded-xl border border-gray-200 px-4 py-2 w-full sm:w-80 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+        <span class="material-symbols-outlined text-gray-400 text-lg">search</span>
+        <input type="text" id="global-search" onkeyup="searchTable()" placeholder="ابحث بالاسم، الهاتف، أو الترخيص..." 
+               class="bg-transparent border-none outline-none text-sm w-full focus:ring-0 p-0 text-gray-900 placeholder-gray-400">
+      </div>
     </div>
 
-    <!-- Table 3: Payments -->
-    <div id="table-container-payments" style="display: none;">
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>المستخدم</th>
-                        <th>مفتاح التفعيل المرتبط</th>
-                        <th>المبلغ المدفوع</th>
-                        <th>طريقة الدفع</th>
-                        <th>كود العملية المالي (Tx ID)</th>
-                        <th>الحالة</th>
-                        <th>تاريخ الدفع</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in payments %}
-                        <tr>
-                            <td><strong>{{ p.user.username }}</strong></td>
-                            <td class="ltr" style="font-family: monospace; font-size: 13px;">{{ p.license_key.key }}</td>
-                            <td style="font-family: Outfit; font-weight: bold; color: var(--success-green);">{{ p.amount|floatformat:2 }} ج.م</td>
-                            <td>{{ p.payment_method }}</td>
-                            <td class="ltr" style="font-family: monospace; font-size: 12px; color: var(--text-muted);">{{ p.transaction_id }}</td>
-                            <td><span class="badge badge-active">{{ p.status }}</span></td>
-                            <td>{{ p.created_at|date:"Y-m-d H:i" }}</td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 30px;">
-                                لا يوجد عمليات دفع مسجلة حتى الآن.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <!-- Django Messages -->
+    {% if messages %}
+    <div class="space-y-2">
+      {% for message in messages %}
+        <div class="p-4 rounded-xl flex items-center gap-3 border {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+          <span class="material-symbols-outlined text-xl">
+            {% if message.tags == 'error' %}error{% else %}check_circle{% endif %}
+          </span>
+          <span class="text-sm font-medium">{{ message }}</span>
         </div>
+      {% endfor %}
     </div>
+    {% endif %}
+
+    <!-- Stats Widgets Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <!-- Card 1 -->
+      <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+          <span class="material-symbols-outlined text-2xl">key</span>
+        </div>
+        <div>
+          <p class="text-xs text-gray-400 font-semibold">إجمالي التراخيص</p>
+          <p class="text-xl font-bold text-gray-900 mt-1">{{ stats.total_keys }}</p>
+        </div>
+      </div>
+      <!-- Card 2 -->
+      <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+          <span class="material-symbols-outlined text-2xl">check_circle</span>
+        </div>
+        <div>
+          <p class="text-xs text-gray-400 font-semibold">اشتراكات نشطة</p>
+          <p class="text-xl font-bold text-emerald-600 mt-1">{{ stats.active_keys }}</p>
+        </div>
+      </div>
+      <!-- Card 3 -->
+      <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+          <span class="material-symbols-outlined text-2xl">cancel</span>
+        </div>
+        <div>
+          <p class="text-xs text-gray-400 font-semibold">اشتراكات منتهية</p>
+          <p class="text-xl font-bold text-red-600 mt-1">{{ stats.expired_keys }}</p>
+        </div>
+      </div>
+      <!-- Card 4 -->
+      <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-amber-50 text-[#CCA133] flex items-center justify-center">
+          <span class="material-symbols-outlined text-2xl">payments</span>
+        </div>
+        <div>
+          <p class="text-xs text-gray-400 font-semibold">صافي الإيرادات</p>
+          <p class="text-xl font-bold text-[#CCA133] mt-1">{{ stats.total_revenue|floatformat:2 }} ج.م</p>
+        </div>
+      </div>
+      <!-- Card 5 -->
+      <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-[#00192d]/5 text-[#00192d] flex items-center justify-center">
+          <span class="material-symbols-outlined text-2xl">group</span>
+        </div>
+        <div>
+          <p class="text-xs text-gray-400 font-semibold">المشتركون</p>
+          <p class="text-xl font-bold text-gray-900 mt-1">{{ stats.total_users }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generators & Actions Row -->
+    <div id="forms-section" class="grid grid-cols-1 gap-8">
+      <!-- Generate License Form Card -->
+      <div id="card-form-licenses" class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
+        <div class="flex items-center gap-2 pb-4 border-b border-gray-100">
+          <span class="material-symbols-outlined text-blue-600 text-2xl">add_box</span>
+          <h3 class="text-lg font-bold text-gray-900">توليد وإصدار مفتاح اشتراك جديد</h3>
+        </div>
+        
+        <form method="POST" class="space-y-4">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="generate_key">
+          
+          <div class="space-y-1">
+            <label for="client_name" class="text-xs font-semibold text-gray-500 block">اسم العميل (Client Name) *</label>
+            <input type="text" id="client_name" name="client_name" required
+                   class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900 placeholder-gray-400"
+                   placeholder="اكتب اسم العميل الثلاثي">
+          </div>
+          
+          <div class="space-y-1">
+            <label for="client_phone" class="text-xs font-semibold text-gray-500 block">رقم الهاتف (Phone Number)</label>
+            <input type="text" id="client_phone" name="client_phone"
+                   class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900 placeholder-gray-400 ltr text-left"
+                   placeholder="01XXXXXXXXX">
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label for="key_type" class="text-xs font-semibold text-gray-500 block">نوع الترخيص</label>
+              <select id="key_type" name="key_type" 
+                      class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900">
+                <option value="MONTHLY">شهري (Monthly)</option>
+                <option value="YEARLY">سنوي (Yearly)</option>
+                <option value="TRIAL">تجريبي (Trial)</option>
+              </select>
+            </div>
+            <div class="space-y-1">
+              <label for="custom_days" class="text-xs font-semibold text-gray-500 block">مدة مخصصة بالأيام</label>
+              <input type="number" id="custom_days" name="custom_days"
+                     class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900 placeholder-gray-400 ltr text-left"
+                     placeholder="مثال: 45">
+            </div>
+          </div>
+          
+          <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm transition-all shadow-md shadow-blue-500/10 flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-lg">magic_button</span>
+            توليد المفتاح وحفظه
+          </button>
+        </form>
+      </div>
+
+      <!-- Create Coupon Form Card -->
+      <div id="card-form-coupons" class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6 hidden">
+        <div class="flex items-center gap-2 pb-4 border-b border-gray-100">
+          <span class="material-symbols-outlined text-[#006b5f] text-2xl">local_activity</span>
+          <h3 class="text-lg font-bold text-gray-900">إنشاء كوبون خصم جديد</h3>
+        </div>
+        
+        <form method="POST" class="space-y-4">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_coupon">
+          
+          <div class="space-y-1">
+            <label for="code" class="text-xs font-semibold text-gray-500 block">كود الكوبون (Coupon Code) *</label>
+            <input type="text" id="code" name="code" required
+                   class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#006b5f] focus:ring-1 focus:ring-[#006b5f] transition-all text-gray-900 placeholder-gray-400 uppercase"
+                   placeholder="مثال: OFF50">
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label for="discount_percent" class="text-xs font-semibold text-gray-500 block">نسبة الخصم %</label>
+              <input type="number" step="0.1" id="discount_percent" name="discount_percent" value="0.0"
+                     class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#006b5f] focus:ring-1 focus:ring-[#006b5f] transition-all text-gray-900 ltr text-left">
+            </div>
+            <div class="space-y-1">
+              <label for="trial_days" class="text-xs font-semibold text-gray-500 block">أيام تجريبية إضافية</label>
+              <input type="number" id="trial_days" name="trial_days" value="0"
+                     class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#006b5f] focus:ring-1 focus:ring-[#006b5f] transition-all text-gray-900 ltr text-left">
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label for="max_uses" class="text-xs font-semibold text-gray-500 block">الحد الأقصى للاستخدام</label>
+              <input type="number" id="max_uses" name="max_uses" value="100" required
+                     class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#006b5f] focus:ring-1 focus:ring-[#006b5f] transition-all text-gray-900 ltr text-left">
+            </div>
+            <div class="space-y-1">
+              <label for="expiry_days" class="text-xs font-semibold text-gray-500 block">أيام الصلاحية من الآن</label>
+              <input type="number" id="expiry_days" name="expiry_days" value="30" required
+                     class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#006b5f] focus:ring-1 focus:ring-[#006b5f] transition-all text-gray-900 ltr text-left">
+            </div>
+          </div>
+          
+          <button type="submit" class="w-full bg-[#006b5f] hover:bg-[#005048] text-white py-3 rounded-xl font-bold text-sm transition-all shadow-md shadow-[#006b5f]/10 flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-lg">add_circle</span>
+            حفظ وإنشاء الكوبون
+          </button>
+        </form>
+      </div>
+
+      <!-- Create Subscriber Form Card -->
+      <div id="card-form-subscribers" class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6 hidden">
+        <div class="flex items-center gap-2 pb-4 border-b border-gray-100">
+          <span class="material-symbols-outlined text-indigo-600 text-2xl">person_add</span>
+          <h3 class="text-lg font-bold text-gray-900">إنشاء حساب مشترك جديد</h3>
+        </div>
+        
+        <form method="POST" class="space-y-4">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_user">
+          
+          <div class="space-y-1">
+            <label for="sub_username" class="text-xs font-semibold text-gray-500 block">اسم المستخدم (Username) *</label>
+            <input type="text" id="sub_username" name="username" required
+                   class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-gray-900 placeholder-gray-400"
+                   placeholder="اسم المستخدم لتسجيل الدخول">
+          </div>
+          
+          <div class="space-y-1">
+            <label for="sub_email" class="text-xs font-semibold text-gray-500 block">البريد الإلكتروني (Email)</label>
+            <input type="email" id="sub_email" name="email"
+                   class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-gray-900 placeholder-gray-400"
+                   placeholder="example@domain.com">
+          </div>
+
+          <div class="space-y-1">
+            <label for="sub_password" class="text-xs font-semibold text-gray-500 block">كلمة المرور (Password) *</label>
+            <input type="password" id="sub_password" name="password" required
+                   class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-gray-900 placeholder-gray-400"
+                   placeholder="كلمة المرور للحساب الجديد">
+          </div>
+          
+          <div class="flex items-center gap-2 py-2">
+            <input type="checkbox" id="sub_is_admin" name="is_admin" value="true"
+                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
+            <label for="sub_is_admin" class="text-xs font-semibold text-gray-700">ترقية كمسؤول/مدير نظام (Staff privileges)</label>
+          </div>
+          
+          <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-500/10 flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-lg">add_circle</span>
+            إنشاء الحساب
+          </button>
+        </form>
+      </div>
+
+      <!-- Record Payment Form Card -->
+      <div id="card-form-payments" class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6 hidden">
+        <div class="flex items-center gap-2 pb-4 border-b border-gray-100">
+          <span class="material-symbols-outlined text-emerald-600 text-2xl">price_check</span>
+          <h3 class="text-lg font-bold text-gray-900">تسجيل عملية دفع يدوية وتفعيل الاشتراك</h3>
+        </div>
+        
+        <form method="POST" class="space-y-4">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="record_payment">
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label for="pay_user_search" class="text-xs font-semibold text-gray-500 block">المشترك *</label>
+              <!-- Hidden input that holds the actual user_id for form submission -->
+              <input type="hidden" id="pay_user_id" name="user_id" required>
+              <!-- Searchable combobox container -->
+              <div class="relative" id="subscriber-combobox">
+                <div class="relative">
+                  <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px] pointer-events-none">search</span>
+                  <input type="text" id="pay_user_search" placeholder="ابحث بالاسم أو الهاتف أو البريد..."
+                         autocomplete="off"
+                         class="w-full bg-gray-50 border border-gray-200 rounded-xl pr-10 pl-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-gray-900"
+                         oninput="filterSubscribers(this.value)"
+                         onfocus="openSubscriberDropdown()"
+                         onblur="scheduleCloseDropdown()">
+                  <!-- Clear button -->
+                  <button type="button" id="clear-subscriber-btn"
+                          onclick="clearSubscriberSearch()"
+                          class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-400 transition-colors hidden">
+                    <span class="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+                <!-- Dropdown list -->
+                <div id="subscriber-dropdown"
+                     class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden hidden max-h-60 overflow-y-auto">
+                  <!-- Selected preview at top -->
+                  <div id="subscriber-selected-preview" class="hidden px-3 py-2 bg-emerald-50 border-b border-emerald-100">
+                    <span class="text-xs font-bold text-emerald-700">✓ المحدد:</span>
+                    <span id="subscriber-selected-name" class="text-xs text-emerald-800 font-semibold mr-1"></span>
+                  </div>
+                  <ul id="subscriber-list" class="py-1">
+                    {% for u in users %}
+                      <li class="subscriber-option px-3 py-2.5 cursor-pointer hover:bg-emerald-50 transition-colors flex items-center gap-2.5"
+                          data-id="{{ u.id }}"
+                          data-username="{{ u.username|lower }}"
+                          data-email="{{ u.email|default:''|lower }}"
+                          data-phone="{{ u.profile.phone|default:'' }}"
+                          onclick="selectSubscriber('{{ u.id }}', '{{ u.username }}', '{{ u.email|default:'' }}', '{{ u.profile.phone|default:'' }}')">
+                        <!-- Avatar -->
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {{ u.username|first|upper }}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                          <div class="text-sm font-bold text-gray-900">{{ u.username }}</div>
+                          <div class="text-xs text-gray-400 flex items-center gap-2 flex-wrap">
+                            {% if u.email %}<span>{{ u.email }}</span>{% endif %}
+                            {% if u.profile.phone %}
+                              <span class="flex items-center gap-0.5">
+                                <span class="material-symbols-outlined text-[12px]">phone</span>
+                                {{ u.profile.phone }}
+                              </span>
+                            {% endif %}
+                          </div>
+                        </div>
+                        {% if u.profile.has_whatsapp %}
+                          <i class="fa-brands fa-whatsapp text-green-500 text-sm flex-shrink-0"></i>
+                        {% endif %}
+                      </li>
+                    {% endfor %}
+                    <li id="subscriber-no-results" class="px-4 py-6 text-center text-gray-400 text-sm hidden">
+                      <span class="material-symbols-outlined text-3xl block mb-1 text-gray-300">person_search</span>
+                      لا توجد نتائج مطابقة
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            
+            <div class="space-y-1">
+              <label for="pay_amount" class="text-xs font-semibold text-gray-500 block">المبلغ المدفوع (ج.م) *</label>
+              <input type="number" step="0.01" id="pay_amount" name="amount" required value="150.00"
+                     class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-gray-900 ltr text-left">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label for="pay_method" class="text-xs font-semibold text-gray-500 block">طريقة الدفع *</label>
+              <select id="pay_method" name="payment_method" required
+                      class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-gray-900">
+                <option value="انستا باي (InstaPay)" selected>انستا باي (InstaPay)</option>
+                <option value="فودافون كاش (Vodafone Cash)">فودافون كاش (Vodafone Cash)</option>
+                <option value="اتصالات كاش (Etisalat Cash)">اتصالات كاش (Etisalat Cash)</option>
+                <option value="أورنج كاش (Orange Cash)">أورنج كاش (Orange Cash)</option>
+                <option value="وي باي (WE Pay)">وي باي (WE Pay)</option>
+                <option value="كاش نقدي (Cash)">كاش نقدي (Cash)</option>
+                <option value="أخرى (Other)">أخرى (Other)</option>
+              </select>
+            </div>
+
+            <div class="space-y-1">
+              <label for="pay_operation" class="text-xs font-semibold text-gray-500 block">نوع العملية *</label>
+              <select id="pay_operation" name="operation_type" required
+                      class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-gray-900">
+                <option value="new" selected>إنشاء ترخيص جديد (New License Key)</option>
+                <option value="extend">تمديد الترخيص النشط الحالي (Extend Active License)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label for="pay_duration" class="text-xs font-semibold text-gray-500 block">مدة الاشتراك *</label>
+              <select id="pay_duration" name="duration_type" required onchange="toggleCustomDaysDisplay()"
+                      class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-gray-900">
+                <option value="MONTHLY" selected>شهري (30 يوم)</option>
+                <option value="YEARLY">سنوي (365 يوم)</option>
+                <option value="TRIAL">تجريبي (3 أيام)</option>
+                <option value="CUSTOM">مدة مخصصة بالأيام (Custom Days)</option>
+              </select>
+            </div>
+
+            <div id="pay_custom_days_container" class="space-y-1 hidden">
+              <label for="pay_custom_days" class="text-xs font-semibold text-gray-500 block">عدد الأيام المخصصة *</label>
+              <input type="number" id="pay_custom_days" name="custom_days"
+                     class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-gray-900 ltr text-left"
+                     placeholder="مثال: 45">
+            </div>
+          </div>
+
+          <div class="space-y-1">
+            <label for="pay_transaction_id" class="text-xs font-semibold text-gray-500 block">رقم المعاملة المالي (Transaction ID) - اختياري</label>
+            <input type="text" id="pay_transaction_id" name="transaction_id"
+                   class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-gray-900 placeholder-gray-400 ltr text-left"
+                   placeholder="اتركه فارغاً لإنشاء رقم تلقائي">
+          </div>
+
+          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold text-sm transition-all shadow-md shadow-emerald-500/10 flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-lg">payments</span>
+            تسجيل الدفع وتفعيل الاشتراك
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Data Tables Container -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <!-- Switcher Title Header -->
+      <div class="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+         <h4 class="text-sm font-bold text-gray-700 flex items-center gap-2">
+             <span class="material-symbols-outlined text-lg text-blue-600">table_rows</span>
+             جدول استعراض السجلات
+         </h4>
+         <span id="current-tab-badge" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">مفاتيح التراخيص</span>
+      </div>
+
+      <!-- Table 1: Licenses -->
+      <div id="table-container-licenses" class="overflow-x-auto w-full">
+        <table class="min-w-full divide-y divide-gray-100 text-right">
+          <thead class="bg-gray-50/50">
+            <tr>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">العميل</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">كود الترخيص</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">النوع</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">تاريخ الانتهاء</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">الحالة</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">الـ MAC المرتبط</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase text-center">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 bg-white">
+            {% for lic in licenses %}
+              <tr class="hover:bg-gray-50/50 transition-colors">
+                <td class="px-6 py-4">
+                  <div class="font-bold text-gray-900">{{ lic.client_name }}</div>
+                  {% if lic.client_phone %}
+                    <div class="text-xs text-gray-400 mt-0.5 font-semibold">{{ lic.client_phone }}</div>
+                  {% endif %}
+                </td>
+                <td class="px-6 py-4 font-mono font-bold text-blue-600 text-sm ltr text-left">{{ lic.key }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ lic.get_type_display }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ lic.expires_at|date:"Y-m-d H:i" }}</td>
+                <td class="px-6 py-4">
+                  {% if lic.is_valid %}
+                    <span class="inline-flex px-3 py-1 text-xs font-bold bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">نشط</span>
+                  {% elif lic.status == 'SUSPENDED' %}
+                    <span class="inline-flex px-3 py-1 text-xs font-bold bg-amber-50 text-[#CCA133] rounded-full border border-amber-100">معطل</span>
+                  {% else %}
+                    <span class="inline-flex px-3 py-1 text-xs font-bold bg-red-50 text-red-600 rounded-full border border-red-100">منتهي</span>
+                  {% endif %}
+                </td>
+                <td class="px-6 py-4 font-mono text-xs text-gray-500 ltr text-left">
+                  {% if lic.mac_address %}{{ lic.mac_address }}{% else %}<span class="text-gray-300">غير مقترن</span>{% endif %}
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center justify-center gap-2">
+                    {% if lic.mac_address %}
+                      <form method="POST" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="reset_mac">
+                        <input type="hidden" name="license_key" value="{{ lic.key }}">
+                        <button type="submit" class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1" title="إعادة تعيين MAC Lock">
+                          <span class="material-symbols-outlined text-sm">settings_backup_restore</span> فك القفل
+                        </button>
+                      </form>
+                    {% endif %}
+                    <form method="POST" class="inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_status">
+                      <input type="hidden" name="license_key" value="{{ lic.key }}">
+                      <button type="submit" class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1" title="تعطيل / تفعيل">
+                        <span class="material-symbols-outlined text-sm">power_settings_new</span> {% if lic.status == 'ACTIVE' %}تعطيل{% else %}تفعيل{% endif %}
+                      </button>
+                    </form>
+                    <form method="POST" class="inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="extend_expiry">
+                      <input type="hidden" name="license_key" value="{{ lic.key }}">
+                      <button type="submit" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border border-emerald-100" title="تمديد 30 يوماً">
+                        <span class="material-symbols-outlined text-sm">add_moderator</span> +30 يوم
+                      </button>
+                    </form>
+                    <form method="POST" class="inline" onsubmit="return confirm('هل أنت متأكد من حذف هذا الترخيص نهائياً؟')">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete_key">
+                      <input type="hidden" name="license_key" value="{{ lic.key }}">
+                      <button type="submit" class="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors border border-red-100" title="حذف">
+                        <span class="material-symbols-outlined text-sm">delete</span>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="7" class="px-6 py-12 text-center text-gray-400 font-semibold">
+                  لا يوجد أي مفاتيح ترخيص في قاعدة البيانات حتى الآن.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table 2: Coupons -->
+      <div id="table-container-coupons" class="hidden overflow-x-auto w-full">
+        <table class="min-w-full divide-y divide-gray-100 text-right">
+          <thead class="bg-gray-50/50">
+            <tr>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">الكود</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">نسبة الخصم</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">أيام مجانية</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">حالة النشاط</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">عدد الاستخدامات</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">تاريخ الانتهاء</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase text-center">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 bg-white">
+            {% for c in coupons %}
+              <tr class="hover:bg-gray-50/50 transition-colors">
+                <td class="px-6 py-4 font-mono font-bold text-[#006b5f] text-sm ltr text-left">{{ c.code }}</td>
+                <td class="px-6 py-4 font-mono text-sm text-gray-900">{{ c.discount_percent }}%</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ c.trial_days }} يوم</td>
+                <td class="px-6 py-4">
+                  {% if c.is_valid %}
+                    <span class="inline-flex px-3 py-1 text-xs font-bold bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">نشط</span>
+                  {% else %}
+                    <span class="inline-flex px-3 py-1 text-xs font-bold bg-red-50 text-red-600 rounded-full border border-red-100">معطل / منتهى</span>
+                  {% endif %}
+                </td>
+                <td class="px-6 py-4 font-mono text-sm text-gray-600">{{ c.uses_count }} / {{ c.max_uses }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ c.expires_at|date:"Y-m-d H:i" }}</td>
+                <td class="px-6 py-4 text-center">
+                  <form method="POST" class="inline" onsubmit="return confirm('هل أنت متأكد من حذف هذا الكوبون؟')">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_coupon">
+                    <input type="hidden" name="code" value="{{ c.code }}">
+                    <button type="submit" class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg text-xs font-bold transition-all flex items-center gap-1 mx-auto">
+                      <span class="material-symbols-outlined text-sm">delete</span> حذف الكوبون
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="7" class="px-6 py-12 text-center text-gray-400 font-semibold">
+                  لا يوجد كوبونات مسجلة حالياً.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table 3: Payments -->
+      <div id="table-container-payments" class="hidden overflow-x-auto w-full">
+        <table class="min-w-full divide-y divide-gray-100 text-right">
+          <thead class="bg-gray-50/50">
+            <tr>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">المستخدم</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">مفتاح التفعيل المرتبط</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">المبلغ المدفوع</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">طريقة الدفع</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">كود العملية المالي (Tx ID)</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">الحالة</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">تاريخ الدفع</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase text-center">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 bg-white">
+            {% for p in payments %}
+              <tr class="hover:bg-gray-50/50 transition-colors">
+                <td class="px-6 py-4 font-bold text-gray-900">{{ p.user.username }}</td>
+                <td class="px-6 py-4 font-mono text-sm text-blue-600 ltr text-left">{{ p.license_key.key }}</td>
+                <td class="px-6 py-4 font-mono font-bold text-emerald-600">{{ p.amount|floatformat:2 }} ج.م</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ p.payment_method }}</td>
+                <td class="px-6 py-4 font-mono text-xs text-gray-500 ltr text-left">{{ p.transaction_id }}</td>
+                <td class="px-6 py-4">
+                  <span class="inline-flex px-3 py-1 text-xs font-bold bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">{{ p.status }}</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ p.created_at|date:"Y-m-d H:i" }}</td>
+                <td class="px-6 py-4 text-center">
+                  <form method="POST" class="inline" onsubmit="return confirm('هل أنت متأكد من حذف هذا السجل المالي نهائياً؟')">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_payment">
+                    <input type="hidden" name="payment_id" value="{{ p.id }}">
+                    <button type="submit" class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg text-xs font-bold transition-all flex items-center gap-1 mx-auto" title="حذف السجل">
+                      <span class="material-symbols-outlined text-sm">delete</span> حذف
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="8" class="px-6 py-12 text-center text-gray-400 font-semibold">
+                  لا يوجد عمليات دفع مسجلة حتى الآن.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table 4: Subscribers -->
+      <div id="table-container-subscribers" class="hidden overflow-x-auto w-full">
+        <table class="min-w-full divide-y divide-gray-100 text-right">
+          <thead class="bg-gray-50/50">
+            <tr>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">المشترك</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">البريد الإلكتروني</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">رقم الهاتف</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase text-center">واتسآب</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">تاريخ الانضمام</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">نوع الحساب</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase">عدد التراخيص</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase text-center">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 bg-white">
+            {% for u in users %}
+              <tr class="hover:bg-gray-50/50 transition-colors">
+                <td class="px-6 py-4">
+                  <div class="font-bold text-gray-900">
+                    {{ u.username }}
+                    {% if u == user %}
+                      <span class="inline-flex px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-100 mr-2">أنت</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">
+                  {% if u.email %}{{ u.email }}{% else %}<span class="text-gray-300">غير متوفر</span>{% endif %}
+                </td>
+                <td class="px-6 py-4">
+                  {% if u.profile.phone %}
+                    <span class="font-mono text-sm text-gray-700 flex items-center gap-1.5 ltr">
+                      <span class="material-symbols-outlined text-sm text-gray-400">phone</span>
+                      {{ u.profile.phone }}
+                    </span>
+                  {% else %}
+                    <span class="text-gray-300 text-xs">لا يوجد</span>
+                  {% endif %}
+                </td>
+                <td class="px-6 py-4 text-center">
+                  {% if u.profile.has_whatsapp %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-green-50 text-green-700 rounded-full border border-green-100">
+                      <i class="fa-brands fa-whatsapp text-sm text-green-500"></i>
+                      نعم
+                    </span>
+                  {% else %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-gray-50 text-gray-400 rounded-full border border-gray-100">
+                      لا
+                    </span>
+                  {% endif %}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ u.date_joined|date:"Y-m-d H:i" }}</td>
+                <td class="px-6 py-4">
+                  {% if u.is_superuser %}
+                    <span class="inline-flex px-3 py-1 text-xs font-bold bg-purple-50 text-purple-600 rounded-full border border-purple-100">مدير عام</span>
+                  {% elif u.is_staff %}
+                    <span class="inline-flex px-3 py-1 text-xs font-bold bg-indigo-50 text-indigo-600 rounded-full border border-indigo-100">مدير نظام</span>
+                  {% else %}
+                    <span class="inline-flex px-3 py-1 text-xs font-bold bg-gray-50 text-gray-600 rounded-full border border-gray-200">مشترك عادي</span>
+                  {% endif %}
+                </td>
+                <td class="px-6 py-4 font-mono text-sm text-gray-600">{{ u.licenses.count }}</td>
+                <td class="px-6 py-4 text-center">
+                  <div class="flex items-center justify-center gap-2">
+                    {% if u != user %}
+                      {% if u.profile.phone %}
+                        <a href="https://wa.me/2{{ u.profile.phone }}" target="_blank"
+                           class="p-1.5 bg-green-50 hover:bg-green-100 text-green-600 border border-green-100 rounded-lg transition-colors"
+                           title="فتح واتسآب">
+                          <i class="fa-brands fa-whatsapp text-sm"></i>
+                        </a>
+                      {% endif %}
+                      <form method="POST" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="toggle_staff">
+                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                        <button type="submit" class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1" title="تغيير الصلاحيات">
+                          <span class="material-symbols-outlined text-sm">shield</span>
+                          {% if u.is_staff %}سحب الإدارة{% else %}ترقية لمدير{% endif %}
+                        </button>
+                      </form>
+                      <form method="POST" class="inline" onsubmit="return confirm('هل أنت متأكد من حذف هذا المشترك نهائياً؟')">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete_user">
+                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                        <button type="submit" class="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg transition-colors" title="حذف الحساب">
+                          <span class="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      </form>
+                    {% else %}
+                      <span class="text-xs text-gray-400 font-semibold italic">لا توجد إجراءات</span>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="6" class="px-6 py-12 text-center text-gray-400 font-semibold">
+                  لا يوجد مشتركين في النظام.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
+    /* =============================================
+       Subscriber Searchable Combobox
+    ============================================= */
+    let subscriberCloseTimer = null;
+
+    function openSubscriberDropdown() {
+        document.getElementById('subscriber-dropdown').classList.remove('hidden');
+        filterSubscribers(document.getElementById('pay_user_search').value);
+    }
+
+    function scheduleCloseDropdown() {
+        subscriberCloseTimer = setTimeout(() => {
+            document.getElementById('subscriber-dropdown').classList.add('hidden');
+        }, 200);
+    }
+
+    function cancelCloseDropdown() {
+        if (subscriberCloseTimer) clearTimeout(subscriberCloseTimer);
+    }
+
+    function filterSubscribers(query) {
+        const q = query.trim().toLowerCase();
+        const items = document.querySelectorAll('.subscriber-option');
+        const noResults = document.getElementById('subscriber-no-results');
+        let visibleCount = 0;
+
+        items.forEach(item => {
+            const username = item.dataset.username || '';
+            const email    = item.dataset.email    || '';
+            const phone    = item.dataset.phone    || '';
+            const match = !q || username.includes(q) || email.includes(q) || phone.includes(q);
+            item.style.display = match ? '' : 'none';
+            if (match) visibleCount++;
+        });
+
+        noResults.classList.toggle('hidden', visibleCount > 0);
+        // Show/hide clear button
+        document.getElementById('clear-subscriber-btn').classList.toggle('hidden', !query);
+        // Always show dropdown while typing
+        document.getElementById('subscriber-dropdown').classList.remove('hidden');
+    }
+
+    function selectSubscriber(id, username, email, phone) {
+        cancelCloseDropdown();
+        document.getElementById('pay_user_id').value = id;
+        const label = phone
+            ? `${username}  •  ${phone}`
+            : email ? `${username}  •  ${email}` : username;
+        document.getElementById('pay_user_search').value = label;
+        // Update selected preview bar
+        document.getElementById('subscriber-selected-name').textContent = label;
+        document.getElementById('subscriber-selected-preview').classList.remove('hidden');
+        // Show clear button, close dropdown
+        document.getElementById('clear-subscriber-btn').classList.remove('hidden');
+        document.getElementById('subscriber-dropdown').classList.add('hidden');
+        // Visual feedback on search input
+        document.getElementById('pay_user_search').classList.add('border-emerald-400', 'bg-emerald-50/30');
+        document.getElementById('pay_user_search').classList.remove('border-gray-200', 'bg-gray-50');
+    }
+
+    function clearSubscriberSearch() {
+        document.getElementById('pay_user_id').value = '';
+        document.getElementById('pay_user_search').value = '';
+        document.getElementById('pay_user_search').classList.remove('border-emerald-400', 'bg-emerald-50/30');
+        document.getElementById('pay_user_search').classList.add('border-gray-200', 'bg-gray-50');
+        document.getElementById('clear-subscriber-btn').classList.add('hidden');
+        document.getElementById('subscriber-selected-preview').classList.add('hidden');
+        document.getElementById('subscriber-selected-name').textContent = '';
+        filterSubscribers('');
+        document.getElementById('pay_user_search').focus();
+    }
+
+    // Keep dropdown open when clicking inside it
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropdown = document.getElementById('subscriber-dropdown');
+        if (dropdown) {
+            dropdown.addEventListener('mousedown', function(e) {
+                cancelCloseDropdown();
+            });
+        }
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const combobox = document.getElementById('subscriber-combobox');
+            if (combobox && !combobox.contains(e.target)) {
+                if (dropdown) dropdown.classList.add('hidden');
+            }
+        });
+    });
+
     function switchTab(tabName) {
-        // Toggle active tabs buttons
-        document.getElementById('tab-btn-licenses').classList.remove('active');
-        document.getElementById('tab-btn-coupons').classList.remove('active');
-        document.getElementById('tab-btn-payments').classList.remove('active');
+
+        // Remove active class from all buttons
+        document.getElementById('sidebar-btn-licenses').classList.remove('sidebar-active');
+        document.getElementById('sidebar-btn-coupons').classList.remove('sidebar-active');
+        document.getElementById('sidebar-btn-payments').classList.remove('sidebar-active');
+        document.getElementById('sidebar-btn-subscribers').classList.remove('sidebar-active');
         
-        document.getElementById('tab-btn-' + tabName).classList.add('active');
+        // Add inactive colors to all
+        document.getElementById('sidebar-btn-licenses').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
+        document.getElementById('sidebar-btn-coupons').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
+        document.getElementById('sidebar-btn-payments').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
+        document.getElementById('sidebar-btn-subscribers').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
+
+        // Add active style to selected button
+        const activeBtn = document.getElementById('sidebar-btn-' + tabName);
+        activeBtn.classList.add('sidebar-active');
+        activeBtn.classList.remove('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
+
+        // Update badge text
+        const badge = document.getElementById('current-tab-badge');
+        if (tabName === 'licenses') {
+            badge.innerText = 'مفاتيح التراخيص';
+            badge.className = 'px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold';
+        } else if (tabName === 'coupons') {
+            badge.innerText = 'كوبونات الخصم';
+            badge.className = 'px-3 py-1 bg-[#006b5f]/10 text-[#006b5f] rounded-full text-xs font-bold';
+        } else if (tabName === 'payments') {
+            badge.innerText = 'السجلات المالية';
+            badge.className = 'px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold';
+        } else if (tabName === 'subscribers') {
+            badge.innerText = 'إدارة المشتركين';
+            badge.className = 'px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold';
+        }
+
+        // Hide/Show forms
+        const formsSection = document.getElementById('forms-section');
+        const cardLicenses = document.getElementById('card-form-licenses');
+        const cardCoupons = document.getElementById('card-form-coupons');
+        const cardSubscribers = document.getElementById('card-form-subscribers');
+        const cardPayments = document.getElementById('card-form-payments');
         
+        if (tabName === 'licenses') {
+            formsSection.classList.remove('hidden');
+            cardLicenses.classList.remove('hidden');
+            cardCoupons.classList.add('hidden');
+            cardSubscribers.classList.add('hidden');
+            cardPayments.classList.add('hidden');
+        } else if (tabName === 'coupons') {
+            formsSection.classList.remove('hidden');
+            cardLicenses.classList.add('hidden');
+            cardCoupons.classList.remove('hidden');
+            cardSubscribers.classList.add('hidden');
+            cardPayments.classList.add('hidden');
+        } else if (tabName === 'subscribers') {
+            formsSection.classList.remove('hidden');
+            cardLicenses.classList.add('hidden');
+            cardCoupons.classList.add('hidden');
+            cardSubscribers.classList.remove('hidden');
+            cardPayments.classList.add('hidden');
+        } else if (tabName === 'payments') {
+            formsSection.classList.remove('hidden');
+            cardLicenses.classList.add('hidden');
+            cardCoupons.classList.add('hidden');
+            cardSubscribers.classList.add('hidden');
+            cardPayments.classList.remove('hidden');
+        } else {
+            formsSection.classList.add('hidden');
+        }
+
         // Hide/Show tables
-        document.getElementById('table-container-licenses').style.display = 'none';
-        document.getElementById('table-container-coupons').style.display = 'none';
-        document.getElementById('table-container-payments').style.display = 'none';
+        document.getElementById('table-container-licenses').classList.add('hidden');
+        document.getElementById('table-container-coupons').classList.add('hidden');
+        document.getElementById('table-container-payments').classList.add('hidden');
+        document.getElementById('table-container-subscribers').classList.add('hidden');
         
-        document.getElementById('table-container-' + tabName).style.display = 'block';
+        document.getElementById('table-container-' + tabName).classList.remove('hidden');
+
+        // Apply active search filter to the newly loaded tab
+        searchTable();
+    }
+
+    function toggleCustomDaysDisplay() {
+        const durationSelect = document.getElementById('pay_duration');
+        const customDaysContainer = document.getElementById('pay_custom_days_container');
+        if (durationSelect.value === 'CUSTOM') {
+            customDaysContainer.classList.remove('hidden');
+            document.getElementById('pay_custom_days').required = true;
+        } else {
+            customDaysContainer.classList.add('hidden');
+            document.getElementById('pay_custom_days').required = false;
+        }
+    }
+
+    function searchTable() {
+        const input = document.getElementById('global-search');
+        if (!input) return;
+        const filter = input.value.toLowerCase().trim();
+        
+        const tables = [
+            'table-container-licenses',
+            'table-container-coupons',
+            'table-container-payments',
+            'table-container-subscribers'
+        ];
+        
+        tables.forEach(tableId => {
+            const container = document.getElementById(tableId);
+            if (!container) return;
+            const tbody = container.getElementsByTagName('tbody')[0];
+            if (!tbody) return;
+            const rows = tbody.getElementsByTagName('tr');
+            
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                // Ignore empty table rows (colspan rows)
+                if (row.cells.length === 1 && row.cells[0].colSpan > 1) {
+                    continue;
+                }
+                
+                const textContent = row.textContent.toLowerCase();
+                if (textContent.includes(filter)) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                }
+            }
+        });
     }
 </script>
-{% endblock %}
+</body></html>

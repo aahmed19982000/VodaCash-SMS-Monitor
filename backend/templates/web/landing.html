@@ -1,445 +1,515 @@
-{% extends 'base.html' %}
 {% load static %}
-
-{% block title %}الرئيسية - دفتر كاش (Daftar Cash){% endblock %}
-
-{% block extra_head %}
+<!DOCTYPE html><html dir="rtl" lang="ar" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Daftar Cash | أتمتة إدارة المحافظ المالية</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
 <style>
-    /* Custom style overrides for landing hero and grids */
-    .hero-section {
-        display: grid;
-        grid-template-columns: 1.2fr 0.8fr;
-        gap: 40px;
-        align-items: center;
-        padding: 40px 0 80px 0;
-    }
-    
-    .hero-content h1 {
-        font-size: 48px;
-        font-weight: 800;
-        line-height: 1.2;
-        margin-bottom: 20px;
-    }
-    
-    .hero-content h1 span {
-        background: var(--primary-gradient);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    
-    .hero-content p {
-        font-size: 18px;
-        color: var(--text-secondary);
-        margin-bottom: 35px;
-    }
-    
-    .hero-buttons {
-        display: flex;
-        gap: 15px;
-    }
-    
-    .hero-image {
-        position: relative;
-        display: flex;
-        justify-content: center;
-    }
-    
-    .hero-graphic {
-        width: 100%;
-        max-width: 400px;
-        background: #FFFFFF;
-        border: 1px solid var(--border-color);
-        border-radius: 30px;
-        padding: 25px;
-        box-shadow: var(--shadow-premium);
-        animation: float 6s ease-in-out infinite;
-    }
-
-    @keyframes float {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-15px); }
-    }
-
-    /* Features section */
-    .section-title {
-        text-align: center;
-        margin-bottom: 60px;
-    }
-    
-    .section-title h2 {
-        font-size: 36px;
-        font-weight: 800;
-        margin-bottom: 10px;
-        background: var(--primary-gradient);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    
-    .section-title p {
-        color: var(--text-secondary);
-        font-size: 16px;
-    }
-    
-    .features-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 25px;
-        margin-bottom: 80px;
-    }
-    
-    .feature-card {
-        text-align: center;
-        padding: 40px 25px;
-    }
-    
-    .feature-icon {
-        font-size: 36px;
-        margin-bottom: 20px;
-        background: var(--primary-gradient);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        display: inline-block;
-    }
-
-    /* Steps Section */
-    .steps-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 30px;
-        margin-bottom: 80px;
-        position: relative;
-    }
-    
-    .step-card {
-        padding: 30px;
-        text-align: right;
-    }
-    
-    .step-num {
-        font-family: 'Outfit', sans-serif;
-        font-size: 40px;
-        font-weight: 800;
-        color: rgba(15, 60, 109, 0.08);
-        position: absolute;
-        top: 15px;
-        left: 20px;
-    }
-
-    /* Pricing Section */
-    .pricing-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 30px;
-        margin-bottom: 60px;
-    }
-    
-    .price-card {
-        border-radius: 24px;
-        padding: 40px 30px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        position: relative;
-    }
-    
-    .price-card.popular {
-        border-color: var(--accent-purple);
-        box-shadow: 0 0 30px rgba(139, 92, 246, 0.15);
-    }
-    
-    .popular-badge {
-        position: absolute;
-        top: -15px;
-        right: 30px;
-        background: var(--primary-gradient);
-        color: white;
-        padding: 4px 14px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 700;
-        box-shadow: 0 4px 10px rgba(109, 40, 217, 0.2);
-    }
-    
-    .price-header h3 {
-        font-size: 22px;
-        font-weight: 700;
-        margin-bottom: 10px;
-    }
-    
-    .price-header .price {
-        font-family: 'Outfit', sans-serif;
-        font-size: 44px;
-        font-weight: 800;
-        color: var(--text-primary);
-        margin: 15px 0;
-    }
-    
-    .price-header .price span {
-        font-size: 16px;
-        font-weight: 400;
-        color: var(--text-secondary);
-    }
-    
-    .price-features {
-        list-style: none;
-        margin: 30px 0;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-    
-    .price-features li {
-        font-size: 14px;
-        color: var(--text-secondary);
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    
-    .price-features li i {
-        color: var(--success-green);
-    }
-
-    @media (max-width: 992px) {
-        .hero-section {
-            grid-template-columns: 1fr;
-            text-align: center;
+        body {
+            font-family: 'IBM Plex Sans Arabic', sans-serif;
+            scroll-behavior: smooth;
         }
-        
-        .hero-buttons {
-            justify-content: center;
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
         }
-        
-        .hero-graphic {
-            max-width: 300px;
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.5);
         }
-    }
+        .hero-gradient {
+            background: radial-gradient(circle at 10% 20%, rgba(207, 229, 255, 0.3) 0%, rgba(248, 249, 255, 1) 90%);
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "secondary": "#006b5f",
+                "surface-dim": "#cbdbf5",
+                "primary-fixed": "#cfe5ff",
+                "on-tertiary-fixed": "#002113",
+                "on-tertiary-fixed-variant": "#005236",
+                "tertiary-fixed-dim": "#4edea3",
+                "on-secondary-fixed": "#00201c",
+                "surface-container-high": "#dce9ff",
+                "on-secondary": "#ffffff",
+                "surface": "#f8f9ff",
+                "on-surface": "#0b1c30",
+                "primary": "#00192d",
+                "tertiary-fixed": "#6ffbbe",
+                "on-primary-fixed-variant": "#2d4963",
+                "surface-bright": "#f8f9ff",
+                "outline": "#73777e",
+                "primary-container": "#0f2e47",
+                "inverse-primary": "#adc9e9",
+                "surface-container-highest": "#d3e4fe",
+                "on-tertiary": "#ffffff",
+                "surface-container-lowest": "#ffffff",
+                "on-secondary-fixed-variant": "#005048",
+                "secondary-container": "#6df5e1",
+                "secondary-fixed-dim": "#4fdbc8",
+                "on-primary-container": "#7a96b4",
+                "secondary-fixed": "#71f8e4",
+                "surface-variant": "#d3e4fe",
+                "on-secondary-container": "#006f64",
+                "surface-tint": "#45617c",
+                "error": "#ba1a1a",
+                "on-background": "#0b1c30",
+                "on-primary-fixed": "#001d33",
+                "primary-fixed-dim": "#adc9e9",
+                "surface-container-low": "#eff4ff",
+                "on-surface-variant": "#43474d",
+                "inverse-on-surface": "#eaf1ff",
+                "surface-container": "#e5eeff",
+                "tertiary-container": "#003320",
+                "error-container": "#ffdad6",
+                "background": "#f8f9ff",
+                "tertiary": "#001c10",
+                "outline-variant": "#c3c7ce",
+                "inverse-surface": "#213145",
+                "on-error": "#ffffff",
+                "on-primary": "#ffffff",
+                "on-tertiary-container": "#00a874",
+                "on-error-container": "#93000a"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+            },
+            "spacing": {
+                "margin-desktop": "40px",
+                "stack-lg": "32px",
+                "stack-sm": "8px",
+                "margin-mobile": "16px",
+                "container-max": "1280px",
+                "stack-md": "16px",
+                "gutter": "24px"
+            },
+            "fontFamily": {
+                "headline-lg": ["IBM Plex Sans Arabic"],
+                "headline-xl": ["IBM Plex Sans Arabic"],
+                "label-bold": ["IBM Plex Sans Arabic"],
+                "headline-md": ["IBM Plex Sans Arabic"],
+                "label-sm": ["IBM Plex Sans Arabic"],
+                "body-md": ["IBM Plex Sans Arabic"],
+                "body-lg": ["IBM Plex Sans Arabic"]
+            },
+            "fontSize": {
+                "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                "headline-xl": ["40px", {"lineHeight": "52px", "fontWeight": "700"}],
+                "label-bold": ["14px", {"lineHeight": "20px", "fontWeight": "600"}],
+                "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-background text-on-background selection:bg-secondary-container">
+<!-- TopNavBar -->
+<header class="fixed top-0 left-0 w-full z-50 bg-surface-container-lowest border-b border-outline-variant h-20 flex items-center shadow-sm">
+<div class="max-w-container-max mx-auto w-full px-4 md:px-margin-desktop flex justify-between items-center">
+<div class="flex items-center gap-4 md:gap-stack-lg">
+<!-- Hamburger Menu Button -->
+<button id="mobile-menu-btn" class="md:hidden text-primary p-2 focus:outline-none hover:bg-surface-container-low rounded-lg transition-colors">
+  <span class="material-symbols-outlined text-2xl">menu</span>
+</button>
 
-    @media (max-width: 768px) {
-        .hero-section {
-            padding: 20px 0 40px 0;
-            gap: 25px;
-        }
-        
-        .hero-content h1 {
-            font-size: 28px !important;
-            line-height: 1.35;
-            margin-bottom: 15px;
-        }
-        
-        .hero-content p {
-            font-size: 14px;
-            margin-bottom: 25px;
-        }
-        
-        .hero-graphic {
-            max-width: 280px;
-            padding: 15px;
-        }
-    }
-</style>
-{% endblock %}
+<a href="{% url 'landing' %}" class="flex items-center gap-2 active:scale-95 transition-transform">
+    <img src="{% static 'logo.png' %}" alt="شعار دفتر كاش" class="w-8 h-8 md:w-10 md:h-10 object-contain">
+    <span class="text-headline-md font-bold text-primary text-lg md:text-2xl">Daftar Cash</span>
+</a>
+<nav class="hidden md:flex gap-gutter">
+<a class="text-on-surface-variant font-label-bold hover:text-secondary transition-colors duration-200" href="#features">المميزات</a>
+<a class="text-on-surface-variant font-label-bold hover:text-secondary transition-colors duration-200" href="#pricing">الأسعار</a>
+<a class="text-on-surface-variant font-label-bold hover:text-secondary transition-colors duration-200" href="#faq">الأسئلة الشائعة</a>
+</nav>
+</div>
+<!-- Desktop Auth -->
+<div class="hidden md:flex items-center gap-6">
+    {% if user.is_authenticated %}
+        <a class="text-on-surface-variant font-label-bold hover:text-secondary transition-colors duration-200" href="{% url 'dashboard' %}">لوحة التحكم</a>
+        <a href="{% url 'logout' %}" class="bg-primary text-on-primary px-6 py-2.5 rounded-lg font-label-bold hover:opacity-90 transition-all active:scale-95">تسجيل الخروج</a>
+    {% else %}
+        <a class="text-on-surface-variant font-label-bold hover:text-secondary transition-colors duration-200" href="{% url 'login' %}">تسجيل الدخول</a>
+        <a href="{% url 'register' %}" class="bg-primary text-on-primary px-6 py-2.5 rounded-lg font-label-bold hover:opacity-90 transition-all active:scale-95">ابدأ التجربة مجاناً</a>
+    {% endif %}
+</div>
+<!-- Mobile Quick Access Indicator -->
+<div class="md:hidden flex items-center">
+    {% if user.is_authenticated %}
+        <a href="{% url 'dashboard' %}" class="bg-primary text-on-primary text-xs px-4 py-2 rounded-lg font-label-bold hover:opacity-90 transition-all">اللوحة</a>
+    {% else %}
+        <a href="{% url 'login' %}" class="text-primary font-label-bold text-sm px-3 py-2">دخول</a>
+    {% endif %}
+</div>
+</div>
+</header>
 
-{% block content %}
+<!-- Mobile Menu Overlay (Drawer) -->
+<div id="mobile-menu-overlay" class="fixed inset-0 z-40 bg-black/40 opacity-0 pointer-events-none transition-opacity duration-300 md:hidden"></div>
+<div id="mobile-menu-drawer" class="fixed top-0 right-0 h-full w-72 bg-surface-container-lowest z-50 shadow-2xl border-l border-outline-variant transform translate-x-full transition-transform duration-300 ease-out md:hidden flex flex-col">
+  <div class="p-6 border-b border-outline-variant flex justify-between items-center h-20">
+    <span class="text-headline-md font-bold text-primary text-lg">القائمة الرئيسية</span>
+    <button id="close-menu-btn" class="text-primary p-2 focus:outline-none hover:bg-surface-container-low rounded-lg transition-colors">
+      <span class="material-symbols-outlined text-2xl">close</span>
+    </button>
+  </div>
+  <div class="p-6 flex flex-col gap-6 flex-grow">
+    <a class="text-on-surface font-label-bold hover:text-secondary text-lg border-b border-outline-variant/30 pb-3" href="#features">المميزات</a>
+    <a class="text-on-surface font-label-bold hover:text-secondary text-lg border-b border-outline-variant/30 pb-3" href="#pricing">الأسعار</a>
+    <a class="text-on-surface font-label-bold hover:text-secondary text-lg border-b border-outline-variant/30 pb-3" href="#faq">الأسئلة الشائعة</a>
+    
+    <div class="flex flex-col gap-4 mt-auto">
+      {% if user.is_authenticated %}
+        <a href="{% url 'dashboard' %}" class="w-full bg-secondary text-on-secondary py-3 rounded-xl font-label-bold text-center">لوحة التحكم</a>
+        <a href="{% url 'logout' %}" class="w-full bg-primary text-on-primary py-3 rounded-xl font-label-bold text-center">تسجيل الخروج</a>
+      {% else %}
+        <a href="{% url 'login' %}" class="w-full border border-primary text-primary py-3 rounded-xl font-label-bold text-center">تسجيل الدخول</a>
+        <a href="{% url 'register' %}" class="w-full bg-secondary text-on-secondary py-3 rounded-xl font-label-bold text-center">ابدأ التجربة مجاناً</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<main class="pt-20">
+<!-- Message Alerts -->
+{% if messages %}
+<div class="max-w-container-max mx-auto px-4 md:px-margin-desktop mt-6 space-y-2">
+  {% for message in messages %}
+    <div class="p-4 rounded-xl flex items-center gap-3 {% if message.tags == 'error' %}bg-error-container text-on-error-container border border-error/20{% else %}bg-secondary-container text-on-secondary-container border border-secondary/20{% endif %}">
+      <span class="material-symbols-outlined text-xl">
+        {% if message.tags == 'error' %}error{% else %}check_circle{% endif %}
+      </span>
+      <span class="font-body-md font-medium text-sm">{{ message }}</span>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <!-- Hero Section -->
-<section class="hero-section">
-    <div class="hero-content">
-        <h1>مراقبة رسائل الكاش <br><span>بشكل ذكي وتلقائي</span></h1>
-        <p>تطبيق ديسكتوب وموبايل يقوم بالتقاط رسائل الكاش القصيرة (فودافون كاش، اتصالات، أورنج، وي باي، انستاباي) ومزامنتها على شاشتك لحساب صافي الأرباح، الرصيد الفعلي، وحجم النشاط اليومي بدقة متناهية.</p>
-        <div class="hero-buttons">
-            {% if user.is_authenticated %}
-                <a href="{% url 'dashboard' %}" class="btn-primary"><i class="fa-solid fa-chart-line"></i> لوحة التحكم الخاصة بك</a>
-            {% else %}
-                <a href="{% url 'register' %}" class="btn-primary"><i class="fa-solid fa-circle-play"></i> ابدأ تجربتك المجانية</a>
-                <a href="#pricing" class="btn-secondary"><i class="fa-solid fa-tags"></i> أسعار الاشتراكات</a>
-            {% endif %}
-        </div>
-    </div>
-    <div class="hero-image">
-        <div class="hero-graphic">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <div style="display: flex; gap: 6px;">
-                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #EF4444;"></div>
-                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #F59E0B;"></div>
-                    <div style="width: 10px; height: 10px; border-radius: 50%; background: #10B981;"></div>
-                </div>
-                <span style="font-size: 11px; color: var(--text-muted); font-family: 'Outfit';">Daftar Cash Live Status</span>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-                <div style="background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">فودافون كاش (سحب)</div>
-                        <div style="font-size: 16px; font-weight: 700; color: #10B981;">+ 1,500.00 ج.م</div>
-                    </div>
-                    <i class="fa-solid fa-phone-flip" style="color: #EF4444; font-size: 18px;"></i>
-                </div>
-                <div style="background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">انستاباي (إيداع)</div>
-                        <div style="font-size: 16px; font-weight: 700; color: #EF4444;">- 500.00 ج.م</div>
-                    </div>
-                    <i class="fa-solid fa-building-columns" style="color: #EC008C; font-size: 18px;"></i>
-                </div>
-                <div style="text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 10px;">
-                    <i class="fa-solid fa-circle-dot" style="color: var(--success-green); animation: pulse 2s infinite;"></i> متصل ومزامن حالياً
-                </div>
-            </div>
-        </div>
-    </div>
+<section class="hero-gradient py-10 md:py-stack-lg min-h-[700px] md:min-h-[870px] flex items-center">
+<div class="max-w-container-max mx-auto px-4 md:px-margin-desktop grid md:grid-cols-2 gap-10 md:gap-stack-lg items-center">
+<div class="space-y-6 md:space-y-stack-md animate-fade-in text-right">
+<h1 class="text-3xl md:text-headline-xl font-bold md:leading-[52px] text-primary">
+                        وداعاً للدفاتر الورقية..<br>
+<span class="text-secondary">أتمتة كاملة</span> لإدارة محافظك المالية
+                    </h1>
+<p class="text-base md:text-body-lg text-on-surface-variant max-w-lg leading-relaxed">
+                        نظام ذكي يلتقط رسائل الـ SMS فورياً، يحلل البيانات، ويقوم بمزامنتها مع حاسوبك في ثانية واحدة. تتبع أرباحك الصافية وفصل رأس المال أصبح أسهل من أي وقت مضى.
+                    </p>
+<div class="flex flex-col sm:flex-row gap-4 pt-4 justify-center sm:justify-start">
+    {% if user.is_authenticated %}
+        <a href="{% url 'dashboard' %}" class="bg-secondary text-on-secondary px-8 py-4 rounded-xl font-label-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all">
+            <span class="material-symbols-outlined">chart_line</span>
+            لوحة التحكم الخاصة بك
+        </a>
+    {% else %}
+        <a href="{% url 'register' %}" class="bg-secondary text-on-secondary px-8 py-4 rounded-xl font-label-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all">
+            <span class="material-symbols-outlined">rocket_launch</span>
+            ابدأ تجربتك المجانية
+        </a>
+    {% endif %}
+    <a href="#pricing" class="border border-outline text-primary px-8 py-4 rounded-xl font-label-bold flex items-center justify-center gap-2 hover:bg-surface-container-low transition-all">
+        <span class="material-symbols-outlined">payments</span>
+        شاهد خطط الأسعار
+    </a>
+</div>
+</div>
+<div class="relative group">
+<div class="absolute -inset-4 bg-secondary-container/20 blur-3xl rounded-full opacity-50 group-hover:opacity-100 transition-opacity"></div>
+<img alt="Friendly shopkeeper and customer making a mobile payment in an Egyptian retail store" class="relative rounded-2xl shadow-2xl border border-outline-variant w-full object-cover aspect-[4/3]" data-alt="A clean, professional dual-screen mockup showing a sleek mobile app interface with real-time SMS transaction alerts on the left, seamlessly syncing to a sophisticated desktop dashboard with charts and financial data on the right. The lighting is soft and corporate-modern, utilizing a white and deep navy palette with emerald green accents representing profit gains." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6We1kmKRHz-joTDRhjM48lFjeMTpEoHvHMWQiJ05EOfZzf5EigJlgWMt7lvDQngL-KFKTxqshct1SO4egKp1mk0uAq8BZQFdbD8E652L9dN14KnSJnx3OQp-A2lbONsOVamGbpAJWJNvbCKibJXJIqunob63wHXUsCoswqDfJaLmSluldxfeNFkE2FRqot1UIQEHZZ_IHfF8Dd9JFSClu_Ugps3LYzGFY9bRshD_0Y92hTJ2JUFIqH8i7wTYgA305jnyHMTjnKA4">
+<div class="absolute -bottom-6 -right-6 bg-surface-container-lowest p-stack-md rounded-xl shadow-xl border border-outline-variant hidden md:block">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-secondary/10 text-secondary rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">sync</span>
+</div>
+<div>
+<p class="text-label-sm text-on-surface-variant">مزامنة حية</p>
+<p class="text-label-bold text-primary">أقل من 1 ثانية</p>
+</div>
+</div>
+</div>
+</div>
+</div>
 </section>
 
-<!-- Features Section -->
-<section id="features" style="padding: 60px 0;">
-    <div class="section-title">
-        <h2>أبرز مميزات التطبيق</h2>
-        <p>كل ما تحتاجه لإدارة عمليات الدفع والتحويل في متجرك أو عملك الصغير</p>
-    </div>
-    
-    <div class="features-grid">
-        <div class="glass-card feature-card">
-            <i class="fa-solid fa-bolt feature-icon"></i>
-            <h3 style="margin-bottom: 12px;">مزامنة فورية حية</h3>
-            <p style="font-size: 14px; color: var(--text-secondary);">بمجرد استلام الهاتف لرسالة التحويل، تظهر في شاشة الديسكتوب خلال أقل من ثانية واحدة مصحوبة بنغمة تنبيه وصوت مميز.</p>
+<!-- Feature Grid (The 6 Pillars) -->
+<section id="features" class="py-stack-lg bg-surface">
+<div class="max-w-container-max mx-auto px-4 md:px-margin-desktop text-center mb-10 md:mb-stack-lg">
+<span class="text-secondary font-label-bold tracking-widest uppercase text-sm">لماذا Daftar Cash؟</span>
+<h2 class="text-2xl md:text-headline-lg font-bold text-primary mt-2">القوة في البساطة والدقة في التنفيذ</h2>
+</div>
+<div class="max-w-container-max mx-auto px-4 md:px-margin-desktop mb-10 md:mb-stack-lg">
+<div class="flex flex-col items-center gap-4 md:gap-stack-md">
+    <h2 class="text-lg md:text-body-lg font-label-bold text-on-surface-variant mb-4 md:mb-stack-md">ندعم جميع محافظك المفضلة</h2>
+    <div class="flex flex-wrap justify-center items-center gap-4 md:gap-stack-lg">
+        <div class="bg-white p-4 md:p-6 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group cursor-default border border-outline-variant/30 flex items-center justify-center w-36 h-20 md:w-48 md:h-28">
+        <img alt="Vodafone Cash" class="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqeQwAecYgymb21j7YyodkMI63XbITFgeI_O1ak6D1Q60Eom7VvpaQHPhm4VVfKiKeV3OZpgDhZdQ0bHqJBX85YMGVZXu40CIe4Y-KZbqmP-y-iSQp2Lde7ygFWPwPhm4g93yAJlz648-0vHXLo_NTpwB8VHlIKcQXmko1apLOs3zdEFgSMOsS_5hOHi16VA6dY2rlATdwVfHIPot3T44Mzo8hFW8zofVXwzBpnJg9MkwkOp_nSUvOUnZgTkFU_jjtv93COPCveY8">
         </div>
-        
-        <div class="glass-card feature-card">
-            <i class="fa-solid fa-calculator feature-icon"></i>
-            <h3 style="margin-bottom: 12px;">حساب تلقائي للأرباح</h3>
-            <p style="font-size: 14px; color: var(--text-secondary);">يقوم البرنامج بحساب العمولة والرسوم والحد الأدنى ديناميكياً لكل عملية سحب أو إيداع، وتحديث صافي الأرباح لحظة بلحظة.</p>
+        <div class="bg-white p-4 md:p-6 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group cursor-default border border-outline-variant/30 flex items-center justify-center w-36 h-20 md:w-48 md:h-28">
+        <img alt="Orange Cash" class="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAkPnWZdw3EfXyApv6f7sZ8MbIvfVB5XaDS8QIxK5bgeNS0BUf2zzQnwB0uQjVbcD2jRjykAc813eqpaUTcZDmnYMiz80pyytHNl48rI0f-6LcvV9t6zx-FMldpcTHzxZENvHnIlg1-BCr2KxvXro7_UtcqhWzaYrxoY20JeWE_KaoFeGZzs2po_-GdTS6F81kE7EgdOgu-h8sgqEqYBrUTwR-RKwmYadUC5ERY1110H7M27-luE9nGObyhXypi8XM5nT9KdN0HmhE">
         </div>
-        
-        <div class="glass-card feature-card">
-            <i class="fa-solid fa-lock feature-icon"></i>
-            <h3 style="margin-bottom: 12px;">أمان محلي 100%</h3>
-            <p style="font-size: 14px; color: var(--text-secondary);">تُحفظ سجلاتك وبيانات عملياتك محلياً بالكامل على حاسوبك الشخصي. لا يتم إرسال أي تفاصيل مالية أو رسائل إلى سيرفر خارجي.</p>
+        <div class="bg-white p-4 md:p-6 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group cursor-default border border-outline-variant/30 flex items-center justify-center w-36 h-20 md:w-48 md:h-28">
+        <img alt="Instapay" class="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB3r7ig0i6ENauDMhm0_zkqeJwA9as8pYiCL7WN0sve7bSTkImdWWWZcqwLcxlVeaTUKGdgsqOYFKruAvFaIa_U7I5Yp99hrSoR-kYIb2sFbNbAdIxSDmDxLJEO3uhZ1ZEMp_BLig-lni0PONWWOSSkFXV65aqb11UF5DXOFBsPhSccAcDggiSMjoZrcBucXvIoH2t_QhV7Akk5_tHAR_hf1mGW9nR6ZmSs5g99JjeopJaSFLoxbcQmjvzhZlkIrSB8zfcR3vDddMM">
         </div>
-    </div>
-</section>
-
-<!-- How it works Section -->
-<section id="how-it-works" style="padding: 60px 0; background: #FFFFFF; border-radius: 30px; border: 1px solid var(--border-color); padding: 40px; margin-bottom: 80px; box-shadow: var(--shadow-soft);">
-    <div class="section-title">
-        <h2>خطوات بسيطة للربط والتشغيل</h2>
-        <p>كيف تبدأ بالعمل الفعلي في أقل من 5 دقائق</p>
-    </div>
-    
-    <div class="steps-container">
-        <div class="glass-card step-card">
-            <div class="step-num">01</div>
-            <h3 style="margin-bottom: 10px; color: var(--accent-blue);">تحميل البرنامج</h3>
-            <p style="font-size: 13px; color: var(--text-secondary);">سجل حساباً مجانياً ثم قم بتحميل ملف الديسكتوب وتثبيت تطبيق الأندرويد (.APK) على هاتفك المخصص لاستقبال الرسائل.</p>
+        <div class="bg-white p-4 md:p-6 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group cursor-default border border-outline-variant/30 flex items-center justify-center w-36 h-20 md:w-48 md:h-28">
+        <img alt="Etisalat Cash" class="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCtyQ34HtW8h7p33j9JYiOsxEfZEeR4eeD5RwniSQlq8CuiyA64p82ppK3JvhIIIyZt--Mla2ig_--QftjCQLvOzC8wSCj_FK5Znp4X6D75cy49FFu_Ypjc_DKRZQWwLvdSmJ3qFC0XBGpPTRVS6dgh8jd_EKqSlPsfjNKpqKe8jC5AO4IlxYKmPt740h2TMozShgl74-U14fi4LWFJ1AJdgH7jJ75MJKXlFb7ucacLDZJojHUZdrCqr9hCyY7aL1udQwxGzeBfbyY">
         </div>
-        <div class="glass-card step-card">
-            <div class="step-num">02</div>
-            <h3 style="margin-bottom: 10px; color: var(--accent-purple);">تفعيل كود الترخيص</h3>
-            <p style="font-size: 13px; color: var(--text-secondary);">انسخ كود التفعيل التجريبي أو كود الاشتراك من لوحة التحكم، واكتبه في نافذة الديسكتوب لتفعيل البرنامج.</p>
-        </div>
-        <div class="glass-card step-card">
-            <div class="step-num">03</div>
-            <h3 style="margin-bottom: 10px; color: var(--accent-pink);">إقران الموبايل والكمبيوتر</h3>
-            <p style="font-size: 13px; color: var(--text-secondary);">تأكد من وجود الجهازين على نفس شبكة الواي فاي، واكتب عنوان الـ IP المعروض في الديسكتوب داخل إعدادات الموبايل.</p>
+        <div class="bg-white p-4 md:p-6 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group cursor-default border border-outline-variant/30 flex items-center justify-center w-36 h-20 md:w-48 md:h-28">
+        <img alt="WE Pay" class="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDUkl5ZMdPfNvsm7zuzs1NXW71-RVrQEX80wc51IYN8vWes1-xBmAanhooM0WBdIKj-Sjd6CuYZiZ3aMPgoQHS9zfqKoFLrYACaZ2edGy35bsAvvF1G0Q-RISxCJ3EN5bRQdU-Yiu6DcXU_q-XOzocZM1UZXqd6wEI5RnQcZzuzJkupe_WeHXfa7RdITKNsDqh_EaAVyvoY9MUVmUsDlRlhMcCiisqFxhehccFNO5l8zUeJ5kbCIYGwbBTMkV-E9MD5iBRwBJ_6UDM">
         </div>
     </div>
-</section>
-
-<!-- App Downloads Section -->
-<section id="download" style="padding: 60px 0; text-align: center;">
-    <div class="section-title">
-        <h2>روابط تحميل التطبيقات</h2>
-        <p>ابدأ التشغيل الفوري بتحميل الأدوات المتوافقة مع أجهزتك</p>
-    </div>
-    
-    <div style="display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; margin-bottom: 50px; direction: rtl;">
-        <!-- Windows Desktop Download Card -->
-        <div class="glass-card" style="padding: 40px; width: 300px; border-radius: 20px; text-align: center; border: 1px solid rgba(30, 143, 139, 0.15); display: flex; flex-direction: column; justify-content: space-between; align-items: center; box-shadow: var(--shadow-premium);">
-            <i class="fa-brands fa-windows" style="font-size: 50px; color: var(--accent-blue); margin-bottom: 20px;"></i>
-            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 10px;">نسخة الكمبيوتر (Windows)</h3>
-            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 25px; min-height: 50px;">تطبيق ديسكتوب خفيف وسريع لمراقبة ومزامنة رسائل التحويل وعرض صافي الأرباح.</p>
-            <a href="{% url 'download_file' 'desktop' %}" class="btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <i class="fa-solid fa-download"></i> تحميل لنظام ويندوز
-            </a>
-        </div>
-
-        <!-- Android Mobile Download Card -->
-        <div class="glass-card" style="padding: 40px; width: 300px; border-radius: 20px; text-align: center; border: 1px solid rgba(30, 143, 139, 0.15); display: flex; flex-direction: column; justify-content: space-between; align-items: center; box-shadow: var(--shadow-premium);">
-            <i class="fa-brands fa-android" style="font-size: 50px; color: var(--success-green); margin-bottom: 20px;"></i>
-            <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 10px;">نسخة الهاتف (Android APK)</h3>
-            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 25px; min-height: 50px;">تطبيق موبايل خفيف جداً (6.5 ميجا بايت) لالتقاط رسائل الكاش وتحويلها فوراً.</p>
-            <a href="{% url 'download_file' 'mobile' %}" class="btn-secondary" style="width: 100%; border-color: var(--success-green); color: var(--success-green); display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <i class="fa-solid fa-download"></i> تحميل ملف الـ APK
-            </a>
-        </div>
-    </div>
+</div>
+</div>
+<div class="max-w-container-max mx-auto px-4 md:px-margin-desktop grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-gutter">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-2xl border border-outline-variant hover:border-secondary transition-all shadow-sm hover:shadow-md group">
+<span class="material-symbols-outlined text-secondary text-4xl mb-4 group-hover:scale-110 transition-transform">bolt</span>
+<h3 class="text-lg md:text-headline-md font-bold text-primary mb-2">أتمتة كاملة</h3>
+<p class="text-sm md:text-body-md text-on-surface-variant">وداعاً للإدخال اليدوي. وفر 2-3 ساعات يومياً من العمل المكتبي الشاق والممل.</p>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-2xl border border-outline-variant hover:border-secondary transition-all shadow-sm hover:shadow-md group">
+<span class="material-symbols-outlined text-secondary text-4xl mb-4 group-hover:scale-110 transition-transform">verified_user</span>
+<h3 class="text-lg md:text-headline-md font-bold text-primary mb-2">دقة 100%</h3>
+<p class="text-sm md:text-body-md text-on-surface-variant">نظام محاسبي متكامل يضمن عدم وجود أي عجز مالي عبر التقاط كل قرش في الرسائل.</p>
+</div>
+<!-- Card 3: Highlight -->
+<div class="bg-primary-container p-stack-lg rounded-2xl border border-secondary transition-all shadow-xl group relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-secondary"></div>
+<span class="material-symbols-outlined text-secondary-fixed text-4xl mb-4 group-hover:scale-110 transition-transform">payments</span>
+<h3 class="text-lg md:text-headline-md font-bold text-white mb-2">فصل الأرباح</h3>
+<p class="text-sm md:text-body-md text-on-primary-container">رؤية واضحة لرأس المال مقابل الربح الصافي. الدرج والمحفظة الآن تحت مجهر واحد.</p>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-2xl border border-outline-variant hover:border-secondary transition-all shadow-sm hover:shadow-md group">
+<span class="material-symbols-outlined text-secondary text-4xl mb-4 group-hover:scale-110 transition-transform">analytics</span>
+<h3 class="text-lg md:text-headline-md font-bold text-primary mb-2">لوحة تحليلية</h3>
+<p class="text-sm md:text-body-md text-on-surface-variant">مؤشرات أداء فورية (KPIs) تعرض أهم جهات التعامل وصافي الربح الشهري بضغطة زر.</p>
+</div>
+<!-- Card 5 -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-2xl border border-outline-variant hover:border-secondary transition-all shadow-sm hover:shadow-md group">
+<span class="material-symbols-outlined text-secondary text-4xl mb-4 group-hover:scale-110 transition-transform">lock_person</span>
+<h3 class="text-lg md:text-headline-md font-bold text-primary mb-2">أمان مطلق</h3>
+<p class="text-sm md:text-body-md text-on-surface-variant">مزامنة محلية عبر WebSockets. لا يتم تخزين بياناتك الحساسة على أي خوادم سحابية.</p>
+</div>
+<!-- Card 6 -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-2xl border border-outline-variant hover:border-secondary transition-all shadow-sm hover:shadow-md group">
+<span class="material-symbols-outlined text-secondary text-4xl mb-4 group-hover:scale-110 transition-transform">keyboard</span>
+<h3 class="text-lg md:text-headline-md font-bold text-primary mb-2">تحويل سريع</h3>
+<p class="text-sm md:text-body-md text-on-surface-variant">استخدم لوحة المفاتيح لإجراء التحويلات عبر الكمبيوتر مباشرة بمزامنة فورية مع الهاتف.</p>
+</div>
+</div>
 </section>
 
 <!-- Pricing Section -->
-<section id="pricing" style="padding: 60px 0;">
-    <div class="section-title">
-        <h2>خطط الأسعار والاشتراكات</h2>
-        <p>اختر الخطة المناسبة لحجم أعمالك، لا توجد أي رسوم خفية</p>
-    </div>
-    
-    <div class="pricing-grid">
-        <!-- Plan 1 -->
-        <div class="glass-card price-card">
-            <div class="price-header">
-                <h3>الفترة التجريبية</h3>
-                <p style="color: var(--text-secondary); font-size: 13px;">تفعيل فوري لتجربة التطبيق</p>
-                <div class="price">ميجاناً <span>/ 3 أيام</span></div>
-            </div>
-            <ul class="price-features">
-                <li><i class="fa-solid fa-check"></i> ربط هاتف واحد</li>
-                <li><i class="fa-solid fa-check"></i> شاشة مراقبة حية</li>
-                <li><i class="fa-solid fa-check"></i> تنبيهات وصوت فوري</li>
-                <li><i class="fa-solid fa-check"></i> تصفير السجل وتجربة كاملة</li>
-            </ul>
-            {% if user.is_authenticated %}
-                <a href="{% url 'dashboard' %}" class="btn-secondary" style="text-align: center;"><i class="fa-solid fa-circle-info"></i> تفعيل من لوحة التحكم</a>
-            {% else %}
-                <a href="{% url 'register' %}" class="btn-secondary" style="text-align: center;"><i class="fa-solid fa-user-plus"></i> سجل للحصول على الكود</a>
-            {% endif %}
-        </div>
-        
-        <!-- Plan 2 -->
-        <div class="glass-card price-card popular">
-            <div class="popular-badge">الأكثر شعبية</div>
-            <div class="price-header">
-                <h3>الاشتراك الشهري</h3>
-                <p style="color: var(--text-secondary); font-size: 13px;">مناسب للمتاجر المتوسطة واليومية</p>
-                <div class="price">150 ج.م <span>/ شهرياً</span></div>
-            </div>
-            <ul class="price-features">
-                <li><i class="fa-solid fa-check"></i> تفعيل كامل للمميزات</li>
-                <li><i class="fa-solid fa-check"></i> ربط غير محدود للهواتف</li>
-                <li><i class="fa-solid fa-check"></i> دعم فني ومزامنة كاملة</li>
-                <li><i class="fa-solid fa-check"></i> تحديثات مستمرة للنظام</li>
-            </ul>
-            {% if user.is_authenticated %}
-                <a href="{% url 'checkout' 'MONTHLY' %}" class="btn-primary" style="text-align: center;"><i class="fa-solid fa-credit-card"></i> اشترك الآن</a>
-            {% else %}
-                <a href="{% url 'login' %}?next=/checkout/MONTHLY/" class="btn-primary" style="text-align: center;"><i class="fa-solid fa-right-to-bracket"></i> سجل دخول للاشتراك</a>
-            {% endif %}
-        </div>
-        
-        <!-- Plan 3 -->
-        <div class="glass-card price-card">
-            <div class="price-header">
-                <h3>الاشتراك السنوي</h3>
-                <p style="color: var(--text-secondary); font-size: 13px;">توفير بقيمة شهرين كاملين</p>
-                <div class="price">1,200 ج.م <span>/ سنوياً</span></div>
-            </div>
-            <ul class="price-features">
-                <li><i class="fa-solid fa-check"></i> توفير كبير (حتى 600 ج.م)</li>
-                <li><i class="fa-solid fa-check"></i> جميع مميزات الاشتراك الشهري</li>
-                <li><i class="fa-solid fa-check"></i> أولوية في الدعم الفني</li>
-                <li><i class="fa-solid fa-check"></i> إمكانية نقل الترخيص لجهاز آخر</li>
-            </ul>
-            {% if user.is_authenticated %}
-                <a href="{% url 'checkout' 'YEARLY' %}" class="btn-secondary" style="text-align: center; border-color: var(--accent-pink); color: var(--accent-pink);"><i class="fa-solid fa-credit-card"></i> اشترك سنوياً ووفر</a>
-            {% else %}
-                <a href="{% url 'login' %}?next=/checkout/YEARLY/" class="btn-secondary" style="text-align: center;"><i class="fa-solid fa-right-to-bracket"></i> سجل دخول ووفر</a>
-            {% endif %}
-        </div>
-    </div>
+<section id="pricing" class="py-stack-lg bg-surface-container-low">
+<div class="max-w-container-max mx-auto px-4 md:px-margin-desktop text-center mb-10 md:mb-stack-lg">
+<h2 class="text-2xl md:text-headline-lg font-bold text-primary">خطط تناسب حجم أعمالك</h2>
+<p class="text-sm md:text-body-md text-on-surface-variant mt-2">لا توجد مصاريف خفية، ابدأ بالباقة التي تريحك</p>
+</div>
+<div class="max-w-container-max mx-auto px-4 md:px-margin-desktop grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-gutter items-center md:items-end">
+<!-- Experimental -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-2xl border border-outline-variant text-center space-y-4 md:space-y-stack-md">
+<p class="text-label-bold text-on-surface-variant">الفترة التجريبية</p>
+<div class="py-4">
+<span class="text-3xl md:text-headline-xl font-bold text-primary">مجاناً</span>
+</div>
+<ul class="text-right space-y-4 text-sm md:text-body-md text-on-surface-variant">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary">check</span> صلاحية لمدة 3 أيام</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary">check</span> ربط هاتف واحد فقط</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary">check</span> تنبيهات صوتية فورية</li>
+</ul>
+{% if user.is_authenticated %}
+    <a href="{% url 'dashboard' %}" class="w-full border-2 border-primary text-primary py-3 rounded-xl font-label-bold hover:bg-primary hover:text-white transition-all block text-center">لوحة التحكم الخاصة بك</a>
+{% else %}
+    <a href="{% url 'register' %}" class="w-full border-2 border-primary text-primary py-3 rounded-xl font-label-bold hover:bg-primary hover:text-white transition-all block text-center">جرب الآن</a>
+{% endif %}
+</div>
+<!-- Monthly (Featured) -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-2xl border-2 border-secondary text-center space-y-4 md:space-y-stack-md relative shadow-2xl md:scale-105 my-4 md:my-0">
+<div class="absolute -top-4 right-1/2 translate-x-1/2 bg-secondary text-on-secondary px-4 py-1 rounded-full text-label-sm">الأكثر طلباً</div>
+<p class="text-label-bold text-secondary">الاشتراك الشهري</p>
+<div class="py-4">
+<span class="text-3xl md:text-headline-xl font-bold text-primary">150 ج.م</span>
+<span class="text-label-sm text-on-surface-variant">/ شهر</span>
+</div>
+<ul class="text-right space-y-4 text-sm md:text-body-md text-on-surface-variant">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary">check</span> تفعيل كامل للمميزات</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary">check</span> ربط غير محدود للهواتف</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary">check</span> دعم فني متميز</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary">check</span> تحديثات مستمرة للنظام</li>
+</ul>
+{% if user.is_authenticated %}
+    <a href="{% url 'checkout' 'MONTHLY' %}" class="w-full bg-secondary text-on-secondary py-3 rounded-xl font-label-bold shadow-lg hover:shadow-xl transition-all block text-center">اشترك الآن</a>
+{% else %}
+    <a href="{% url 'login' %}?next=/checkout/MONTHLY/" class="w-full bg-secondary text-on-secondary py-3 rounded-xl font-label-bold shadow-lg hover:shadow-xl transition-all block text-center">سجل دخول للاشتراك</a>
+{% endif %}
+</div>
+<!-- Yearly -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-2xl border border-outline-variant text-center space-y-4 md:space-y-stack-md">
+<p class="text-label-bold text-on-surface-variant">الاشتراك السنوي</p>
+<div class="py-4">
+<span class="text-3xl md:text-headline-xl font-bold text-primary">1,200 ج.م</span>
+<span class="text-label-sm text-on-surface-variant">/ سنة</span>
+</div>
+<div class="bg-secondary-container text-on-secondary-container rounded-lg py-1 px-3 text-label-sm inline-block">توفير 600 ج.م</div>
+<ul class="text-right space-y-4 text-sm md:text-body-md text-on-surface-variant">
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary">check</span> جميع مميزات الباقة الشهرية</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary">check</span> أولوية في الدعم المباشر</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary">check</span> نقل الترخيص لجهاز آخر</li>
+</ul>
+{% if user.is_authenticated %}
+    <a href="{% url 'checkout' 'YEARLY' %}" class="w-full bg-primary text-on-primary py-3 rounded-xl font-label-bold hover:opacity-90 transition-all block text-center">اشترك الآن</a>
+{% else %}
+    <a href="{% url 'login' %}?next=/checkout/YEARLY/" class="w-full bg-primary text-on-primary py-3 rounded-xl font-label-bold hover:opacity-90 transition-all block text-center">سجل ووفر الآن</a>
+{% endif %}
+</div>
+</div>
 </section>
-{% endblock %}
+
+<!-- FAQ Section -->
+<section id="faq" class="py-stack-lg bg-surface">
+<div class="max-w-3xl mx-auto px-4 md:px-margin-desktop">
+<h2 class="text-2xl md:text-headline-lg font-bold text-primary text-center mb-10 md:mb-stack-lg">الأسئلة الشائعة</h2>
+<div class="space-y-4 md:space-y-stack-md">
+<details class="bg-surface-container-lowest p-4 md:p-stack-md rounded-xl border border-outline-variant group open:border-secondary transition-all">
+<summary class="font-label-bold text-primary cursor-pointer flex justify-between items-center list-none">
+                            هل بياناتي المالية في أمان؟
+                            <span class="material-symbols-outlined group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<p class="mt-4 text-sm md:text-body-md text-on-surface-variant leading-relaxed">
+                            نعم تماماً. تطبيق Daftar Cash يعتمد على المزامنة المحلية المباشرة بين هاتفك وحاسوبك عبر شبكة الواي فاي الخاصة بك فقط. لا يتم تخزين تفاصيل معاملاتك أو رسائل الـ SMS على أي خوادم خارجية.
+                        </p>
+</details>
+<details class="bg-surface-container-lowest p-4 md:p-stack-md rounded-xl border border-outline-variant group open:border-secondary transition-all">
+<summary class="font-label-bold text-primary cursor-pointer flex justify-between items-center list-none">
+                            هل يدعم التطبيق جميع شبكات المحمول؟
+                            <span class="material-symbols-outlined group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<p class="mt-4 text-sm md:text-body-md text-on-surface-variant leading-relaxed">
+                            نعم، النظام مصمم للتعامل مع رسائل الـ SMS الواردة من جميع المحافظ الإلكترونية في مصر (فودافون كاش، اتصالات كاش، أورنج كاش، وي باي، إنستاباي) وغيرها.
+                        </p>
+</details>
+</div>
+</div>
+</section>
+</main>
+
+<!-- Footer -->
+<footer class="bg-primary text-on-primary py-stack-lg border-t border-primary-container">
+<div class="max-w-container-max mx-auto px-4 md:px-margin-desktop grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-gutter mb-stack-lg">
+<div class="space-y-4 md:space-y-stack-md">
+<span class="font-headline-md text-headline-md text-secondary-fixed">Daftar Cash</span>
+<p class="text-sm md:text-body-md opacity-80 leading-relaxed">
+                    النظام الأقوى والمساعد الذكي لمراقبة ومزامنة رسائل محافظ الكاش والتحويلات المالية لحظياً بدقة وبساطة تامة.
+                </p>
+<div class="flex gap-4">
+<a class="w-10 h-10 rounded-full border border-primary-fixed-dim flex items-center justify-center hover:bg-secondary hover:border-secondary transition-colors" href="#">
+<img alt="Facebook" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBA3Wge04z68POsqMer2mIQMXpj6gGiU_f0UQOh51D1VHN_hhgMicZLAnne2BXy7yjNwsr5x8HLwl8K0tUrzCPiAWPLRoyL315BJu3hcLwhN3g2rlbyJcBpwMN5nDKjyPJOIQG1iIWkr0DTbGjcJmL6PO4EUwumFgL-3Q-9E2-dI5t2s5BKLLsQvXfPq3QqPC-98c_7KtXLW1puAMK4t-mJRFQgLL_pgiJKXm4U1XVmHgWAu9_MW9EtIMr-BjX_Uy_b1wSwSZo_ZfQ" class="">
+</a>
+<a class="w-10 h-10 rounded-full border border-primary-fixed-dim flex items-center justify-center hover:bg-secondary hover:border-secondary transition-colors" href="#">
+<img alt="Telegram" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAntxEbdF3EZIsMjEyBpQ6jNrJS7vTEDENhsLMGb-PaHLLFw5ccag3B3eNBAvIFW9WwZq_jRQVo0QIglDBTtM4UXeZj3GAXKLFenQBXKwtGCwXCHtuUkbY6575IbwS_oP2kyNWPCm40pmhjNPH05_a_HC324Z1FBmydW6rr3rpjFKPH5hGl0D5SyHjO33TDG7pkM0bbZHeGGLfhFz-mTmnbUyG_thMUwqRFat1qnm2_W8hl0MV5QvVMIFLlecy0asgv1NDKVgAv5UM" class="">
+</a>
+</div>
+</div>
+<div class="space-y-4 md:space-y-stack-md">
+<h4 class="font-label-bold text-secondary-fixed">روابط سريعة</h4>
+<ul class="space-y-2 text-sm md:text-body-md opacity-80">
+<li class=""><a class="hover:text-secondary-fixed transition-colors" href="{% url 'landing' %}">الرئيسية</a></li>
+<li class=""><a class="hover:text-secondary-fixed transition-colors" href="#features">مميزات الخدمة</a></li>
+<li class=""><a class="hover:text-secondary-fixed transition-colors" href="#pricing">خطط الأسعار</a></li>
+<li class=""><a class="hover:text-secondary-fixed transition-colors" href="{% url 'dashboard' %}">لوحة تحكم المشترك</a></li>
+</ul>
+</div>
+<div class="space-y-4 md:space-y-stack-md">
+<h4 class="font-label-bold text-secondary-fixed">تحميل البرامج</h4>
+<ul class="space-y-2 text-sm md:text-body-md opacity-80">
+<li class="flex items-center gap-2">
+  <a href="{% url 'download_file' 'desktop' %}" class="hover:text-secondary-fixed transition-colors flex items-center gap-2">
+    <span class="material-symbols-outlined text-sm">desktop_windows</span> نسخة الكمبيوتر (.exe)
+  </a>
+</li>
+<li class="flex items-center gap-2">
+  <a href="{% url 'download_file' 'mobile' %}" class="hover:text-secondary-fixed transition-colors flex items-center gap-2">
+    <span class="material-symbols-outlined text-sm">android</span> نسخة الأندرويد (.apk)
+  </a>
+</li>
+</ul>
+</div>
+<div class="space-y-4 md:space-y-stack-md">
+<h4 class="font-label-bold text-secondary-fixed">الدعم الفني</h4>
+<ul class="space-y-2 text-sm md:text-body-md opacity-80">
+<li class="flex items-center gap-2 leading-none"><span class="material-symbols-outlined text-sm">mail</span> support@daftarcash.com</li>
+<li class="flex items-center gap-2 leading-none"><span class="material-symbols-outlined text-sm">call</span> +20 100 000 0000</li>
+<li class=""><a class="flex items-center gap-2 hover:text-secondary-fixed transition-colors" href="{% url 'privacy_policy' %}"><span class="material-symbols-outlined text-sm">policy</span> سياسة الخصوصية</a></li>
+</ul>
+</div>
+</div>
+<div class="max-w-container-max mx-auto px-4 md:px-margin-desktop pt-stack-md border-t border-primary-container flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-right">
+<p class="text-label-sm opacity-60">© 2026 Daftar Cash. جميع الحقوق محفوظة للمؤسسة.</p>
+<div class="flex flex-wrap justify-center gap-4 md:gap-stack-lg text-label-sm opacity-60">
+<a class="hover:underline" href="#">الشروط والأحكام</a>
+<a class="hover:underline" href="{% url 'privacy_policy' %}">سياسة الخصوصية</a>
+<a class="hover:underline" href="mailto:support@daftarcash.com">اتصل بنا</a>
+<a class="hover:underline" href="#faq">الأسئلة الشائعة</a>
+</div>
+</div>
+</footer>
+
+<script>
+        // Simple scroll interaction for header
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('header');
+            if (window.scrollY > 20) {
+                header.classList.add('shadow-md');
+                header.classList.remove('shadow-sm');
+            } else {
+                header.classList.add('shadow-sm');
+                header.classList.remove('shadow-md');
+            }
+        });
+
+        // Mobile Menu Drawer functionality
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const mobileMenuOverlay = document.getElementById('mobile-menu-overlay');
+        const mobileMenuDrawer = document.getElementById('mobile-menu-drawer');
+
+        function openMobileMenu() {
+            mobileMenuOverlay.classList.remove('pointer-events-none', 'opacity-0');
+            mobileMenuOverlay.classList.add('opacity-100');
+            mobileMenuDrawer.classList.remove('translate-x-full');
+        }
+
+        function closeMobileMenu() {
+            mobileMenuOverlay.classList.add('pointer-events-none', 'opacity-0');
+            mobileMenuOverlay.classList.remove('opacity-100');
+            mobileMenuDrawer.classList.add('translate-x-full');
+        }
+
+        if (mobileMenuBtn && closeMenuBtn && mobileMenuOverlay && mobileMenuDrawer) {
+            mobileMenuBtn.addEventListener('click', openMobileMenu);
+            closeMenuBtn.addEventListener('click', closeMobileMenu);
+            mobileMenuOverlay.addEventListener('click', closeMobileMenu);
+
+            // Close menu when clicking on nav links
+            const mobileLinks = mobileMenuDrawer.querySelectorAll('a[href^="#"]');
+            mobileLinks.forEach(link => {
+                link.addEventListener('click', closeMobileMenu);
+            });
+        }
+    </script>
+</body></html>
