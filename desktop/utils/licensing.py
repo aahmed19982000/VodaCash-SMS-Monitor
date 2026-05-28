@@ -173,10 +173,15 @@ class LicensingManager:
                 if response.status_code == 200:
                     return response.json()
                 else:
-                    return {"success": False, "message": f"فشل التحقق من خادم Django ({response.status_code})"}
+                    is_server_error = response.status_code >= 500
+                    return {
+                        "success": False, 
+                        "connection_error": is_server_error,
+                        "message": f"فشل التحقق من خادم Django ({response.status_code})"
+                    }
             except Exception as e:
                 logger.error(f"Error checking Django license: {e}")
-                return {"success": False, "message": f"خطأ اتصال بخادم Django: {str(e)}"}
+                return {"success": False, "connection_error": True, "message": f"خطأ اتصال بخادم Django: {str(e)}"}
 
         # 3. Supabase Backend Mode (Default)
         try:
@@ -184,7 +189,12 @@ class LicensingManager:
             response = httpx.get(api_url, headers=self._get_supabase_headers(), timeout=10.0)
             
             if response.status_code != 200:
-                return {"success": False, "message": f"خطأ في الاتصال بالخادم السحابي ({response.status_code})"}
+                is_server_error = response.status_code >= 500
+                return {
+                    "success": False, 
+                    "connection_error": is_server_error,
+                    "message": f"خطأ في الاتصال بالخادم السحابي ({response.status_code})"
+                }
             
             data = response.json()
             if not data:
@@ -232,7 +242,7 @@ class LicensingManager:
             }
         except Exception as e:
             logger.error(f"Error validating license online: {e}")
-            return {"success": False, "message": f"فشل التحقق بسبب خطأ اتصال: {str(e)}"}
+            return {"success": False, "connection_error": True, "message": f"فشل التحقق بسبب خطأ اتصال: {str(e)}"}
 
     def check_mac_has_trial(self, mac_addr: str) -> bool:
         self.refresh_credentials()

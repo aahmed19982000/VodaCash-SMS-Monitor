@@ -11,6 +11,7 @@ from desktop.ui.views.calculator_view import CalculatorView
 from desktop.ui.views.cash_management_view import CashManagementView
 from desktop.ui.views.transfer_view import TransferView
 from desktop.ui.views.login_view import LoginView
+from desktop.ui.views.profits_view import ProfitsView
 
 class DesktopApp:
     def __init__(self, page: ft.Page, db: DesktopDatabase, server):
@@ -54,6 +55,7 @@ class DesktopApp:
         self.calculator_view = CalculatorView(self.page, self.db)
         self.transfer_view = TransferView(self.page, self.db, self.server)
         self.cash_management_view = CashManagementView(self.page, self.db)
+        self.profits_view = ProfitsView(self.page, self.db, self.server)
         self.settings_view = SettingsView(
             self.page,
             db=self.db,
@@ -107,6 +109,11 @@ class DesktopApp:
                     icon=ft.Icons.ACCOUNT_BALANCE_WALLET_OUTLINED,
                     selected_icon=ft.Icons.ACCOUNT_BALANCE_WALLET_ROUNDED,
                     label="Cash",
+                ),
+                ft.NavigationRailDestination(
+                    icon=ft.Icons.MONETIZATION_ON_OUTLINED,
+                    selected_icon=ft.Icons.MONETIZATION_ON_ROUNDED,
+                    label="Profits",
                 ),
                 ft.NavigationRailDestination(
                     icon=ft.Icons.SETTINGS_OUTLINED,
@@ -199,6 +206,16 @@ class DesktopApp:
         
         def apply_status():
             if not res["success"]:
+                if res.get("connection_error"):
+                    self.page.snack_bar = ft.SnackBar(
+                        content=ft.Text(f"⚠️ وضع العمل دون اتصال: تعذر تحديث حالة الاشتراك. ({res['message']})", size=14, weight=ft.FontWeight.BOLD),
+                        bgcolor=ft.Colors.ORANGE_800,
+                        duration=5000
+                    )
+                    self.page.snack_bar.open = True
+                    self.page.update()
+                    return
+
                 self.db.set_setting("license_key", "")
                 self.db.set_setting("license_expiry", "")
                 self.db.set_setting("license_status", "EXPIRED")
@@ -330,6 +347,8 @@ class DesktopApp:
         elif idx == 6:
             self.view_container.content = self.cash_management_view
         elif idx == 7:
+            self.view_container.content = self.profits_view
+        elif idx == 8:
             self.view_container.content = self.settings_view
         self.page.update()
         
@@ -352,6 +371,8 @@ class DesktopApp:
             self.transfer_view.update_data()
         elif self.view_container.content == self.cash_management_view:
             self.cash_management_view.update_data()
+        elif self.view_container.content == self.profits_view:
+            self.profits_view.update_data()
         elif self.view_container.content == self.settings_view:
             self.settings_view.update_data()
 
@@ -365,6 +386,7 @@ class DesktopApp:
             self.calculator_view.update_data()
             self.transfer_view.update_data()
             self.cash_management_view.update_data()
+            self.profits_view.update_data()
         except Exception as e:
             print(f"Error refreshing all views: {e}")
 

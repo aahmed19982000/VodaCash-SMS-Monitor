@@ -404,13 +404,27 @@ class DesktopDatabase:
             logger.error(f"❌ Error getting transactions count: {e}")
             return 0
 
-    def get_kpi_summary(self, month: str = None) -> Dict[str, float]:
+    def get_kpi_summary(self, month: str = None, start_date: str = None, end_date: str = None) -> Dict[str, float]:
         """إحصائيات (رصيد، دخل، مصاريف) للـ Dashboard"""
         # إذا لم يُحدد شهر، نستخدم الشهر الحالي بالتوقيت المحلي لضمان الدقة
-        if month == "ALL":
-            date_filter = "IS NOT NULL"
+        filter_params = []
+        if start_date and end_date:
+            date_filter = "AND date(sms_timestamp) BETWEEN date(?) AND date(?)"
+            filter_params = [start_date, end_date]
+        elif start_date:
+            date_filter = "AND date(sms_timestamp) >= date(?)"
+            filter_params = [start_date]
+        elif end_date:
+            date_filter = "AND date(sms_timestamp) <= date(?)"
+            filter_params = [end_date]
+        elif month == "ALL":
+            date_filter = ""
         else:
-            date_filter = f"LIKE '{month}%'" if month else ">= date('now', 'localtime', 'start of month')"
+            if month:
+                date_filter = "AND sms_timestamp LIKE ?"
+                filter_params = [f"{month}%"]
+            else:
+                date_filter = "AND date(sms_timestamp) >= date('now', 'localtime', 'start of month')"
         
         row = self._conn.execute(f"""
             SELECT
@@ -418,9 +432,9 @@ class DesktopDatabase:
                 COALESCE(SUM(CASE WHEN type IN ('SENT', 'BILL', 'PURCHASE', 'TOPUP', 'ATM_WITHDRAWAL') THEN amount ELSE 0 END), 0) AS total_expenses,
                 COUNT(*) AS total_transactions
             FROM transactions
-            WHERE sms_timestamp {date_filter}
-              AND wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''
-        """).fetchone()
+            WHERE wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''
+              {date_filter}
+        """, filter_params).fetchone()
         
         # حساب رصيد كل محفظة
         wallet_balances = {}
@@ -477,9 +491,9 @@ class DesktopDatabase:
         # حساب إجمالي الرسوم للشهر الحالي
         tx_rows = self._conn.execute(f"""
             SELECT * FROM transactions
-            WHERE sms_timestamp {date_filter}
-              AND wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''
-        """).fetchall()
+            WHERE wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''
+              {date_filter}
+        """, filter_params).fetchall()
         
         total_fees = 0.0
         wallet_fees = {}

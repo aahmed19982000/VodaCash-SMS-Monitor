@@ -76,15 +76,102 @@ class DashboardView(ft.Container):
         self.activity_list = ft.ListView(expand=True, spacing=10)
 
         # Month Selector Dropdown
+        # Month Selector Dropdown
         self.month_dropdown = ft.Dropdown(
             label="Period / الفترة",
             width=180,
-            on_select=self._handle_month_change,
+            options=[
+                ft.dropdown.Option("TODAY", "Today / اليوم"),
+                ft.dropdown.Option("YESTERDAY", "Yesterday / أمس"),
+                ft.dropdown.Option("THIS_WEEK", "This Week / هذا الأسبوع"),
+                ft.dropdown.Option("THIS_MONTH", "This Month / هذا الشهر"),
+                ft.dropdown.Option("ALL_TIME", "All Time / كل الأوقات"),
+                ft.dropdown.Option("CUSTOM", "Custom Period / فترة مخصصة"),
+            ],
+            value="THIS_MONTH",
+            on_select=self._handle_period_change,
             border_radius=12,
             bgcolor="#0B0F19",
             border_color=ft.Colors.WHITE24,
             focused_border_color=ft.Colors.BLUE_ACCENT,
             filled=True
+        )
+
+        # Date pickers
+        self.start_date_picker = ft.DatePicker(
+            on_change=self._handle_start_date_picked,
+            first_date=datetime(2024, 1, 1),
+            last_date=datetime(2030, 12, 31)
+        )
+        self.end_date_picker = ft.DatePicker(
+            on_change=self._handle_end_date_picked,
+            first_date=datetime(2024, 1, 1),
+            last_date=datetime(2030, 12, 31)
+        )
+        self.flet_page.overlay.append(self.start_date_picker)
+        self.flet_page.overlay.append(self.end_date_picker)
+
+        # Custom date text fields
+        self.start_date_field = ft.TextField(
+            label="Start / من",
+            value=datetime.now().strftime("%Y-%m-%d"),
+            width=135,
+            height=48,
+            text_size=13,
+            read_only=True,
+            border_radius=10,
+            bgcolor="#0B0F19",
+            border_color=ft.Colors.WHITE24,
+            focused_border_color=ft.Colors.BLUE_ACCENT,
+            filled=True,
+            suffix=ft.IconButton(
+                icon=ft.Icons.CALENDAR_MONTH_ROUNDED,
+                icon_size=18,
+                icon_color=ft.Colors.BLUE_400,
+                on_click=lambda e: self._open_start_picker()
+            )
+        )
+        self.end_date_field = ft.TextField(
+            label="End / إلى",
+            value=datetime.now().strftime("%Y-%m-%d"),
+            width=135,
+            height=48,
+            text_size=13,
+            read_only=True,
+            border_radius=10,
+            bgcolor="#0B0F19",
+            border_color=ft.Colors.WHITE24,
+            focused_border_color=ft.Colors.BLUE_ACCENT,
+            filled=True,
+            suffix=ft.IconButton(
+                icon=ft.Icons.CALENDAR_MONTH_ROUNDED,
+                icon_size=18,
+                icon_color=ft.Colors.BLUE_400,
+                on_click=lambda e: self._open_end_picker()
+            )
+        )
+
+        self.apply_btn = ft.ElevatedButton(
+            "Apply / تطبيق",
+            icon=ft.Icons.FILTER_ALT_ROUNDED,
+            color=ft.Colors.WHITE,
+            bgcolor="#1E8F8B",
+            on_click=self._handle_apply_custom_period,
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=10),
+                padding=ft.Padding(12, 10, 12, 10),
+            )
+        )
+
+        self.custom_date_row = ft.Row(
+            controls=[
+                self.start_date_field,
+                self.end_date_field,
+                self.apply_btn
+            ],
+            spacing=10,
+            alignment=ft.MainAxisAlignment.START,
+            visible=False
         )
 
         self.content = ft.Column(
@@ -94,6 +181,7 @@ class DashboardView(ft.Container):
                         ft.Icon(ft.Icons.DASHBOARD_ROUNDED, color=ft.Colors.BLUE_ACCENT, size=32),
                         ft.Text("Dashboard / لوحة التحكم", size=28, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
                         ft.Container(expand=True),
+                        self.custom_date_row,
                         self.month_dropdown,
                         ft.Container(width=10),
                         ft.ElevatedButton(
@@ -386,40 +474,73 @@ class DashboardView(ft.Container):
             on_hover=self._handle_card_hover
         )
 
-    def _handle_month_change(self, e):
+    def _open_start_picker(self):
+        self.start_date_picker.open = True
+        self.flet_page.update()
+
+    def _open_end_picker(self):
+        self.end_date_picker.open = True
+        self.flet_page.update()
+
+    def _handle_start_date_picked(self, e):
+        if self.start_date_picker.value:
+            self.start_date_field.value = self.start_date_picker.value.strftime("%Y-%m-%d")
+            self.start_date_field.update()
+
+    def _handle_end_date_picked(self, e):
+        if self.end_date_picker.value:
+            self.end_date_field.value = self.end_date_picker.value.strftime("%Y-%m-%d")
+            self.end_date_field.update()
+
+    def _handle_period_change(self, e):
+        if self.month_dropdown.value == "CUSTOM":
+            self.custom_date_row.visible = True
+        else:
+            self.custom_date_row.visible = False
+        self.custom_date_row.update()
+        self.update_data()
+
+    def _handle_apply_custom_period(self, e):
         self.update_data()
 
     def update_data(self):
         """يُستدعى لتحديث البيانات من قاعدة البيانات"""
-        # 1. Update month dropdown options dynamically
-        try:
-            available_months = self.db.get_available_months()
-        except Exception as e:
-            available_months = []
-            print(f"Error fetching months: {e}")
+        from datetime import datetime, timedelta
+        
+        selected_period = self.month_dropdown.value or "THIS_MONTH"
+        
+        start_date = None
+        end_date = None
+        db_month = None
+        
+        today = datetime.now()
+        
+        if selected_period == "TODAY":
+            start_date = today.strftime("%Y-%m-%d")
+            end_date = today.strftime("%Y-%m-%d")
+        elif selected_period == "YESTERDAY":
+            yesterday = today - timedelta(days=1)
+            start_date = yesterday.strftime("%Y-%m-%d")
+            end_date = yesterday.strftime("%Y-%m-%d")
+        elif selected_period == "THIS_WEEK":
+            days_since_saturday = (today.weekday() + 2) % 7
+            saturday = today - timedelta(days=days_since_saturday)
+            start_date = saturday.strftime("%Y-%m-%d")
+            end_date = today.strftime("%Y-%m-%d")
+        elif selected_period == "THIS_MONTH":
+            start_date = today.replace(day=1).strftime("%Y-%m-%d")
+            end_date = today.strftime("%Y-%m-%d")
+        elif selected_period == "ALL_TIME":
+            db_month = "ALL"
+        elif selected_period == "CUSTOM":
+            start_date = self.start_date_field.value
+            end_date = self.end_date_field.value
+        else:
+            db_month = selected_period
 
-        current_month = datetime.now().strftime("%Y-%m")
-        months_list = list(available_months)
-        if current_month not in months_list:
-            months_list.insert(0, current_month)
-
-        expected_keys = ["ALL"] + months_list
-        current_options_keys = [opt.key for opt in self.month_dropdown.options] if self.month_dropdown.options else []
-
-        if current_options_keys != expected_keys:
-            options = [ft.dropdown.Option("ALL", "All Time / كل الأوقات")]
-            for m in months_list:
-                options.append(ft.dropdown.Option(m, m))
-            self.month_dropdown.options = options
-            
-            # Default to current month if not set or invalid
-            if not self.month_dropdown.value or self.month_dropdown.value not in expected_keys:
-                self.month_dropdown.value = current_month
-
-        selected_period = self.month_dropdown.value
-        db_month = selected_period
-
-        kpi = self.db.get_kpi_summary(month=db_month)
+        # Fetch KPIs
+        kpi = self.db.get_kpi_summary(month=db_month, start_date=start_date, end_date=end_date)
+        
         self.balance_text.value = f"{kpi['current_balance']:,.2f} EGP"
         
         cash_summary = self.db.get_cash_summary()
@@ -437,7 +558,6 @@ class DashboardView(ft.Container):
         wallet_fees = kpi.get("wallet_fees", {})
         new_wallets = []
         
-        # نعرض فقط المحافظ التي يملكها العميل (توجد في wallet_balances)
         for w_id in WALLET_STYLING.keys():
             if w_id not in wallet_balances:
                 continue
@@ -449,18 +569,15 @@ class DashboardView(ft.Container):
         self.wallets_row.controls = new_wallets
 
         # تحديث قائمة آخر العمليات
-        if selected_period == "ALL":
+        try:
+            recent_txs = self.db.get_all_transactions(
+                start_date=start_date,
+                end_date=end_date,
+                limit=15
+            )
+        except Exception as e:
+            print(f"Error querying transactions for dashboard: {e}")
             recent_txs = self.db.get_all_transactions(limit=15)
-        else:
-            try:
-                year, month = map(int, selected_period.split('-'))
-                last_day = calendar.monthrange(year, month)[1]
-                start_date = f"{selected_period}-01"
-                end_date = f"{selected_period}-{last_day}"
-                recent_txs = self.db.get_all_transactions(start_date=start_date, end_date=end_date, limit=15)
-            except Exception as e:
-                print(f"Error parsing period for transactions query: {e}")
-                recent_txs = self.db.get_all_transactions(limit=15)
 
         new_activity = []
         
@@ -474,7 +591,7 @@ class DashboardView(ft.Container):
             )
         else:
             for tx in recent_txs:
-                tx_val = tx.type.value
+                tx_val = tx.type.value if hasattr(tx.type, "value") else str(tx.type)
                 is_received = tx_val in ["RECEIVED", "ATM_DEPOSIT"]
                 
                 if tx_val == "RECEIVED":
@@ -489,7 +606,7 @@ class DashboardView(ft.Container):
                     icon_color = ft.Colors.ORANGE_400
                     icon_name = ft.Icons.ATM_ROUNDED
                     row_bg = "#1A1008"
-                elif tx_val in ["SENT", "PURCHASE", "BILL"]:
+                elif tx_val in ["SENT", "PURCHASE", "BILL", "TOPUP"]:
                     icon_color = ft.Colors.RED_400
                     icon_name = ft.Icons.CALL_MADE_ROUNDED
                     row_bg = "#0D131F"
@@ -519,68 +636,70 @@ class DashboardView(ft.Container):
                 elif tx_val == "SENT":
                     cp_label = f"المستلم / To: {cp}"
                 elif tx_val == "TOPUP":
-                    cp_label = f"رقم الشحن / Top-up: {cp}"
+                    cp_label = f"رقم الشحن / Top-up To: {cp}"
                 elif tx_val == "BILL":
-                    cp_label = f"المستلم / Merchant: {cp}"
+                    cp_label = f"الجهة / Merchant: {cp}"
                 else:
                     cp_label = f"الطرف الآخر / Counterpart: {cp}"
+                
+                date_str = ""
+                if tx.sms_timestamp:
+                    try:
+                        date_str = tx.sms_timestamp.strftime("%Y-%m-%d %I:%M %p")
+                    except Exception:
+                        date_str = str(tx.sms_timestamp)
 
                 new_activity.append(
                     ft.Container(
                         content=ft.Row(
                             controls=[
-                                ft.Container(
-                                    content=ft.Icon(icon_name, color=icon_color, size=18),
-                                    bgcolor=ft.Colors.with_opacity(0.08, icon_color),
-                                    padding=8,
-                                    border_radius=20,
-                                    border=ft.Border.all(1, ft.Colors.with_opacity(0.15, icon_color)),
-                                    margin=ft.Margin(left=0, top=0, right=5, bottom=0)
-                                ),
-                                ft.Column(
+                                ft.Row(
                                     controls=[
-                                        ft.Row(
+                                        ft.Container(
+                                            content=ft.Icon(icon_name, color=icon_color, size=18),
+                                            bgcolor=ft.Colors.with_opacity(0.1, icon_color),
+                                            padding=8,
+                                            border_radius=10,
+                                        ),
+                                        ft.Column(
                                             controls=[
-                                                ft.Text(f"{tx.type.value} — {tx.amount:,.2f} EGP", weight=ft.FontWeight.BOLD, size=14, color=ft.Colors.WHITE),
-                                                fee_badge
-                                            ] if fee_badge else [ft.Text(f"{tx.type.value} — {tx.amount:,.2f} EGP", weight=ft.FontWeight.BOLD, size=14, color=ft.Colors.WHITE)],
-                                            spacing=10,
-                                            vertical_alignment=ft.CrossAxisAlignment.CENTER
-                                        ),
-                                        ft.Text(
-                                            f"{cp_label} | Date: {tx.sms_timestamp.strftime('%Y-%m-%d %H:%M')}" + (f" | Bal: {tx.balance_after:,.2f} EGP" if tx.balance_after >= 0 else ""),
-                                            color=ft.Colors.WHITE54,
-                                            size=11
-                                        ),
+                                                ft.Text(f"{tx.amount:,.2f} EGP", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+                                                ft.Text(cp_label, size=11, color=ft.Colors.WHITE54),
+                                            ],
+                                            spacing=2,
+                                            horizontal_alignment=ft.CrossAxisAlignment.START,
+                                        )
                                     ],
-                                    expand=True,
-                                    spacing=2
+                                    spacing=10,
+                                    expand=True
                                 ),
-                                ft.Container(
-                                    content=ft.Text(w_name, size=10, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
-                                    gradient=ft.LinearGradient(colors=w_colors),
-                                    padding=ft.Padding(left=10, top=5, right=10, bottom=5),
-                                    border_radius=12,
-                                    border=ft.Border.all(1, ft.Colors.with_opacity(0.2, w_style["accent_color"]))
+                                ft.Row(
+                                    controls=[
+                                        fee_badge if fee_badge else ft.Container(),
+                                        ft.Container(
+                                            content=ft.Text(w_name, size=10, color=w_style["accent_color"], weight=ft.FontWeight.W_500),
+                                            bgcolor=w_colors[0],
+                                            padding=ft.Padding(10, 4, 10, 4),
+                                            border_radius=8,
+                                        ),
+                                        ft.Text(date_str, size=11, color=ft.Colors.WHITE38),
+                                    ],
+                                    spacing=15,
+                                    alignment=ft.MainAxisAlignment.END
                                 )
                             ],
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                            vertical_alignment=ft.CrossAxisAlignment.CENTER
                         ),
-                        padding=12,
                         bgcolor=row_bg,
+                        padding=ft.Padding(15, 10, 15, 10),
                         border_radius=12,
-                        border=ft.Border(
-                            left=ft.BorderSide(4, icon_color),
-                            top=ft.BorderSide(1, ft.Colors.with_opacity(0.08, ft.Colors.WHITE)),
-                            right=ft.BorderSide(1, ft.Colors.with_opacity(0.08, ft.Colors.WHITE)),
-                            bottom=ft.BorderSide(1, ft.Colors.with_opacity(0.08, ft.Colors.WHITE))
-                        ),
+                        border=ft.Border.all(1, ft.Colors.WHITE10),
                     )
                 )
-        self.activity_list.controls = new_activity
         
+        self.activity_list.controls = new_activity
         self.flet_page.update()
+
 
     def _handle_resync(self, e):
         if not self.server or self.server.connected_clients == 0:
