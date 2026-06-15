@@ -1,0 +1,382 @@
+{% extends 'base.html' %}
+
+{% block title %}انتظار تأكيد الدفع - دفتر كاش (Daftar Cash){% endblock %}
+
+{% block extra_head %}
+<style>
+    .pending-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 70vh;
+        padding: 20px;
+    }
+
+    .pending-card {
+        background: rgba(30, 41, 59, 0.4);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 24px;
+        padding: 40px;
+        width: 100%;
+        max-width: 580px;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    }
+
+    .pulse-container {
+        position: relative;
+        width: 100px;
+        height: 100px;
+        margin: 0 auto 30px auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .pulse-circle {
+        position: absolute;
+        width: 80px;
+        height: 80px;
+        background: rgba(59, 130, 246, 0.15);
+        border: 2px solid var(--accent-blue);
+        border-radius: 50%;
+        animation: pulse 2s infinite ease-in-out;
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+    }
+
+    .pulse-circle-2 {
+        animation-delay: 0.6s;
+    }
+
+    .pulse-circle-3 {
+        animation-delay: 1.2s;
+    }
+
+    .center-icon {
+        position: relative;
+        font-size: 32px;
+        color: var(--accent-blue);
+        z-index: 10;
+        animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            transform: scale(0.9);
+            opacity: 1;
+        }
+        100% {
+            transform: scale(1.6);
+            opacity: 0;
+        }
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+    }
+
+    .info-box {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        padding: 20px;
+        margin: 25px 0;
+        text-align: right;
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .info-row:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+
+    .wallet-badge {
+        background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .timer-text {
+        font-family: 'Outfit', sans-serif;
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--accent-pink);
+        margin: 15px 0 5px 0;
+    }
+
+    .copy-btn {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        color: var(--accent-blue);
+        padding: 5px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .copy-btn:hover {
+        background: var(--accent-blue);
+        color: white;
+    }
+
+    .btn-whatsapp {
+        background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);
+        transition: all 0.3s ease;
+        margin-top: 15px;
+    }
+
+    .btn-whatsapp:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4);
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pending-container">
+    <div class="pending-card">
+        <!-- Pulse Indicator -->
+        <div class="pulse-container" id="status-indicator">
+            <div class="pulse-circle"></div>
+            <div class="pulse-circle pulse-circle-2"></div>
+            <div class="pulse-circle pulse-circle-3"></div>
+            <i class="fa-solid fa-spinner fa-spin center-icon" id="status-icon" style="color: var(--accent-blue);"></i>
+        </div>
+
+        <h2 id="main-title" style="font-size: 24px; font-weight: 800; margin-bottom: 10px;">في انتظار إتمام التحويل المالي...</h2>
+        <p id="main-desc" style="color: var(--text-secondary); font-size: 14px; max-width: 460px; margin: 0 auto; line-height: 1.6;">
+            يرجى إرسال المبلغ المطلوب عبر فودافون كاش. سيقوم نظامنا بالتقاط رسالة التحويل وتنشيط حسابك تلقائياً.
+            <br>
+            <span style="font-size: 12.5px; color: var(--accent-blue); display: block; margin-top: 8px; background: rgba(59, 130, 246, 0.08); padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(59, 130, 246, 0.15);">
+                💡 إذا قمت بالتحويل بالفعل، يرجى الانتظار حتى تكتمل المزامنة. وإذا انتهى الوقت ولم يتغير الكود، يمكنك مراسلتنا فوراً عبر الواتساب على الرقم <strong>01222820473</strong> مع إرفاق لقطة شاشة للتحويل.
+            </span>
+        </p>
+
+        <!-- Dynamic Timer -->
+        <div class="timer-text" id="countdown-timer">30:00</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">الوقت المتبقي لانتهاء صلاحية هذا الطلب</p>
+
+        <!-- Payment Instructions Box -->
+        <div class="info-box">
+            <div class="info-row">
+                <span style="color: var(--text-secondary);">المبلغ المطلوب:</span>
+                <strong style="font-size: 18px; color: var(--text-primary); font-family: Outfit;">
+                    {{ payment.amount|floatformat:2 }} ج.م
+                </strong>
+            </div>
+            <div class="info-row">
+                <span style="color: var(--text-secondary);">رقم محفظة الإدارة (المستلم):</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <strong style="color: var(--accent-blue); font-family: Outfit;" id="admin-wallet-num">{{ admin_wallet }}</strong>
+                    <button class="copy-btn" onclick="copyText('{{ admin_wallet }}', this)">
+                        <i class="fa-solid fa-copy"></i> نسخ
+                    </button>
+                </div>
+            </div>
+            <div class="info-row">
+                <span style="color: var(--text-secondary);">رقم محفظتك (المُرسِل):</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <strong style="color: var(--text-primary); font-family: Outfit;">{{ payment.sender_wallet }}</strong>
+                    <span class="wallet-badge">المرسل</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Indicator text -->
+        <div style="font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <i class="fa-solid fa-signal" style="color: var(--success-green); animation: pulse 1.5s infinite;"></i>
+            <span id="polling-status">جاري الاستعلام عن حالة الدفع تلقائياً...</span>
+        </div>
+
+        <div style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 25px;">
+            <a href="{% url 'dashboard' %}" class="btn-secondary" style="display: inline-block; padding: 10px 24px;">
+                <i class="fa-solid fa-house"></i> العودة للرئيسية والانتظار بالخلفية
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const paymentId = "{{ payment.transaction_id }}";
+    const statusUrl = "{% url 'check_payment_status' payment_id=payment.transaction_id %}";
+    let elapsedSeconds = 0;
+    let pollInterval = 5000; // 5 seconds initial
+    let timerIntervalId;
+    let pollTimeoutId;
+    
+    // Countdown timer calculation from expires_at
+    const expiresAt = new Date("{{ payment.expires_at|date:'c' }}").getTime();
+
+    function updateTimer() {
+        const now = new Date().getTime();
+        const distance = expiresAt - now;
+
+        if (distance < 0) {
+            clearInterval(timerIntervalId);
+            clearTimeout(pollTimeoutId);
+            document.getElementById("countdown-timer").innerText = "منتهي";
+            document.getElementById("countdown-timer").style.color = "var(--error-red)";
+            showStatusExpired();
+            return;
+        }
+
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+        document.getElementById("countdown-timer").innerText = 
+            (minutes < 10 ? "0" + minutes : minutes) + ":" + (seconds < 10 ? "0" + seconds : seconds);
+    }
+
+    // Copy to clipboard helper
+    function copyText(text, btn) {
+        navigator.clipboard.writeText(text).then(() => {
+            const origHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> تم النسخ';
+            btn.style.background = 'rgba(16, 185, 129, 0.15)';
+            btn.style.color = 'var(--success-green)';
+            btn.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            setTimeout(() => {
+                btn.innerHTML = origHTML;
+                btn.style.background = '';
+                btn.style.color = '';
+                btn.style.borderColor = '';
+            }, 2000);
+        });
+    }
+
+    function showStatusSuccess(licenseKey) {
+        // Stop all timers
+        clearInterval(timerIntervalId);
+        clearTimeout(pollTimeoutId);
+
+        // Update DOM elements for a premium success transition
+        document.getElementById("status-indicator").innerHTML = `
+            <div style="width: 80px; height: 80px; background: rgba(16, 185, 129, 0.15); border-radius: 50%; display: flex; justify-content: center; align-items: center; border: 2px solid var(--success-green); box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); animation: float 3s infinite;">
+                <i class="fa-solid fa-circle-check" style="font-size: 40px; color: var(--success-green);"></i>
+            </div>
+        `;
+        document.getElementById("main-title").innerText = "🎉 تم الدفع وتفعيل الاشتراك بنجاح!";
+        document.getElementById("main-title").style.color = "var(--success-green)";
+        document.getElementById("main-desc").innerHTML = `
+            مرحباً بك! لقد تم توليد ترخيصك بنجاح.<br>
+            كود الترخيص الخاص بك: <strong style="color: white; font-family: Outfit; font-size: 16px; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 8px; margin-top: 8px; display: inline-block;">${licenseKey}</strong>
+        `;
+        document.getElementById("countdown-timer").innerText = "مكتملة";
+        document.getElementById("countdown-timer").style.color = "var(--success-green)";
+        document.getElementById("polling-status").innerText = "جاري تحويلك إلى لوحة التحكم خلال 5 ثوانٍ...";
+
+        setTimeout(() => {
+            window.location.href = "{% url 'dashboard' %}";
+        }, 5000);
+    }
+
+    function showStatusExpired() {
+        document.getElementById("status-indicator").innerHTML = `
+            <div style="width: 80px; height: 80px; background: rgba(239, 68, 68, 0.15); border-radius: 50%; display: flex; justify-content: center; align-items: center; border: 2px solid var(--error-red); box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);">
+                <i class="fa-solid fa-circle-xmark" style="font-size: 40px; color: var(--error-red);"></i>
+            </div>
+        `;
+        document.getElementById("main-title").innerText = "عذراً، انتهت صلاحية هذا الطلب";
+        document.getElementById("main-title").style.color = "var(--error-red)";
+        document.getElementById("main-desc").innerHTML = `
+            لم يتم استلام الدفع وتأكيده تلقائياً قبل انتهاء الوقت المخصص (30 دقيقة).<br>
+            <strong>إذا قمت بالتحويل بالفعل:</strong> يرجى مراسلتنا عبر الواتساب على الرقم 01222820473 مع إرفاق صورة التحويل لتفعيل حسابك يدوياً فوراً.
+            <br>
+            <a href="https://wa.me/201222820473?text=${encodeURIComponent('مرحباً، لقد قمت بالتحويل لطلب الدفع رقم ' + paymentId + ' بمبلغ {{ payment.amount|floatformat:2 }} ج.م ولكن انتهت صلاحية الطلب. مرفق صورة التحويل.')}" target="_blank" class="btn-whatsapp">
+                <i class="fa-brands fa-whatsapp" style="font-size: 18px;"></i> مراسلتنا لتأكيد الدفع يدوياً (واتساب)
+            </a>
+        `;
+        document.getElementById("polling-status").innerText = "توقف الاستعلام التلقائي.";
+    }
+
+    function showStatusStopped() {
+        clearInterval(timerIntervalId);
+        clearTimeout(pollTimeoutId);
+        document.getElementById("status-indicator").innerHTML = `
+            <div style="width: 80px; height: 80px; background: rgba(245, 158, 11, 0.15); border-radius: 50%; display: flex; justify-content: center; align-items: center; border: 2px solid var(--accent-orange); box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);">
+                <i class="fa-solid fa-circle-exclamation" style="font-size: 40px; color: var(--accent-orange);"></i>
+            </div>
+        `;
+        document.getElementById("main-title").innerText = "انتهى وقت الاستعلام التلقائي المسموح به";
+        document.getElementById("main-desc").innerHTML = `
+            توقف الاستعلام التلقائي بعد مرور 10 دقائق لتوفير موارد الشبكة.<br>
+            <strong>إذا قمت بالتحويل بالفعل:</strong> يرجى مراسلتنا عبر الواتساب على الرقم 01222820473 مع إرفاق صورة التحويل لتفعيل حسابك يدوياً فوراً.
+            <br>
+            <a href="https://wa.me/201222820473?text=${encodeURIComponent('مرحباً، لقد قمت بالتحويل لطلب الدفع رقم ' + paymentId + ' بمبلغ {{ payment.amount|floatformat:2 }} ج.م ولم يتم التنشيط التلقائي بعد مرور 10 دقائق. مرفق صورة التحويل.')}" target="_blank" class="btn-whatsapp">
+                <i class="fa-brands fa-whatsapp" style="font-size: 18px;"></i> مراسلتنا لتأكيد الدفع يدوياً (واتساب)
+            </a>
+        `;
+        document.getElementById("polling-status").innerText = "يرجى التواصل مع الدعم وإرسال صورة التحويل يدوياً.";
+    }
+
+    function pollStatus() {
+        fetch(statusUrl)
+            .then(response => response.json())
+            .then(data => {
+                elapsedSeconds = data.elapsed_seconds;
+                
+                if (data.status === 'SUCCESS') {
+                    showStatusSuccess(data.license_key);
+                    return;
+                } else if (data.status === 'FAILED') {
+                    showStatusExpired();
+                    return;
+                }
+
+                // Apply Polling Schedule Logic
+                // 1. First 2 minutes (120 seconds): poll every 5s
+                // 2. From 2 minutes to 10 minutes (120s - 600s): poll every 15s
+                // 3. After 10 minutes (> 600s): stop polling and show warning to contact support
+                if (elapsedSeconds > 600) {
+                    showStatusStopped();
+                } else {
+                    if (elapsedSeconds > 120) {
+                        pollInterval = 15000;
+                        document.getElementById("polling-status").innerText = "الاستعلام يعمل الآن كل 15 ثانية...";
+                    } else {
+                        pollInterval = 5000;
+                    }
+                    pollTimeoutId = setTimeout(pollStatus, pollInterval);
+                }
+            })
+            .catch(err => {
+                console.error("Error polling payment status:", err);
+                pollTimeoutId = setTimeout(pollStatus, pollInterval);
+            });
+    }
+
+    // Start UI processes
+    timerIntervalId = setInterval(updateTimer, 1000);
+    updateTimer();
+    pollTimeoutId = setTimeout(pollStatus, pollInterval);
+</script>
+{% endblock %}

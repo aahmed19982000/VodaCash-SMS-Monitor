@@ -280,6 +280,22 @@ public class SmsMonitorService extends Service {
 
         processedCount++;
 
+        // ── إعادة التوجيه لبوابة الدفع (Gateway Mode) إذا كانت مفعلة ─────────
+        try {
+            SharedPreferences settingsPrefs = getSharedPreferences("VodaCashPrefs", MODE_PRIVATE);
+            boolean gatewayMode = settingsPrefs.getBoolean("gateway_mode", false);
+            if (gatewayMode) {
+                String gatewayUrl = settingsPrefs.getString("gateway_url", "");
+                String gatewayKey = settingsPrefs.getString("gateway_key", "");
+                if (gatewayUrl != null && !gatewayUrl.isEmpty()) {
+                    Log.i(TAG, "📡 Gateway Mode is enabled. Forwarding to: " + gatewayUrl);
+                    sendSmsToGateway(sender, body, timestamp, gatewayUrl, gatewayKey);
+                }
+            }
+        } catch (Exception ex) {
+            Log.e(TAG, "⚠️ Error checking/forwarding for Gateway Mode: " + ex.getMessage());
+        }
+
         try {
             // ── بناء JSON للإرسال ─────────────────────────────────────
             JSONObject payload = new JSONObject();
@@ -312,6 +328,66 @@ public class SmsMonitorService extends Service {
         } catch (Exception e) {
             Log.e(TAG, "❌ Error processing SMS: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * إرسال تفاصيل الرسالة إلى بوابة الدفع التلقائي للموقع (Django API) بشكل غير متزامن.
+     */
+    private void sendSmsToGateway(String sender, String body, long timestamp, String gatewayUrl, String gatewayKey) {
+        workerHandler.post(() -> {
+            java.net.HttpURLConnection conn = null;
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("sender", sender);
+                payload.put("body", body);
+                payload.put("timestamp", timestamp / 1000L); // Convert to seconds
+
+                byte[] postData = payload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+                java.net.URL url = new java.net.URL(gatewayUrl);
+                conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setConnectTimeout(10000); // 10 seconds
+                conn.setReadTimeout(10000);
+                conn.setDoOutput(true);
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setRequestProperty("Accept", "application/json");
+                
+                if (gatewayKey != null && !gatewayKey.isEmpty()) {
+                    conn.setRequestProperty("Authorization", "Bearer " + gatewayKey);
+                    conn.setRequestProperty("X-Gateway-Key", gatewayKey);
+                }
+
+                try (java.io.OutputStream os = conn.getOutputStream()) {
+                    os.write(postData, 0, postData.length);
+                }
+
+                int responseCode = conn.getResponseCode();
+                Log.i(TAG, "📡 Gateway Response Code: " + responseCode);
+                
+                if (responseCode >= 200 && responseCode < 300) {
+                    Log.i(TAG, "🟢 Gateway POST Success");
+                    try (java.io.InputStream is = conn.getInputStream();
+                         java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is))) {
+                        StringBuilder sb = new StringBuilder();
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            sb.append(line);
+                        }
+                        Log.d(TAG, "Gateway Response Body: " + sb.toString());
+                    }
+                } else {
+                    Log.e(TAG, "🔴 Gateway POST Failed with code: " + responseCode);
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error sending to Gateway API: " + e.getMessage(), e);
+            } finally {
+                if (conn != null) {
+                    conn.disconnect();
+                }
+            }
+        });
     }
 
     // ═════════════════════════════════════════════════════════════════════

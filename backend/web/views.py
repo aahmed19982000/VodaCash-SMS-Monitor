@@ -12,7 +12,8 @@ from django.http import JsonResponse, FileResponse, Http404
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
-from licensing.models import LicenseKey, Coupon, PaymentRecord
+from licensing.models import LicenseKey, Coupon, PaymentRecord, SiteConfiguration
+from licensing.utils import normalize_egyptian_phone
 
 logger = logging.getLogger(__name__)
 
@@ -359,53 +360,90 @@ def checkout_view(request, plan_type):
                 coupon_code = ""
 
         if action == 'pay':
-            # Perform payment mockup
             payment_method = request.POST.get('payment_method', 'Credit Card')
             client_phone = request.POST.get('client_phone', '').strip()
             
-            # Generate a new license key
-            key_format = f"VC-{plan_type[:4]}-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}"
-            duration = 30 if plan_type == 'MONTHLY' else 365
+            if payment_method == 'Vodafone Cash':
+                if not client_phone:
+                    messages.error(request, "يرجى إدخال رقم الهاتف المرتبط بالمحفظة.")
+                    return redirect('checkout', plan_type=plan_type)
+                
+                normalized_phone = normalize_egyptian_phone(client_phone)
+                if not normalized_phone.startswith('01') or len(normalized_phone) != 11:
+                    messages.error(request, "رقم الهاتف غير صحيح. يجب إدخال رقم هاتف مصري مكوّن من 11 رقماً (مثال: 01012345678).")
+                    return redirect('checkout', plan_type=plan_type)
+                
+                # Generate a suspended license key linked to the user
+                key_format = f"VC-{plan_type[:4]}-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}"
+                lic = LicenseKey.objects.create(
+                    key=key_format,
+                    user=request.user,
+                    client_name=request.user.username,
+                    client_phone=normalized_phone,
+                    type=plan_type,
+                    status='SUSPENDED',
+                    expires_at=timezone.now(), # not active yet
+                    coupon_used=coupon_code or None
+                )
+                
+                # Create pending payment record linking to the license key
+                tx_id = f"PEND-{uuid.uuid4().hex[:10].upper()}"
+                expires_at = timezone.now() + timedelta(minutes=30)
+                
+                PaymentRecord.objects.create(
+                    user=request.user,
+                    license_key=lic,
+                    amount=final_price,
+                    payment_method=payment_method,
+                    transaction_id=tx_id,
+                    sender_wallet=normalized_phone,
+                    status='PENDING',
+                    expires_at=expires_at,
+                    coupon_code=coupon_code or None
+                )
+                return redirect('checkout_pending', payment_id=tx_id)
             
-            # If coupon was valid, apply it and use it
-            if coupon_code:
-                try:
-                    coupon = Coupon.objects.get(code=coupon_code)
-                    if coupon.is_valid():
-                        coupon.uses_count += 1
-                        coupon.save()
-                except Coupon.DoesNotExist:
-                    pass
+            else:
+                # Credit Card Mockup Logic (keeps working as mockup for testing)
+                key_format = f"VC-{plan_type[:4]}-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}"
+                duration = 30 if plan_type == 'MONTHLY' else 365
+                
+                if coupon_code:
+                    try:
+                        coupon = Coupon.objects.get(code=coupon_code)
+                        if coupon.is_valid():
+                            coupon.uses_count += 1
+                            coupon.save()
+                    except Coupon.DoesNotExist:
+                        pass
 
-            expires_at = timezone.now() + timedelta(days=duration)
-            
-            # Create license
-            lic = LicenseKey.objects.create(
-                key=key_format,
-                user=request.user,
-                client_name=request.user.username,
-                client_phone=client_phone or getattr(request.user, 'phone', ''),
-                type=plan_type,
-                status='ACTIVE',
-                expires_at=expires_at,
-                coupon_used=coupon_code or None
-            )
-            
-            # Create payment record
-            tx_id = f"TXN-{uuid.uuid4().hex[:10].upper()}"
-            PaymentRecord.objects.create(
-                user=request.user,
-                license_key=lic,
-                amount=final_price,
-                payment_method=payment_method,
-                transaction_id=tx_id,
-                status='SUCCESS'
-            )
-            
-            send_license_email(request.user, lic.key, lic.type, lic.expires_at)
-            
-            messages.success(request, f"🎉 تم إتمام الدفع بنجاح وتوليد كود التفعيل: {lic.key}")
-            return redirect('dashboard')
+                expires_at_val = timezone.now() + timedelta(days=duration)
+                
+                lic = LicenseKey.objects.create(
+                    key=key_format,
+                    user=request.user,
+                    client_name=request.user.username,
+                    client_phone=client_phone or getattr(request.user, 'phone', ''),
+                    type=plan_type,
+                    status='ACTIVE',
+                    expires_at=expires_at_val,
+                    coupon_used=coupon_code or None
+                )
+                
+                tx_id = f"TXN-{uuid.uuid4().hex[:10].upper()}"
+                PaymentRecord.objects.create(
+                    user=request.user,
+                    license_key=lic,
+                    amount=final_price,
+                    payment_method=payment_method,
+                    transaction_id=tx_id,
+                    status='SUCCESS'
+                )
+                
+                send_license_email(request.user, lic.key, lic.type, lic.expires_at)
+                
+                messages.success(request, f"🎉 تم إتمام الدفع بنجاح وتوليد كود التفعيل: {lic.key}")
+                return redirect('dashboard')
 
     context = {
         "plan_type": plan_type,
@@ -416,6 +454,47 @@ def checkout_view(request, plan_type):
         "coupon_code": coupon_code
     }
     return render(request, 'web/checkout.html', context)
+
+
+@login_required
+def checkout_pending_view(request, payment_id):
+    payment = get_object_or_404(PaymentRecord, transaction_id=payment_id, user=request.user)
+    
+    if payment.status == 'SUCCESS':
+        messages.success(request, "🎉 تم تفعيل اشتراكك بنجاح!")
+        return redirect('dashboard')
+    elif payment.status == 'FAILED' or (payment.expires_at and timezone.now() > payment.expires_at):
+        if payment.status == 'PENDING':
+            payment.status = 'FAILED'
+            payment.save()
+        messages.error(request, "عذراً، انتهت صلاحية طلب الدفع هذا أو تم إلغاؤه.")
+        return redirect('dashboard')
+        
+    config = SiteConfiguration.get_solo()
+    context = {
+        "payment": payment,
+        "admin_wallet": config.admin_wallet,
+    }
+    return render(request, 'web/checkout_pending.html', context)
+
+
+@login_required
+def check_payment_status_api(request, payment_id):
+    payment = get_object_or_404(PaymentRecord, transaction_id=payment_id, user=request.user)
+    
+    if payment.status == 'PENDING' and payment.expires_at and timezone.now() > payment.expires_at:
+        payment.status = 'FAILED'
+        payment.save()
+        
+    elapsed_seconds = (timezone.now() - payment.created_at).total_seconds()
+    
+    return JsonResponse({
+        "status": payment.status,
+        "elapsed_seconds": int(elapsed_seconds),
+        "expires_in": int((payment.expires_at - timezone.now()).total_seconds()) if payment.expires_at else 0,
+        "license_key": payment.license_key.key if payment.license_key else None
+    })
+
 
 def backend_login_view(request):
     if request.user.is_authenticated:

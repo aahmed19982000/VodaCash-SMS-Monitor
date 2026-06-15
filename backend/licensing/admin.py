@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import LicenseKey, Coupon, PaymentRecord, UnclassifiedSMSReport
+from .models import LicenseKey, Coupon, PaymentRecord, UnclassifiedSMSReport, UnmatchedTransaction, SiteConfiguration
 
 @admin.register(LicenseKey)
 class LicenseKeyAdmin(admin.ModelAdmin):
@@ -15,13 +15,25 @@ class CouponAdmin(admin.ModelAdmin):
 
 @admin.register(PaymentRecord)
 class PaymentRecordAdmin(admin.ModelAdmin):
-    list_display = ('user', 'license_key', 'amount', 'payment_method', 'transaction_id', 'created_at')
+    list_display = ('user', 'license_key', 'amount', 'payment_method', 'transaction_id', 'sender_wallet', 'status', 'created_at')
     list_filter = ('payment_method', 'status', 'created_at')
-    search_fields = ('transaction_id', 'user__username')
+    search_fields = ('transaction_id', 'user__username', 'sender_wallet')
 
 @admin.register(UnclassifiedSMSReport)
 class UnclassifiedSMSReportAdmin(admin.ModelAdmin):
     list_display = ('sender', 'reported_at', 'mac_address', 'license_key')
     list_filter = ('reported_at', 'sender')
     search_fields = ('sender', 'raw_sms', 'mac_address', 'license_key')
+
+@admin.register(UnmatchedTransaction)
+class UnmatchedTransactionAdmin(admin.ModelAdmin):
+    list_display = ('parsed_sender', 'parsed_amount', 'parsed_transaction_id', 'received_at', 'resolved')
+    list_filter = ('resolved', 'received_at', 'parsed_sender')
+    search_fields = ('parsed_sender', 'parsed_transaction_id', 'raw_sms_body', 'admin_notes')
+    list_editable = ('resolved',)
+
+@admin.register(SiteConfiguration)
+class SiteConfigurationAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'admin_wallet', 'gateway_api_key')
+
 

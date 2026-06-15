@@ -54,16 +54,65 @@ class Coupon(models.Model):
         return f"{self.code} ({self.discount_percent}% / {self.trial_days} days)"
 
 class PaymentRecord(models.Model):
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending (معلقة)'),
+        ('SUCCESS', 'Success (ناجحة)'),
+        ('FAILED', 'Failed (فشلت)'),
+    )
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    license_key = models.ForeignKey(LicenseKey, on_delete=models.CASCADE)
+    license_key = models.ForeignKey(LicenseKey, on_delete=models.SET_NULL, null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(max_length=50) # e.g. Credit Card, Vodafone Cash
-    transaction_id = models.CharField(max_length=100, unique=True)
-    status = models.CharField(max_length=20, default='SUCCESS')
+    transaction_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    sender_wallet = models.CharField(max_length=20, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    coupon_code = models.CharField(max_length=50, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if self.sender_wallet:
+            from .utils import normalize_egyptian_phone
+            self.sender_wallet = normalize_egyptian_phone(self.sender_wallet)
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.user.username} - {self.amount} EGP ({self.transaction_id})"
+        return f"{self.user.username} - {self.amount} EGP ({self.status})"
+
+
+class UnmatchedTransaction(models.Model):
+    raw_sms_body = models.TextField()
+    parsed_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    parsed_sender = models.CharField(max_length=20)
+    parsed_transaction_id = models.CharField(max_length=100, unique=True)
+    received_at = models.DateTimeField(auto_now_add=True)
+    resolved = models.BooleanField(default=False)
+    admin_notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"Unmatched {self.parsed_amount} EGP from {self.parsed_sender} ({self.parsed_transaction_id})"
+
+
+class SiteConfiguration(models.Model):
+    admin_wallet = models.CharField(max_length=20, default="01000000000", verbose_name="محفظة المدير المستلمة")
+    gateway_api_key = models.CharField(max_length=100, default="default_key_123456", verbose_name="مفتاح الـ API المشترك للبوابة")
+
+    class Meta:
+        verbose_name = "إعدادات الموقع"
+        verbose_name_plural = "إعدادات الموقع"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_solo(cls):
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "إعدادات الموقع الموحدة"
+
 
 
 class UnclassifiedSMSReport(models.Model):

@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.utils import timezone
 from datetime import timedelta
 import json
-from .models import LicenseKey, Coupon
+from .models import LicenseKey, Coupon, PaymentRecord, UnmatchedTransaction, SiteConfiguration
 
 class LicensingAPITestCase(TestCase):
     def setUp(self):
@@ -274,4 +274,143 @@ class AccountLoginLicensingTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["success"])
         self.assertIn("غير صحيحة", response.json()["message"])
+
+
+class PaymentCallbackAPITestCase(TestCase):
+    def setUp(self):
+        self.config = SiteConfiguration.get_solo()
+        self.config.gateway_api_key = "secure_test_key_123"
+        self.config.save()
+
+        self.user = User.objects.create_user(
+            username="payment_user",
+            email="pay@example.com",
+            password="password123"
+        )
+
+        self.pending_license = LicenseKey.objects.create(
+            key="VC-PENDING-KEY-999",
+            user=self.user,
+            client_name="payment_user",
+            type="MONTHLY",
+            status="SUSPENDED",
+            expires_at=timezone.now()
+        )
+
+        self.pending_payment = PaymentRecord.objects.create(
+            user=self.user,
+            license_key=self.pending_license,
+            amount=150.00,
+            payment_method="Vodafone Cash",
+            transaction_id="PEND-TEST1234",
+            sender_wallet="01012345678",
+            status="PENDING",
+            expires_at=timezone.now() + timedelta(minutes=30)
+        )
+
+    def test_callback_unauthorized(self):
+        response = self.client.post(
+            '/api/v1/payment/callback/',
+            data=json.dumps({
+                "sender": "Vodafone",
+                "body": "تم استلام مبلغ 150 جنيه من رقم 01012345678.",
+                "timestamp": timezone.now().timestamp()
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(response.json()["success"])
+
+        response = self.client.post(
+            '/api/v1/payment/callback/',
+            headers={"Authorization": "Bearer WRONG_KEY"},
+            data=json.dumps({
+                "sender": "Vodafone",
+                "body": "تم استلام مبلغ 150 جنيه من رقم 01012345678.",
+                "timestamp": timezone.now().timestamp()
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_callback_expired_timestamp(self):
+        old_timestamp = timezone.now().timestamp() - 601
+        response = self.client.post(
+            '/api/v1/payment/callback/',
+            headers={"Authorization": "Bearer secure_test_key_123"},
+            data=json.dumps({
+                "sender": "Vodafone",
+                "body": "تم استلام مبلغ 150 جنيه من رقم 01012345678.",
+                "timestamp": old_timestamp
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("expired", response.json()["message"])
+
+    def test_callback_success_matching(self):
+        sms_body = "تم استلام مبلغ 150 جنيه من رقم 01012345678. رصيدك الحالي: 200.0 جنيه. تاريخ العملية: 12:00 26-05-14. رقم العملية: 9876543210"
+        
+        response = self.client.post(
+            '/api/v1/payment/callback/',
+            headers={"Authorization": "Bearer secure_test_key_123"},
+            data=json.dumps({
+                "sender": "VF-Cash",
+                "body": sms_body,
+                "timestamp": timezone.now().timestamp()
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["details"]["status"], "SUCCESS")
+
+        payment = PaymentRecord.objects.get(id=self.pending_payment.id)
+        self.assertEqual(payment.status, "SUCCESS")
+        self.assertEqual(payment.transaction_id, "9876543210")
+
+        lic = LicenseKey.objects.get(key="VC-PENDING-KEY-999")
+        self.assertEqual(lic.status, "ACTIVE")
+        self.assertTrue(lic.expires_at > timezone.now() + timedelta(days=29))
+
+    def test_callback_duplicate_transaction(self):
+        self.pending_payment.status = "SUCCESS"
+        self.pending_payment.transaction_id = "9876543210"
+        self.pending_payment.save()
+
+        sms_body = "تم استلام مبلغ 150 جنيه من رقم 01012345678. رصيدك الحالي: 200.0 جنيه. تاريخ العملية: 12:00 26-05-14. رقم العملية: 9876543210"
+        response = self.client.post(
+            '/api/v1/payment/callback/',
+            headers={"Authorization": "Bearer secure_test_key_123"},
+            data=json.dumps({
+                "sender": "VF-Cash",
+                "body": sms_body,
+                "timestamp": timezone.now().timestamp()
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Duplicate", response.json()["message"])
+
+    def test_callback_unmatched_logged(self):
+        sms_body = "تم استلام مبلغ 500 جنيه من رقم 01099999999. رصيدك الحالي: 500.0 جنيه. تاريخ العملية: 12:00 26-05-14. رقم العملية: 1112223334"
+        response = self.client.post(
+            '/api/v1/payment/callback/',
+            headers={"Authorization": "Bearer secure_test_key_123"},
+            data=json.dumps({
+                "sender": "VF-Cash",
+                "body": sms_body,
+                "timestamp": timezone.now().timestamp()
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["success"])
+
+        unmatched_exists = UnmatchedTransaction.objects.filter(parsed_transaction_id="1112223334").exists()
+        self.assertTrue(unmatched_exists)
+        unmatched = UnmatchedTransaction.objects.get(parsed_transaction_id="1112223334")
+        self.assertEqual(unmatched.parsed_amount, 500.00)
+        self.assertEqual(unmatched.parsed_sender, "01099999999")
 
