@@ -13,5 +13,8 @@ urlpatterns = [
     path('update-license-status/', views.update_license_status, name='update_license_status'),
     path('login-license/', views.login_license, name='login_license'),
     path('report-unclassified-sms/', views.report_unclassified_sms, name='report_unclassified_sms'),
+    path('patterns/', views.get_patterns, name='get_patterns'),
+    path('parser-rules/', views.get_parser_rules, name='get_parser_rules'),
+    path('transactions/', views.post_transaction, name='post_transaction'),
     path('v1/payment/callback/', api.payment_callback_api, name='payment_callback_api'),
 ]

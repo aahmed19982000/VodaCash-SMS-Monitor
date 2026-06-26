@@ -8,6 +8,43 @@ from mobile.parser.patterns import PATTERNS
 from mobile.parser.classifier import SMSClassifier
 
 class SMSEngine:
+    _loaded_patterns = None
+
+    @classmethod
+    def set_patterns(cls, patterns_list: list):
+        """
+        تحميل أنماط جديدة ديناميكياً من السيرفر.
+        """
+        import re
+        from shared.models import TransactionType
+        
+        compiled_patterns = []
+        for p in patterns_list:
+            try:
+                tx_type = p["type"]
+                if isinstance(tx_type, str):
+                    tx_type = TransactionType(tx_type)
+                
+                regex_obj = p["regex"]
+                if isinstance(regex_obj, str):
+                    regex_obj = re.compile(regex_obj, re.IGNORECASE | re.DOTALL)
+                
+                compiled_patterns.append({
+                    "id": p["id"],
+                    "type": tx_type,
+                    "regex": regex_obj,
+                    "groups": p["groups"]
+                })
+            except Exception:
+                continue
+        cls._loaded_patterns = compiled_patterns
+
+    @classmethod
+    def get_patterns(cls):
+        if cls._loaded_patterns is not None:
+            return cls._loaded_patterns
+        return PATTERNS
+
     @staticmethod
     def parse(raw_sms: str, sender: str = None) -> Transaction:
         """
@@ -21,7 +58,7 @@ class SMSEngine:
         wallet_id = SMSClassifier.detect_wallet(sender, raw_sms)
 
         # 2. محاولة مطابقة الأنماط الثابتة (Regex Patterns)
-        for pattern_info in PATTERNS:
+        for pattern_info in SMSEngine.get_patterns():
             match = pattern_info["regex"].search(raw_sms)
             if match:
                 tx = SMSEngine._create_transaction(match, pattern_info, raw_sms)

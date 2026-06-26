@@ -16,6 +16,7 @@ class TransactionType(Enum):
     BALANCE        = "BALANCE"         # استعلام رصيد
     ATM_WITHDRAWAL = "ATM_WITHDRAWAL"  # سحب نقدي من ATM / فرع
     ATM_DEPOSIT    = "ATM_DEPOSIT"     # إيداع نقدي في ATM / فرع
+    FEE            = "FEE"             # خصم خدمة / رسوم
     UNKNOWN        = "UNKNOWN"         # غير مصنف
 
 

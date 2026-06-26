@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import LicenseKey, Coupon, PaymentRecord, UnclassifiedSMSReport, UnmatchedTransaction, SiteConfiguration
+from .models import LicenseKey, Coupon, PaymentRecord, UnclassifiedSMSReport, UnmatchedTransaction, SiteConfiguration, MerchantTransaction
 
 @admin.register(LicenseKey)
 class LicenseKeyAdmin(admin.ModelAdmin):
@@ -35,5 +35,11 @@ class UnmatchedTransactionAdmin(admin.ModelAdmin):
 @admin.register(SiteConfiguration)
 class SiteConfigurationAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'admin_wallet', 'gateway_api_key')
+
+@admin.register(MerchantTransaction)
+class MerchantTransactionAdmin(admin.ModelAdmin):
+    list_display = ('user', 'license_key', 'transaction_id', 'type', 'amount', 'balance_after', 'wallet_id', 'sms_timestamp')
+    list_filter = ('type', 'wallet_id', 'sms_timestamp', 'created_at')
+    search_fields = ('transaction_id', 'user__username', 'counterpart', 'raw_sms')
 
 

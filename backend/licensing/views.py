@@ -327,8 +327,140 @@ def report_unclassified_sms(request):
             mac_address=mac_addr,
             license_key=license_key
         )
+        
+        # Trigger Gemini AI dynamically to analyze the raw SMS and create a parser pattern
+        import threading
+        from .ai_service import GeminiParserGenerator
+        threading.Thread(
+            target=GeminiParserGenerator.analyze_and_create_pattern,
+            args=(raw_sms, sender),
+            daemon=True
+        ).start()
+
         return JsonResponse({"success": True, "message": "تم إرسال الرسالة للتحليل بنجاح."})
     except Exception as e:
         return json_error(f"Failed to save report: {str(e)}")
+
+
+@csrf_exempt
+def get_patterns(request):
+    """
+    إرجاع جميع أنماط تحليل الرسائل النشطة على السيرفر بصيغة JSON لجميع العملاء.
+    """
+    from .models import SMSPattern
+    patterns = SMSPattern.objects.filter(is_active=True)
+    patterns_list = []
+    for p in patterns:
+        try:
+            groups = json.loads(p.groups_json)
+        except Exception:
+            groups = {}
+        patterns_list.append({
+            "id": p.pattern_id,
+            "type": p.type,
+            "regex": p.regex_pattern,
+            "groups": groups
+        })
+    return JsonResponse({"success": True, "patterns": patterns_list})
+
+
+@csrf_exempt
+def get_parser_rules(request):
+    """
+    Endpoint لقواعد التحليل (GET /parser-rules) يرجع آخر نسخة محدثة من النماذج لكل شبكة.
+    """
+    if request.method != 'GET':
+        return JsonResponse({"success": False, "message": "Method not allowed"}, status=405)
+    return get_patterns(request)
+
+
+@csrf_exempt
+def post_transaction(request):
+    """
+    Endpoint لتسجيل المعاملات (POST /transactions) يستقبل كل عملية من تطبيق الديسكتوب
+    ويخزنها على السيرفر مربوطة بحساب التاجر/المحل.
+    """
+    if request.method != 'POST':
+        return JsonResponse({"success": False, "message": "Method not allowed"}, status=405)
+
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        return JsonResponse({"success": False, "message": "Invalid JSON payload"}, status=400)
+
+    # 1. المصادقة عبر مفتاح الترخيص
+    license_key = data.get("license_key") or request.headers.get("X-License-Key")
+    if not license_key:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            license_key = auth_header.split(" ")[1]
+
+    if not license_key:
+        return JsonResponse({"success": False, "message": "يرجى تقديم مفتاح الترخيص (license_key)"}, status=401)
+
+    from .models import LicenseKey, MerchantTransaction
+    try:
+        lic_obj = LicenseKey.objects.get(key=license_key)
+    except LicenseKey.DoesNotExist:
+        return JsonResponse({"success": False, "message": "مفتاح الترخيص غير موجود."}, status=404)
+
+    if not lic_obj.is_valid():
+        return JsonResponse({"success": False, "message": "الترخيص منتهي الصلاحية أو غير نشط."}, status=403)
+
+    if not lic_obj.user:
+        return JsonResponse({"success": False, "message": "مفتاح الترخيص غير مرتبط بمستحدم."}, status=400)
+
+    # 2. استخراج بيانات المعاملة
+    tx_id = data.get("transaction_id")
+    tx_type = data.get("type")
+    amount_raw = data.get("amount", 0)
+    balance_after_raw = data.get("balance_after", 0)
+    counterpart = data.get("counterpart", "")
+    raw_sms = data.get("raw_sms", "")
+    parsed_at_str = data.get("parsed_at")
+    sms_timestamp_str = data.get("sms_timestamp")
+    confidence = data.get("confidence", 1.0)
+    wallet_id = data.get("wallet_id", "")
+    profit_status = data.get("profit_status", "UNSET")
+
+    if not tx_id or not tx_type:
+        return JsonResponse({"success": False, "message": "بيانات المعاملة غير كاملة (يجب توفير transaction_id و type)"}, status=400)
+
+    from django.utils.dateparse import parse_datetime
+    from django.utils import timezone
+
+    parsed_at = parse_datetime(parsed_at_str) if parsed_at_str else timezone.now()
+    sms_timestamp = parse_datetime(sms_timestamp_str) if sms_timestamp_str else timezone.now()
+
+    # لمنع أخطاء الـ None في حالة عدم نجاح التحويل
+    if not parsed_at:
+        parsed_at = timezone.now()
+    if not sms_timestamp:
+        sms_timestamp = timezone.now()
+
+    # 3. حفظ/تحديث المعاملة (Idempotency)
+    try:
+        tx_obj, created = MerchantTransaction.objects.update_or_create(
+            transaction_id=tx_id,
+            defaults={
+                'user': lic_obj.user,
+                'license_key': lic_obj,
+                'type': tx_type,
+                'amount': amount_raw,
+                'balance_after': balance_after_raw,
+                'counterpart': counterpart,
+                'raw_sms': raw_sms,
+                'parsed_at': parsed_at,
+                'sms_timestamp': sms_timestamp,
+                'confidence': confidence,
+                'wallet_id': wallet_id,
+                'profit_status': profit_status,
+            }
+        )
+        msg = "تم حفظ المعاملة بنجاح." if created else "تم تحديث المعاملة بنجاح."
+        return JsonResponse({"success": True, "message": msg, "created": created})
+    except Exception as save_err:
+        return JsonResponse({"success": False, "message": f"خطأ أثناء حفظ المعاملة: {str(save_err)}"}, status=500)
+
 
 

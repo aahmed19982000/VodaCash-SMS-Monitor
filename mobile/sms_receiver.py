@@ -1,12 +1,17 @@
 # mobile/sms_receiver.py
 # ── الجسر بين Android BroadcastReceiver و Python Parser ──────────────────
 
+import httpx
+import threading
+import logging
 from datetime import datetime
 from shared.models import Transaction, TransactionType, UnclassifiedSMS
 from shared.config import CONFIDENCE_THRESHOLD
 from mobile.parser.engine import SMSEngine
 from mobile.parser.classifier import SMSClassifier
 from mobile.db.database import MobileDatabase
+
+logger = logging.getLogger("VodaCash.SmsReceiver")
 
 
 class SmsReceiver:
@@ -44,9 +49,12 @@ class SmsReceiver:
             # حفظ في قاعدة البيانات المحلية
             self._db.save_transaction(tx)
 
-            # إرسال عبر Broadcaster
+            # إرسال عبر Broadcaster للديسكتوب
             if self._broadcaster:
                 self._broadcaster.broadcast_transaction(tx)
+                
+            # الرفع الفوري للسيرفر المركزي إن أمكن
+            self.upload_transaction_to_server(tx)
         else:
             # رسالة غير مصنفة
             unclassified = UnclassifiedSMS(
@@ -59,8 +67,40 @@ class SmsReceiver:
 
         return tx
 
+    def upload_transaction_to_server(self, tx: Transaction):
+        """الرفع الفوري للمعاملة إلى السيرفر المركزي بشكل منفصل"""
+        direct_sync = self._db.get_setting("direct_sync", "0") == "1"
+        if not direct_sync:
+            return
+
+        server_url = self._db.get_setting("server_url", "http://127.0.0.1:8000/api")
+        license_key = self._db.get_setting("license_key", "")
+        if not license_key:
+            logger.warning("⚠️ Cannot sync directly to server: No license key configured.")
+            return
+
+        def _run():
+            try:
+                api_url = f"{server_url}/transactions/"
+                payload = tx.to_dict()
+                payload["license_key"] = license_key
+                payload["profit_status"] = tx.profit_status
+                
+                response = httpx.post(api_url, json=payload, timeout=10.0)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("success", False):
+                        self._db.mark_server_synced([tx.transaction_id])
+                        logger.info(f"✅ Transaction {tx.transaction_id} synced directly to server successfully.")
+                        return
+                logger.warning(f"⚠️ Direct sync failed for {tx.transaction_id}: {response.status_code} {response.text}")
+            except Exception as e:
+                logger.error(f"❌ Connection error during direct transaction sync: {e}")
+
+        threading.Thread(target=_run, daemon=True).start()
+
     def sync_pending(self):
-        """إرسال العمليات المعلقة التي لم تتم مزامنتها."""
+        """إرسال العمليات المعلقة التي لم تتم مزامنتها مع الديسكتوب."""
         unsynced = self._db.get_unsynced_transactions()
         if not unsynced or not self._broadcaster:
             return 0
@@ -75,6 +115,42 @@ class SmsReceiver:
             self._db.log_sync(len(synced_ids))
 
         return len(synced_ids)
+
+    def sync_server_pending(self):
+        """مزامنة كافة المعاملات غير المرفوعة للسيرفر تلقائياً"""
+        direct_sync = self._db.get_setting("direct_sync", "0") == "1"
+        if not direct_sync:
+            return 0
+            
+        unsynced = self._db.get_unsynced_server_transactions()
+        if not unsynced:
+            return 0
+            
+        server_url = self._db.get_setting("server_url", "http://127.0.0.1:8000/api")
+        license_key = self._db.get_setting("license_key", "")
+        if not license_key:
+            return 0
+
+        logger.info(f"🔄 Found {len(unsynced)} unsynced transactions for cloud server. Syncing...")
+        success_count = 0
+        for tx in unsynced:
+            try:
+                api_url = f"{server_url}/transactions/"
+                payload = tx.to_dict()
+                payload["license_key"] = license_key
+                payload["profit_status"] = tx.profit_status
+                
+                response = httpx.post(api_url, json=payload, timeout=8.0)
+                if response.status_code == 200 and response.json().get("success", False):
+                    self._db.mark_server_synced([tx.transaction_id])
+                    success_count += 1
+            except Exception as e:
+                logger.error(f"❌ Error syncing transaction {tx.transaction_id} to server: {e}")
+                break # توقف عند انقطاع الاتصال
+                
+        if success_count > 0:
+            logger.info(f"📊 Cloud sync complete: {success_count}/{len(unsynced)} successfully uploaded.")
+        return success_count
 
     @property
     def stats(self) -> dict:

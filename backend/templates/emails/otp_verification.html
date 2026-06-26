@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>رمز التحقق لـ دفتر كاش</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F8FAFC;
+            color: #1E293B;
+            margin: 0;
+            padding: 0;
+            -webkit-text-size-adjust: none;
+            -ms-text-size-adjust: none;
+            text-align: right;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #FFFFFF;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(15, 60, 109, 0.05);
+            border: 1px solid #E2E8F0;
+        }
+        .header {
+            background: linear-gradient(135deg, #0F3C6D 0%, #1E8F8B 100%);
+            padding: 30px 20px;
+            text-align: center;
+            color: #FFFFFF;
+        }
+        .header h1 {
+            margin: 10px 0 0 0;
+            font-size: 24px;
+            font-weight: 800;
+        }
+        .content {
+            padding: 40px 30px;
+            line-height: 1.6;
+        }
+        .title {
+            color: #0F3C6D;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+        .otp-container {
+            background-color: #F1F5F9;
+            border: 2px dashed #1E8F8B;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 25px 0;
+            text-align: center;
+        }
+        .otp-code {
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: 6px;
+            color: #0F3C6D;
+            font-family: monospace, Courier, monospace;
+        }
+        .expiry-note {
+            font-size: 13px;
+            color: #64748B;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .footer {
+            background-color: #F8FAFC;
+            padding: 25px;
+            text-align: center;
+            font-size: 12px;
+            color: #64748B;
+            border-top: 1px solid #E2E8F0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>دفتر كاش - Daftar Cash</h1>
+        </div>
+        <div class="content">
+            <div class="title">مرحباً {{ user.username }}،</div>
+            <p>نشكرك على التسجيل في دفتر كاش. لإكمال عملية إنشاء الحساب وتفعيل فترتك التجريبية المجانية، يرجى استخدام رمز التحقق المؤقت التالي:</p>
+            
+            <div class="otp-container">
+                <div class="otp-code">{{ otp }}</div>
+                <div class="expiry-note">هذا الرمز صالح لمدة 15 دقيقة فقط. يرجى عدم مشاركته مع أي شخص.</div>
+            </div>
+            
+            <p>إذا لم تكن قد طلبت هذا الرمز، يمكنك تجاهل هذا البريد الإلكتروني بأمان.</p>
+        </div>
+        <div class="footer">
+            جميع الحقوق محفوظة لـ دفتر كاش &copy; {% now "Y" %}
+        </div>
+    </div>
+</body>
+</html>

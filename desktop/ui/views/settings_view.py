@@ -49,6 +49,15 @@ class SettingsView(ft.Container):
             active_color=ft.Colors.BLUE_ACCENT,
             label_text_style=ft.TextStyle(size=13, color=ft.Colors.WHITE)
         )
+        
+        track_instapay_val = self.db.get_setting("track_instapay", "true") == "true" if self.db else True
+        self.switch_track_instapay = ft.Switch(
+            label="تتبع عمليات انستا باي (Track InstaPay)",
+            value=track_instapay_val,
+            on_change=self.on_track_instapay_change,
+            active_color=ft.Colors.BLUE_ACCENT,
+            label_text_style=ft.TextStyle(size=13, color=ft.Colors.WHITE)
+        )
 
         # جلب الـ IP المحلي
         self.local_ips = self.get_local_ips()
@@ -164,6 +173,7 @@ class SettingsView(ft.Container):
                     ft.Container(height=5),
                     self.switch_notifications,
                     self.switch_sound,
+                    self.switch_track_instapay,
                 ],
                 spacing=10
             ),
@@ -527,12 +537,33 @@ class SettingsView(ft.Container):
         self.flet_page.snack_bar.open = True
         self.flet_page.update()
 
+    def on_track_instapay_change(self, e):
+        val = "true" if self.switch_track_instapay.value else "false"
+        if self.db:
+            self.db.set_setting("track_instapay", val)
+            
+        # Refresh current settings view to immediately update layout
+        try:
+            self.update_data()
+        except Exception as ex:
+            print(f"Error updating settings UI: {ex}")
+
+        self.flet_page.snack_bar = ft.SnackBar(
+            content=ft.Text("تم حفظ إعدادات تتبع انستا باي بنجاح!", size=16, weight=ft.FontWeight.BOLD),
+            bgcolor=ft.Colors.BLUE_700,
+        )
+        self.flet_page.snack_bar.open = True
+        self.flet_page.update()
+
     def build_balances_section(self):
         kpi = self.db.get_kpi_summary() if self.db else {}
         wallet_balances = kpi.get("wallet_balances", {})
         
         controls = []
+        track_instapay = self.db.get_setting("track_instapay", "true") == "true" if self.db else True
         for w_id, w_name in self.wallet_names.items():
+            if w_id == "bank" and not track_instapay:
+                continue
             current_bal = wallet_balances.get(w_id, 0.0)
             
             tf = ft.TextField(
@@ -666,7 +697,10 @@ class SettingsView(ft.Container):
         self.fee_withdraw_min_inputs = {}
         
         controls = []
+        track_instapay = self.db.get_setting("track_instapay", "true") == "true" if self.db else True
         for w_id, w_name in self.wallet_names.items():
+            if w_id == "bank" and not track_instapay:
+                continue
             # Get current values from DB (defaults are 0.0)
             dep_fee = self.db.get_setting(f"fee_deposit_{w_id}", "0.0") if self.db else "0.0"
             wth_fee = self.db.get_setting(f"fee_withdraw_{w_id}", "0.0") if self.db else "0.0"
@@ -841,6 +875,13 @@ class SettingsView(ft.Container):
         """تحديث قيم الأرصدة والرسوم المعروضة من قاعدة البيانات"""
         if not self.db:
             return
+            
+        # Rebuild Balances and Fees UI sections to respect track_instapay toggle status instantly
+        if hasattr(self, 'balances_container'):
+            self.balances_container.content = self.build_balances_section()
+        if hasattr(self, 'fees_container'):
+            self.fees_container.content = self.build_fees_section()
+
         # 1. Balances
         kpi = self.db.get_kpi_summary()
         wallet_balances = kpi.get("wallet_balances", {})
@@ -892,6 +933,9 @@ class SettingsView(ft.Container):
             else:
                 self.license_info_text.value = "❌ لا يوجد كود تفعيل نشط حالياً."
                 self.deactivate_btn.visible = False
+
+        if hasattr(self, 'switch_track_instapay'):
+            self.switch_track_instapay.value = self.db.get_setting("track_instapay", "true") == "true"
 
         self.flet_page.update()
 

@@ -57,7 +57,11 @@ class DesktopDatabase:
             self._local.conn = sqlite3.connect(self._db_path)
             self._local.conn.row_factory = sqlite3.Row
             self._local.conn.execute("PRAGMA journal_mode=WAL")
+            self._local.conn.execute("PRAGMA synchronous=NORMAL")
+            self._local.conn.execute("PRAGMA cache_size=-64000")
+            self._local.conn.execute("PRAGMA temp_store=MEMORY")
         return self._local.conn
+
 
     # ═════════════════════════════════════════════════════════════════════
     # بناء الجداول
@@ -77,7 +81,8 @@ class DesktopDatabase:
                 sms_timestamp   TEXT    NOT NULL,
                 confidence      REAL    NOT NULL,
                 wallet_id       TEXT    DEFAULT '',
-                received_at     TEXT    DEFAULT (datetime('now'))
+                received_at     TEXT    DEFAULT (datetime('now')),
+                is_synced       INTEGER DEFAULT 0
             );
 
             -- فهارس للفلترة السريعة
@@ -110,8 +115,27 @@ class DesktopDatabase:
                 confidence    REAL NOT NULL,
                 reviewed      INTEGER DEFAULT 0
             );
+
+            -- جدول الأنماط المخزنة مؤقتاً من السيرفر
+            CREATE TABLE IF NOT EXISTS cached_patterns (
+                pattern_id    TEXT PRIMARY KEY,
+                type          TEXT NOT NULL,
+                regex_pattern TEXT NOT NULL,
+                groups_json   TEXT NOT NULL,
+                updated_at    TEXT DEFAULT (datetime('now'))
+            );
         """)
         conn.commit()
+
+        # هجرة: إضافة عمود is_synced إذا لم يكن موجوداً
+        try:
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(transactions)").fetchall()]
+            if "is_synced" not in cols:
+                conn.execute("ALTER TABLE transactions ADD COLUMN is_synced INTEGER DEFAULT 0")
+                conn.commit()
+                logger.info("✅ Added is_synced column to transactions table")
+        except Exception as e:
+            logger.warning(f"is_synced migration warning: {e}")
 
         # هجرة: إضافة عمود profit_status إذا لم يكن موجوداً
         try:
@@ -133,6 +157,16 @@ class DesktopDatabase:
 
         # تشغيل الهجرة لإعادة تحليل العمليات وتصحيح المحفظة والرصيد
         try:
+            # Check if this migration was already completed to prevent slow startup
+            try:
+                cur = conn.execute("SELECT value FROM settings WHERE key = 'migration_reparse_v3'")
+                row = cur.fetchone()
+                if row and row[0] == "done":
+                    logger.info("⚡ Reparsing migration already completed. Skipping.")
+                    return
+            except Exception as se:
+                logger.debug(f"Could not check migration setting (expected on fresh DB): {se}")
+
             from mobile.parser.engine import SMSEngine
             rows = conn.execute("SELECT transaction_id, raw_sms, wallet_id, type FROM transactions").fetchall()
             for row in rows:
@@ -187,6 +221,9 @@ class DesktopDatabase:
                             "UPDATE transactions SET wallet_id=?, type=?, amount=? WHERE transaction_id IS NULL AND raw_sms=?",
                             (w_id, tx_type, amount, raw_sms)
                         )
+            
+            # Mark migration as done
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('migration_reparse_v3', 'done')")
             conn.commit()
             logger.info("🔄 Desktop Cache database successfully migrated and re-parsed.")
         except Exception as e:
@@ -220,8 +257,8 @@ class DesktopDatabase:
             self._conn.execute("""
                 INSERT INTO transactions
                     (transaction_id, type, amount, balance_after, counterpart,
-                     raw_sms, parsed_at, sms_timestamp, confidence, wallet_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     raw_sms, parsed_at, sms_timestamp, confidence, wallet_id, is_synced)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
             """, (
                 tx.transaction_id, tx.type.value, tx.amount, tx.balance_after,
                 tx.counterpart, tx.raw_sms, tx.parsed_at.isoformat(),
@@ -231,6 +268,30 @@ class DesktopDatabase:
             return True
         except Exception as e:
             logger.error(f"❌ Failed to save transaction to desktop DB: {e}")
+            return False
+
+    def get_unsynced_transactions(self) -> List[Transaction]:
+        """استرجاع جميع المعاملات غير المزامنة مع السيرفر لرفعها لاحقاً"""
+        try:
+            rows = self._conn.execute(
+                "SELECT * FROM transactions WHERE is_synced = 0"
+            ).fetchall()
+            return [self._row_to_transaction(r) for r in rows]
+        except Exception as e:
+            logger.error(f"❌ Failed to get unsynced transactions: {e}")
+            return []
+
+    def mark_transaction_synced(self, tx_id: str) -> bool:
+        """تحديث حالة المعاملة لتصبح مزامنة"""
+        try:
+            self._conn.execute(
+                "UPDATE transactions SET is_synced = 1 WHERE transaction_id = ?",
+                (tx_id,)
+            )
+            self._conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"❌ Failed to mark transaction synced: {e}")
             return False
 
     def transaction_exists(self, tx_id: str, raw_sms: str = None) -> bool:
@@ -279,6 +340,9 @@ class DesktopDatabase:
             params.append(wallet_filter)
         else:
             query += " AND wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''"
+            track_instapay = self.get_setting("track_instapay", "true") == "true"
+            if not track_instapay:
+                query += " AND wallet_id != 'bank'"
 
         if profit_status_filter and profit_status_filter != "ALL":
             query += " AND COALESCE(profit_status, 'UNSET') = ?"
@@ -426,6 +490,11 @@ class DesktopDatabase:
             else:
                 date_filter = "AND date(sms_timestamp) >= date('now', 'localtime', 'start of month')"
         
+        track_instapay = self.get_setting("track_instapay", "true") == "true"
+        wallet_filter = ""
+        if not track_instapay:
+            wallet_filter = "AND wallet_id != 'bank'"
+
         row = self._conn.execute(f"""
             SELECT
                 COALESCE(SUM(CASE WHEN type IN ('RECEIVED', 'ATM_DEPOSIT') THEN amount ELSE 0 END), 0) AS total_income,
@@ -433,12 +502,15 @@ class DesktopDatabase:
                 COUNT(*) AS total_transactions
             FROM transactions
             WHERE wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''
+              {wallet_filter}
               {date_filter}
         """, filter_params).fetchone()
         
         # حساب رصيد كل محفظة
         wallet_balances = {}
         supported_wallets = ["vodafone_cash", "orange_cash", "etisalat_cash", "we_pay", "bank"]
+        if not track_instapay:
+            supported_wallets.remove("bank")
         
         for w_id in supported_wallets:
             # 1. تحقق مما إذا كان هناك رصيد ابتدائي يدوي في الإعدادات
@@ -492,6 +564,7 @@ class DesktopDatabase:
         tx_rows = self._conn.execute(f"""
             SELECT * FROM transactions
             WHERE wallet_id IS NOT NULL AND wallet_id != 'unspecified' AND wallet_id != ''
+              {wallet_filter}
               {date_filter}
         """, filter_params).fetchall()
         
@@ -1066,4 +1139,43 @@ class DesktopDatabase:
         except Exception as e:
             logger.error(f"Error checking is_license_active: {e}")
             return False
+
+    def get_cached_patterns(self) -> list:
+        """استرجاع الأنماط المخزنة محلياً لتمريرها للمحرك"""
+        try:
+            import json
+            rows = self._conn.execute("SELECT pattern_id, type, regex_pattern, groups_json FROM cached_patterns").fetchall()
+            patterns = []
+            for row in rows:
+                try:
+                    groups = json.loads(row["groups_json"])
+                except Exception:
+                    groups = {}
+                patterns.append({
+                    "id": row["pattern_id"],
+                    "type": row["type"],
+                    "regex": row["regex_pattern"],
+                    "groups": groups
+                })
+            return patterns
+        except Exception as e:
+            logger.error(f"Error retrieving cached patterns: {e}")
+            return []
+
+    def save_cached_patterns(self, patterns_list: list) -> bool:
+        """حفظ الأنماط القادمة من السيرفر وتحديث الكاش المحلي"""
+        try:
+            import json
+            self._conn.execute("DELETE FROM cached_patterns")
+            for p in patterns_list:
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO cached_patterns (pattern_id, type, regex_pattern, groups_json) VALUES (?, ?, ?, ?)",
+                    (p["id"], p["type"], p["regex"], json.dumps(p["groups"]))
+                )
+            self._conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error caching patterns: {e}")
+            return False
+
 

@@ -4,6 +4,7 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>لوحة الإدارة - دفتر كاش (Daftar Cash)</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
 <style>
@@ -58,6 +59,36 @@
               class="w-full text-right px-4 py-3 rounded-xl font-semibold text-sm flex items-center gap-3 transition-all text-gray-400 hover:bg-white/5 hover:text-white">
         <span class="material-symbols-outlined text-lg">group</span>
         إدارة المشتركين
+      </button>
+
+      <button onclick="switchTab('unclassified')" id="sidebar-btn-unclassified" 
+              class="w-full text-right px-4 py-3 rounded-xl font-semibold text-sm flex items-center gap-3 transition-all text-gray-400 hover:bg-white/5 hover:text-white">
+        <span class="material-symbols-outlined text-lg">sms_failed</span>
+        الرسائل غير المصنفة
+      </button>
+
+      <button onclick="switchTab('patterns')" id="sidebar-btn-patterns" 
+              class="w-full text-right px-4 py-3 rounded-xl font-semibold text-sm flex items-center gap-3 transition-all text-gray-400 hover:bg-white/5 hover:text-white">
+        <span class="material-symbols-outlined text-lg">fact_check</span>
+        الرسائل المصنفة (الأنماط)
+      </button>
+
+      <button onclick="switchTab('merchant_tx')" id="sidebar-btn-merchant_tx" 
+              class="w-full text-right px-4 py-3 rounded-xl font-semibold text-sm flex items-center gap-3 transition-all text-gray-400 hover:bg-white/5 hover:text-white">
+        <span class="material-symbols-outlined text-lg">currency_exchange</span>
+        معاملات التجار المزامنة
+      </button>
+
+      <button onclick="switchTab('analytics')" id="sidebar-btn-analytics" 
+              class="w-full text-right px-4 py-3 rounded-xl font-semibold text-sm flex items-center gap-3 transition-all text-gray-400 hover:bg-white/5 hover:text-white">
+        <span class="material-symbols-outlined text-lg">monitoring</span>
+        التحليلات التجارية
+      </button>
+
+      <button onclick="switchTab('settings')" id="sidebar-btn-settings" 
+              class="w-full text-right px-4 py-3 rounded-xl font-semibold text-sm flex items-center gap-3 transition-all text-gray-400 hover:bg-white/5 hover:text-white">
+        <span class="material-symbols-outlined text-lg">settings</span>
+        إعدادات النظام
       </button>
     </nav>
     
@@ -758,6 +789,550 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Table 5: Unclassified SMS -->
+      <div id="table-container-unclassified" class="hidden overflow-x-auto w-full p-6 space-y-6">
+        <div class="flex items-center gap-2 pb-4 border-b border-gray-100 justify-between">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#00192d] text-2xl font-bold">sms_failed</span>
+            <h3 class="text-lg font-bold text-gray-900">الرسائل غير المصنفة (تحت التحليل)</h3>
+          </div>
+          <p class="text-xs text-gray-500">هنا تظهر الرسائل التي لم تتطابق مع أي نمط حالي. يمكنك الاستعانة بالذكاء الاصطناعي لتحليلها وتوليد نمط جديد تلقائياً.</p>
+        </div>
+
+        <table class="min-w-full divide-y divide-gray-100 text-right">
+          <thead>
+            <tr class="bg-gray-50">
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">المرسل</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-1/2">محتوى الرسالة</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">تاريخ الوصول</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            {% for r in unclassified_reports %}
+              <tr class="hover:bg-gray-50/50 transition-colors" id="sms-row-{{ r.id }}">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">
+                  <span class="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">{{ r.sender }}</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500 break-all select-all font-mono bg-gray-50/50 rounded-lg p-2" id="sms-content-{{ r.id }}" title="{{ r.raw_sms }}">
+                  {{ r.raw_sms }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-400">
+                  {{ r.received_at|date:"Y-m-d H:i" }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                  <div class="flex items-center gap-2 justify-end">
+                    <button id="btn-analyze-{{ r.id }}" onclick="analyzeSMS('{{ r.id }}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors">
+                      <span class="material-symbols-outlined text-xs">psychology</span>
+                      تحليل بالذكاء الاصطناعي
+                    </button>
+                    <button onclick="deleteUnclassified('{{ r.id }}')" class="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg transition-colors" title="تجاهل وحذف">
+                      <span class="material-symbols-outlined text-sm">delete</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="4" class="px-6 py-12 text-center text-gray-400 font-semibold">
+                  لا توجد رسائل غير مصنفة حالياً.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table 6: Active Patterns (Classified SMS) -->
+      <div id="table-container-patterns" class="hidden overflow-x-auto w-full p-6 space-y-6">
+        <div class="flex items-center gap-2 pb-4 border-b border-gray-100 justify-between">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#00192d] text-2xl font-bold">fact_check</span>
+            <h3 class="text-lg font-bold text-gray-900">الرسائل المصنفة وقواعد التحليل النشطة</h3>
+          </div>
+          <p class="text-xs text-gray-500">هنا تظهر جميع قواعد وأنماط تحليل الرسائل (Regex) المعتمدة على السيرفر ويتم مزامنتها مع جميع الأجهزة فوراً.</p>
+        </div>
+
+        <table class="min-w-full divide-y divide-gray-100 text-right">
+          <thead>
+            <tr class="bg-gray-50">
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">معرف النمط</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">نوع العملية</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-1/2">التعبير المنتظم (Regex)</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">المجموعات</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            {% for p in patterns_list %}
+              <tr class="hover:bg-gray-50/50 transition-colors">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700 font-mono">
+                  {{ p.pattern_id }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">{{ p.type }}</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500 font-mono bg-gray-50/50 rounded-lg p-2 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap select-all" title="{{ p.regex_pattern }}">
+                  {{ p.regex_pattern }}
+                </td>
+                <td class="px-6 py-4 text-xs text-gray-400 font-mono">
+                  {{ p.groups_json }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                  <form method="POST" action="{% url 'admin_panel' %}" onsubmit="return confirm('هل أنت متأكد من حذف هذا النمط وإلغاء تصنيفه؟');" class="inline-block">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_pattern">
+                    <input type="hidden" name="pattern_id" value="{{ p.pattern_id }}">
+                    <button type="submit" class="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg transition-colors" title="حذف النمط">
+                      <span class="material-symbols-outlined text-sm">delete</span>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="px-6 py-12 text-center text-gray-400 font-semibold">
+                  لا توجد أنماط أو قواعد مسجلة حالياً.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table 7: Merchant Transactions -->
+      <div id="table-container-merchant_tx" class="hidden overflow-x-auto w-full p-6 space-y-6">
+        <div class="flex items-center gap-4 pb-4 border-b border-gray-100 justify-between flex-wrap">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#00192d] text-2xl font-bold">currency_exchange</span>
+            <h3 class="text-lg font-bold text-gray-900">المعاملات المزامنة من أجهزة التجار</h3>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="text-sm text-gray-600 font-semibold">تصفية حسب التاجر:</label>
+            <select id="adminMerchantFilter" class="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 outline-none" onchange="filterMerchantTransactions()">
+              <option value="">جميع التجار (All Merchants)</option>
+              {% for u in users %}
+                <option value="{{ u.username }}">{{ u.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- بطاقات التجار السريعة لتسهيل الفرز المباشر والتصفح المنفصل -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
+          <!-- بطاقة الكل -->
+          <div onclick="selectMerchantCard('')" id="merchant-card-all"
+               class="cursor-pointer bg-white p-4 rounded-xl border border-blue-500 shadow-sm flex flex-col justify-between transition-all hover:shadow-md hover:scale-[1.02] border-2 ring-2 ring-blue-500/20">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-blue-600">جميع التجار</span>
+              <span class="material-symbols-outlined text-blue-500 text-lg">group</span>
+            </div>
+            <div class="mt-3">
+              <p class="text-lg font-bold text-gray-900">{{ merchant_transactions.count }}</p>
+              <p class="text-[10px] text-gray-400">إجمالي العمليات المزامنة</p>
+            </div>
+          </div>
+
+          {% for u in users %}
+            {% if u.merchant_transactions.count > 0 %}
+              <div onclick="selectMerchantCard('{{ u.username }}')" id="merchant-card-{{ u.username }}"
+                   class="cursor-pointer bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between transition-all hover:shadow-md hover:scale-[1.02]">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-gray-700 truncate max-w-[100px]">{{ u.username }}</span>
+                  <span class="material-symbols-outlined text-gray-400 text-lg">person</span>
+                </div>
+                <div class="mt-3">
+                  <p class="text-lg font-bold text-gray-900">{{ u.merchant_transactions.count }}</p>
+                  <p class="text-[10px] text-gray-400">عملية مزامنة</p>
+                </div>
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <table id="merchantTransactionsTable" class="min-w-full divide-y divide-gray-100 text-right">
+          <thead>
+            <tr class="bg-gray-50">
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">التاجر</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">معرف العملية</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">المحفظة</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">النوع</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">المبلغ</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">الرصيد بعدها</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">الطرف الآخر</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">وقت العملية</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">حالة الربح</th>
+              <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            {% for t in merchant_transactions %}
+              <tr class="hover:bg-gray-50/50 transition-colors">
+                <td class="merchant-name-cell px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">
+                  {{ t.user.username }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600 select-all">
+                  {{ t.transaction_id }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ t.wallet_id }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  {% if t.type == 'RECEIVED' %}
+                    <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">سحب للعميل (RECEIVED)</span>
+                  {% elif t.type == 'SENT' %}
+                    <span class="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">إيداع للعميل (SENT)</span>
+                  {% else %}
+                    <span class="px-2.5 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-bold">{{ t.type }}</span>
+                  {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                  {{ t.amount }} EGP
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  {{ t.balance_after }} EGP
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ t.decrypted_counterpart }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ t.sms_timestamp|date:"Y-m-d H:i" }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <span class="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-100 rounded text-xs font-semibold">{{ t.profit_status }}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                  <form method="POST" action="{% url 'admin_panel' %}" onsubmit="return confirm('هل أنت متأكد من حذف هذه العملية؟');" class="inline-block">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_merchant_transaction">
+                    <input type="hidden" name="transaction_id" value="{{ t.transaction_id }}">
+                    <button type="submit" class="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg transition-colors" title="حذف العملية">
+                      <span class="material-symbols-outlined text-sm">delete</span>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="10" class="px-6 py-12 text-center text-gray-400 font-semibold">
+                  لا توجد معاملات مزامنة حالياً.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Section 8: Commercial Analytics -->
+      <div id="table-container-analytics" class="hidden p-6 space-y-8">
+        <!-- Header -->
+        <div class="flex items-center gap-2 pb-4 border-b border-gray-100">
+          <span class="material-symbols-outlined text-[#00192d] text-2xl font-bold">monitoring</span>
+          <h3 class="text-lg font-bold text-gray-900">التحليلات التجارية المركزية</h3>
+        </div>
+
+        <!-- ── القسم 1: مقارنة التجار (البطاقات المجمّعة) ── -->
+        <div>
+          <h4 class="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+            <span class="material-symbols-outlined text-purple-500 text-lg">leaderboard</span>
+            مقارنة التجار - حجم التداول الكلي
+          </h4>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+              <h5 class="text-xs font-bold text-gray-500 mb-4">أكثر التجار نشاطاً (حجم التداول بالجنيه)</h5>
+              <div class="relative h-64">
+                <canvas id="adminMerchantChart"></canvas>
+              </div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+              <h5 class="text-xs font-bold text-gray-500 mb-4">توزيع استخدام المحافظ بين كل التجار</h5>
+              <div class="relative h-64">
+                <canvas id="adminWalletsChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── القسم 2: التحليلات التفصيلية المستقلة لكل تاجر ── -->
+        <div class="border-t border-gray-100 pt-6">
+          <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+            <h4 class="text-sm font-bold text-gray-700 flex items-center gap-2">
+              <span class="material-symbols-outlined text-teal-500 text-lg">person_search</span>
+              تحليلات تفصيلية لكل تاجر منفرد
+            </h4>
+            <div class="flex items-center gap-3">
+              <label class="text-sm text-gray-600 font-semibold">اختر التاجر:</label>
+              <select id="merchantAnalyticsSelector"
+                      onchange="loadMerchantAnalytics(this.value)"
+                      class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 shadow-sm focus:outline-none focus:border-teal-500 transition-all">
+                <option value="">-- اختر تاجراً --</option>
+                {% for u in users %}
+                  <option value="{{ u.username }}">{{ u.username }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <!-- Placeholder عندما لا يتم اختيار تاجر -->
+          <div id="merchantAnalyticsPlaceholder" class="flex flex-col items-center justify-center py-20 text-center">
+            <span class="material-symbols-outlined text-6xl text-gray-200 mb-4">manage_search</span>
+            <p class="text-gray-400 font-semibold text-sm">اختر تاجراً من القائمة أعلاه لعرض تحليلاته التفصيلية الكاملة</p>
+          </div>
+
+          <!-- لوحة التحليلات المفصلة للتاجر المختار -->
+          <div id="merchantAnalyticsContent" class="hidden space-y-6">
+            <!-- اسم التاجر -->
+            <div class="flex items-center gap-3 bg-teal-50 border border-teal-100 px-5 py-3 rounded-xl">
+              <span class="material-symbols-outlined text-teal-600">account_circle</span>
+              <div>
+                <p class="text-xs text-teal-600 font-semibold">التاجر المختار</p>
+                <p id="selectedMerchantName" class="text-base font-bold text-gray-800"></p>
+              </div>
+            </div>
+
+            <!-- بطاقات KPI للتاجر -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div class="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                  <span class="material-symbols-outlined text-lg">arrow_downward</span>
+                </div>
+                <div>
+                  <p class="text-[10px] text-gray-400 font-semibold">إجمالي الاستلام</p>
+                  <p id="m-total-received" class="text-base font-bold text-emerald-600 mt-0.5">0 ج.م</p>
+                </div>
+              </div>
+              <div class="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                  <span class="material-symbols-outlined text-lg">arrow_upward</span>
+                </div>
+                <div>
+                  <p class="text-[10px] text-gray-400 font-semibold">إجمالي الإرسال</p>
+                  <p id="m-total-sent" class="text-base font-bold text-blue-600 mt-0.5">0 ج.م</p>
+                </div>
+              </div>
+              <div class="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+                  <span class="material-symbols-outlined text-lg">payments</span>
+                </div>
+                <div>
+                  <p class="text-[10px] text-gray-400 font-semibold">صافي العمولات</p>
+                  <p id="m-total-fee" class="text-base font-bold text-amber-600 mt-0.5">0 ج.م</p>
+                </div>
+              </div>
+              <div class="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                <div class="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
+                  <span class="material-symbols-outlined text-lg">receipt_long</span>
+                </div>
+                <div>
+                  <p class="text-[10px] text-gray-400 font-semibold">عدد العمليات</p>
+                  <p id="m-count" class="text-base font-bold text-purple-600 mt-0.5">0</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- بطاقات تصنيف الأرباح -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="bg-gradient-to-br from-emerald-700 to-emerald-900 p-4 rounded-xl text-white">
+                <p class="text-xs font-bold opacity-80 mb-1">أرباح في المحفظة (IN_WALLET)</p>
+                <p id="m-profit-in-wallet" class="text-xl font-bold">0 ج.م</p>
+              </div>
+              <div class="bg-gradient-to-br from-cyan-700 to-cyan-900 p-4 rounded-xl text-white">
+                <p class="text-xs font-bold opacity-80 mb-1">أرباح نقدية (CASH)</p>
+                <p id="m-profit-cash" class="text-xl font-bold">0 ج.م</p>
+              </div>
+              <div class="bg-gradient-to-br from-amber-700 to-amber-900 p-4 rounded-xl text-white">
+                <p class="text-xs font-bold opacity-80 mb-1">غير مصنفة (UNSET)</p>
+                <p id="m-profit-unset" class="text-xl font-bold">0 ج.م</p>
+              </div>
+            </div>
+
+            <!-- الرسوم البيانية للتاجر -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                <h5 class="text-xs font-bold text-gray-500 mb-4">اتجاه العمليات اليومية (7 أيام)</h5>
+                <div class="relative h-56">
+                  <canvas id="merchantDailyChart"></canvas>
+                </div>
+              </div>
+              <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                <h5 class="text-xs font-bold text-gray-500 mb-4">توزيع المحافظ المستخدمة</h5>
+                <div class="relative h-56">
+                  <canvas id="merchantWalletsChart"></canvas>
+                </div>
+              </div>
+              <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                <h5 class="text-xs font-bold text-gray-500 mb-4">ساعات الذروة (24 ساعة)</h5>
+                <div class="relative h-56">
+                  <canvas id="merchantHoursChart"></canvas>
+                </div>
+              </div>
+              <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                <h5 class="text-xs font-bold text-gray-500 mb-4">أرباح كل محفظة</h5>
+                <div class="relative h-56">
+                  <canvas id="merchantWalletProfitsChart"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- جدول أكثر جهات الاتصال تعاملاً -->
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div class="p-4 border-b border-gray-100 flex items-center gap-2">
+                <span class="material-symbols-outlined text-gray-500 text-lg">contacts</span>
+                <h5 class="text-sm font-bold text-gray-700">أكثر جهات الاتصال تعاملاً</h5>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="min-w-full text-right">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-3 text-xs font-bold text-gray-500">الرقم / الجهة</th>
+                      <th class="px-4 py-3 text-xs font-bold text-gray-500 text-center">عدد الاستلام</th>
+                      <th class="px-4 py-3 text-xs font-bold text-gray-500 text-center">إجمالي الاستلام</th>
+                      <th class="px-4 py-3 text-xs font-bold text-gray-500 text-center">عدد الإرسال</th>
+                      <th class="px-4 py-3 text-xs font-bold text-gray-500 text-center">إجمالي الإرسال</th>
+                      <th class="px-4 py-3 text-xs font-bold text-gray-500 text-center">المجموع الكلي</th>
+                    </tr>
+                  </thead>
+                  <tbody id="merchantTopContactsTable" class="divide-y divide-gray-100">
+                    <tr><td colspan="6" class="px-4 py-6 text-center text-gray-400 text-sm">اختر تاجراً لعرض بيانات جهات الاتصال</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Section 5: Settings -->
+      <div id="table-container-settings" class="hidden p-6 space-y-6">
+        <div class="flex items-center gap-2 pb-4 border-b border-gray-100">
+          <span class="material-symbols-outlined text-[#00192d] text-2xl font-bold">settings</span>
+          <h3 class="text-lg font-bold text-gray-900">تعديل إعدادات النظام</h3>
+        </div>
+
+        <form method="POST" class="space-y-6 max-w-2xl">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_settings">
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-1">
+              <label for="admin_wallet" class="text-xs font-semibold text-gray-500 block">محفظة المدير المستلمة (Admin Wallet)</label>
+              <input type="text" id="admin_wallet" name="admin_wallet" value="{{ config.admin_wallet }}"
+                     class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900"
+                     placeholder="01XXXXXXXXX">
+            </div>
+
+            <div class="space-y-1">
+              <label for="gateway_api_key" class="text-xs font-semibold text-gray-500 block">مفتاح الـ API المشترك للبوابة (Gateway API Key)</label>
+              <input type="text" id="gateway_api_key" name="gateway_api_key" value="{{ config.gateway_api_key }}"
+                     class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900">
+            </div>
+          </div>
+
+          <div class="border-t border-gray-100 pt-6 space-y-4">
+            <h4 class="text-sm font-bold text-gray-700">إعدادات تأكيد البريد الإلكتروني عبر Infobip</h4>
+            
+            <div class="space-y-1">
+              <label for="infobip_api_key" class="text-xs font-semibold text-gray-500 block">مفتاح الـ API لـ Infobip (INFOBIP_API_KEY)</label>
+              <input type="text" id="infobip_api_key" name="infobip_api_key" value="{{ config.infobip_api_key }}"
+                     class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900"
+                     placeholder="ادخل مفتاح API الخاص بـ Infobip">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="space-y-1">
+                <label for="infobip_base_url" class="text-xs font-semibold text-gray-500 block">الرابط الأساسي لـ Infobip (INFOBIP_BASE_URL)</label>
+                <input type="text" id="infobip_base_url" name="infobip_base_url" value="{{ config.infobip_base_url }}"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900"
+                       placeholder="e.g. yy-xx.api.infobip.com">
+              </div>
+
+              <div class="space-y-1">
+                <label for="infobip_from_email" class="text-xs font-semibold text-gray-500 block">البريد الإلكتروني للمرسل (INFOBIP_FROM_EMAIL)</label>
+                <input type="text" id="infobip_from_email" name="infobip_from_email" value="{{ config.infobip_from_email }}"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900"
+                       placeholder="Daftar Cash <noreply@yourdomain.com>">
+              </div>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-100 pt-6 space-y-4">
+            <h4 class="text-sm font-bold text-gray-700">إعدادات تأكيد البريد الإلكتروني عبر Resend (الخيار الأسهل)</h4>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="space-y-1">
+                <label for="resend_api_key" class="text-xs font-semibold text-gray-500 block">مفتاح الـ API لـ Resend (RESEND_API_KEY)</label>
+                <input type="text" id="resend_api_key" name="resend_api_key" value="{{ config.resend_api_key }}"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900"
+                       placeholder="re_xxxxxxxxxxxx">
+              </div>
+
+              <div class="space-y-1">
+                <label for="resend_from_email" class="text-xs font-semibold text-gray-500 block">البريد الإلكتروني للمرسل (RESEND_FROM_EMAIL)</label>
+                <input type="text" id="resend_from_email" name="resend_from_email" value="{{ config.resend_from_email }}"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900"
+                       placeholder="onboarding@resend.dev">
+              </div>
+            </div>
+          <div class="border-t border-gray-100 pt-6 space-y-4">
+            <h4 class="text-sm font-bold text-gray-700 flex items-center gap-2">
+              <span class="material-symbols-outlined text-green-500 text-lg font-bold">chat</span>
+              إعدادات إرسال الواتس آب (عبر Infobip)
+            </h4>
+
+            <div class="flex items-center gap-2 mb-4">
+              <input type="checkbox" id="whatsapp_enabled" name="whatsapp_enabled" value="true"
+                     {% if config.whatsapp_enabled %}checked{% endif %}
+                     class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+              <label for="whatsapp_enabled" class="text-xs font-semibold text-gray-700">تفعيل إرسال إشعارات الواتس آب</label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="space-y-1">
+                <label for="whatsapp_from_number" class="text-xs font-semibold text-gray-500 block">رقم واتسآب المرسل الخاص بك (WhatsApp Sender Number)</label>
+                <input type="text" id="whatsapp_from_number" name="whatsapp_from_number" value="{{ config.whatsapp_from_number }}"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900"
+                       placeholder="e.g. 447860088970">
+              </div>
+
+              <div class="space-y-1">
+                <label for="whatsapp_template_language" class="text-xs font-semibold text-gray-500 block">لغة قالب الواتس آب (Template Language)</label>
+                <input type="text" id="whatsapp_template_language" name="whatsapp_template_language" value="{{ config.whatsapp_template_language }}"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900"
+                       placeholder="e.g. en or ar">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="space-y-1">
+                <label for="whatsapp_template_otp" class="text-xs font-semibold text-gray-500 block">اسم قالب الـ OTP (التحقق)</label>
+                <input type="text" id="whatsapp_template_otp" name="whatsapp_template_otp" value="{{ config.whatsapp_template_otp }}"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900"
+                       placeholder="test_whatsapp_template_en">
+              </div>
+
+              <div class="space-y-1">
+                <label for="whatsapp_template_welcome" class="text-xs font-semibold text-gray-500 block">اسم قالب الترحيب والتفعيل</label>
+                <input type="text" id="whatsapp_template_welcome" name="whatsapp_template_welcome" value="{{ config.whatsapp_template_welcome }}"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900"
+                       placeholder="اسم القالب من Infobip">
+              </div>
+
+              <div class="space-y-1">
+                <label for="whatsapp_template_payment" class="text-xs font-semibold text-gray-500 block">اسم قالب الفاتورة وتأكيد الدفع</label>
+                <input type="text" id="whatsapp_template_payment" name="whatsapp_template_payment" value="{{ config.whatsapp_template_payment }}"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-900"
+                       placeholder="اسم القالب من Infobip">
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="bg-[#00192d] hover:bg-[#00192d]/90 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition-all shadow-md">
+            حفظ التغييرات وإعدادات النظام
+          </button>
+        </form>
+      </div>
     </div>
   </main>
 </div>
@@ -859,12 +1434,22 @@
         document.getElementById('sidebar-btn-coupons').classList.remove('sidebar-active');
         document.getElementById('sidebar-btn-payments').classList.remove('sidebar-active');
         document.getElementById('sidebar-btn-subscribers').classList.remove('sidebar-active');
+        document.getElementById('sidebar-btn-unclassified').classList.remove('sidebar-active');
+        document.getElementById('sidebar-btn-patterns').classList.remove('sidebar-active');
+        document.getElementById('sidebar-btn-merchant_tx').classList.remove('sidebar-active');
+        document.getElementById('sidebar-btn-analytics').classList.remove('sidebar-active');
+        document.getElementById('sidebar-btn-settings').classList.remove('sidebar-active');
         
         // Add inactive colors to all
         document.getElementById('sidebar-btn-licenses').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
         document.getElementById('sidebar-btn-coupons').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
         document.getElementById('sidebar-btn-payments').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
         document.getElementById('sidebar-btn-subscribers').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
+        document.getElementById('sidebar-btn-unclassified').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
+        document.getElementById('sidebar-btn-patterns').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
+        document.getElementById('sidebar-btn-merchant_tx').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
+        document.getElementById('sidebar-btn-analytics').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
+        document.getElementById('sidebar-btn-settings').classList.add('text-gray-400', 'hover:bg-white/5', 'hover:text-white');
 
         // Add active style to selected button
         const activeBtn = document.getElementById('sidebar-btn-' + tabName);
@@ -885,6 +1470,21 @@
         } else if (tabName === 'subscribers') {
             badge.innerText = 'إدارة المشتركين';
             badge.className = 'px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold';
+        } else if (tabName === 'unclassified') {
+            badge.innerText = 'الرسائل غير المصنفة';
+            badge.className = 'px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold';
+        } else if (tabName === 'patterns') {
+            badge.innerText = 'الرسائل المصنفة والأنماط';
+            badge.className = 'px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold';
+        } else if (tabName === 'merchant_tx') {
+            badge.innerText = 'معاملات التجار المزامنة';
+            badge.className = 'px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold';
+        } else if (tabName === 'settings') {
+            badge.innerText = 'إعدادات النظام';
+            badge.className = 'px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-bold';
+        } else if (tabName === 'analytics') {
+            badge.innerText = 'التحليلات التجارية المركزية';
+            badge.className = 'px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-xs font-bold';
         }
 
         // Hide/Show forms
@@ -927,6 +1527,11 @@
         document.getElementById('table-container-coupons').classList.add('hidden');
         document.getElementById('table-container-payments').classList.add('hidden');
         document.getElementById('table-container-subscribers').classList.add('hidden');
+        document.getElementById('table-container-unclassified').classList.add('hidden');
+        document.getElementById('table-container-patterns').classList.add('hidden');
+        document.getElementById('table-container-merchant_tx').classList.add('hidden');
+        document.getElementById('table-container-analytics').classList.add('hidden');
+        document.getElementById('table-container-settings').classList.add('hidden');
         
         document.getElementById('table-container-' + tabName).classList.remove('hidden');
 
@@ -955,7 +1560,10 @@
             'table-container-licenses',
             'table-container-coupons',
             'table-container-payments',
-            'table-container-subscribers'
+            'table-container-subscribers',
+            'table-container-unclassified',
+            'table-container-patterns',
+            'table-container-merchant_tx'
         ];
         
         tables.forEach(tableId => {
@@ -981,5 +1589,457 @@
             }
         });
     }
+
+    function closeAIModal() {
+        document.getElementById('ai-modal').classList.add('hidden');
+    }
+
+    function analyzeSMS(smsId) {
+        const btn = document.getElementById('btn-analyze-' + smsId);
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin">sync</span> جاري التحليل...';
+
+        fetch('/backend/api/analyze-sms/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ sms_id: smsId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+
+            if (data.success) {
+                const analysis = data.analysis;
+                document.getElementById('modal-sms-id').value = smsId;
+                document.getElementById('modal-sms-body').innerText = document.getElementById('sms-content-' + smsId).innerText.trim();
+                
+                // Prefill fields
+                const randomId = Math.floor(1000 + Math.random() * 9000);
+                document.getElementById('modal-pattern-id').value = 'auto_' + analysis.type.toLowerCase() + '_' + randomId;
+                document.getElementById('modal-pattern-type').value = analysis.type;
+                document.getElementById('modal-pattern-regex').value = analysis.regex_pattern;
+                
+                // Capture groups
+                const groups = analysis.groups || {};
+                document.getElementById('modal-group-amount').value = groups.amount || "";
+                document.getElementById('modal-group-counterpart').value = groups.counterpart || "";
+                document.getElementById('modal-group-balance').value = groups.balance || "";
+                document.getElementById('modal-group-trx').value = groups.trx_id || "";
+                document.getElementById('modal-group-date').value = groups.date || "";
+                document.getElementById('modal-group-time').value = groups.time || "";
+
+                // Show modal
+                document.getElementById('ai-modal').classList.remove('hidden');
+            } else {
+                alert('فشل التحليل: ' + (data.message || 'خطأ غير معروف'));
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            alert('حدث خطأ أثناء الاتصال بالسيرفر: ' + err);
+        });
+    }
+
+    function savePattern() {
+        const smsId = document.getElementById('modal-sms-id').value;
+        const patternId = document.getElementById('modal-pattern-id').value.trim();
+        const type = document.getElementById('modal-pattern-type').value;
+        const regex_pattern = document.getElementById('modal-pattern-regex').value.trim();
+        
+        if (!patternId || !regex_pattern) {
+            alert('يرجى ملء جميع الحقول المطلوبة.');
+            return;
+        }
+
+        const groups = {};
+        const amount = document.getElementById('modal-group-amount').value;
+        const counterpart = document.getElementById('modal-group-counterpart').value;
+        const balance = document.getElementById('modal-group-balance').value;
+        const trx = document.getElementById('modal-group-trx').value;
+        const date = document.getElementById('modal-group-date').value;
+        const time = document.getElementById('modal-group-time').value;
+
+        if (amount) groups.amount = parseInt(amount);
+        if (counterpart) {
+            groups.counterpart = isNaN(counterpart) ? counterpart : parseInt(counterpart);
+        }
+        if (balance) groups.balance = parseInt(balance);
+        if (trx) groups.trx_id = parseInt(trx);
+        if (date) groups.date = isNaN(date) ? date : parseInt(date);
+        if (time) groups.time = isNaN(time) ? time : parseInt(time);
+
+        fetch('/backend/api/save-pattern/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                sms_id: smsId,
+                pattern_id: patternId,
+                type: type,
+                regex_pattern: regex_pattern,
+                groups: groups
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('فشل حفظ النمط: ' + data.message);
+            }
+        })
+        .catch(err => {
+            alert('حدث خطأ: ' + err);
+        });
+    }
+
+    function deleteUnclassified(smsId) {
+        if (!confirm('هل أنت متأكد من تجاهل وحذف هذه الرسالة؟')) return;
+
+        fetch('/backend/api/delete-unclassified/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ sms_id: smsId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const row = document.getElementById('sms-row-' + smsId);
+                if (row) row.remove();
+            } else {
+                alert('فشل الحذف: ' + data.message);
+            }
+        })
+        .catch(err => {
+            alert('حدث خطأ: ' + err);
+        });
+    }
+
+    /* =============================================
+       Filter Merchant Transactions Table
+    ============================================= */
+    function filterMerchantTransactions() {
+        const val = document.getElementById('adminMerchantFilter').value;
+        const rows = document.querySelectorAll('#merchantTransactionsTable tbody tr');
+        rows.forEach(row => {
+            const cell = row.querySelector('.merchant-name-cell');
+            if (cell) {
+                const name = cell.textContent.trim();
+                if (!val || name === val) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    /* =============================================
+       Merchant Cards Selection (in merchant_tx tab)
+    ============================================= */
+    function selectMerchantCard(username) {
+        // Reset all card styles
+        document.querySelectorAll('[id^="merchant-card-"]').forEach(card => {
+            card.classList.remove('border-blue-500', 'ring-2', 'ring-blue-500/20', 'border-2');
+            card.classList.add('border-gray-200');
+        });
+        // Highlight selected
+        const selectedCard = document.getElementById('merchant-card-' + (username || 'all'));
+        if (selectedCard) {
+            selectedCard.classList.add('border-blue-500', 'ring-2', 'ring-blue-500/20', 'border-2');
+            selectedCard.classList.remove('border-gray-200');
+        }
+        // Update dropdown & filter table
+        const dropdown = document.getElementById('adminMerchantFilter');
+        if (dropdown) dropdown.value = username;
+        filterMerchantTransactions();
+    }
+
+    /* =============================================
+       Commercial Analytics Charts (Global)
+    ============================================= */
+    document.addEventListener("DOMContentLoaded", function() {
+        const merchantCtx = document.getElementById('adminMerchantChart');
+        if (merchantCtx) {
+            new Chart(merchantCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: {{ admin_merchant_names|safe }},
+                    datasets: [
+                        {
+                            label: 'إجمالي حجم التداول (EGP)',
+                            data: {{ admin_merchant_amounts|safe }},
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: 'rgb(59, 130, 246)',
+                            borderWidth: 1,
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        const walletsCtx = document.getElementById('adminWalletsChart');
+        if (walletsCtx) {
+            new Chart(walletsCtx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: {{ admin_wallet_labels|safe }},
+                    datasets: [
+                        {
+                            data: {{ admin_wallet_counts|safe }},
+                            backgroundColor: ['#ff3b30', '#34c759', '#007aff', '#ffcc00', '#af52de', '#5856d6'],
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+    });
+
+    /* =============================================
+       Individual Merchant Analytics (Interactive)
+    ============================================= */
+    const allMerchantData = {{ merchant_analytics_json|safe }};
+    let merchantChartInstances = {};
+
+    function destroyMerchantChart(id) {
+        if (merchantChartInstances[id]) {
+            merchantChartInstances[id].destroy();
+            delete merchantChartInstances[id];
+        }
+    }
+
+    function loadMerchantAnalytics(username) {
+        const placeholder = document.getElementById('merchantAnalyticsPlaceholder');
+        const content = document.getElementById('merchantAnalyticsContent');
+
+        if (!username || !allMerchantData[username]) {
+            placeholder.classList.remove('hidden');
+            content.classList.add('hidden');
+            return;
+        }
+
+        const d = allMerchantData[username];
+
+        // Show panel
+        placeholder.classList.add('hidden');
+        content.classList.remove('hidden');
+
+        // Update KPIs
+        document.getElementById('selectedMerchantName').textContent = username;
+        document.getElementById('m-total-received').textContent = d.total_received.toFixed(2) + ' ج.م';
+        document.getElementById('m-total-sent').textContent = d.total_sent.toFixed(2) + ' ج.م';
+        document.getElementById('m-total-fee').textContent = d.total_fee.toFixed(2) + ' ج.م';
+        document.getElementById('m-count').textContent = d.count;
+        document.getElementById('m-profit-in-wallet').textContent = d.profit_in_wallet.toFixed(2) + ' ج.م';
+        document.getElementById('m-profit-cash').textContent = d.profit_cash.toFixed(2) + ' ج.م';
+        document.getElementById('m-profit-unset').textContent = d.profit_unset.toFixed(2) + ' ج.م';
+
+        const palette = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316'];
+
+        // Chart 1: Daily trend
+        destroyMerchantChart('daily');
+        const dailyCtx = document.getElementById('merchantDailyChart');
+        if (dailyCtx) {
+            merchantChartInstances['daily'] = new Chart(dailyCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: d.days_labels,
+                    datasets: [
+                        { label: 'استلام (Received)', data: d.daily_received, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.4, pointRadius: 4 },
+                        { label: 'إرسال (Sent)', data: d.daily_sent, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4, pointRadius: 4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        // Chart 2: Wallet distribution
+        destroyMerchantChart('wallets');
+        const walletsCtx = document.getElementById('merchantWalletsChart');
+        if (walletsCtx) {
+            merchantChartInstances['wallets'] = new Chart(walletsCtx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: d.wallets_labels,
+                    datasets: [{ data: d.wallets_values, backgroundColor: palette, borderWidth: 1 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // Chart 3: Peak hours
+        destroyMerchantChart('hours');
+        const hoursCtx = document.getElementById('merchantHoursChart');
+        if (hoursCtx) {
+            merchantChartInstances['hours'] = new Chart(hoursCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => i + ':00'),
+                    datasets: [{
+                        label: 'عدد العمليات',
+                        data: d.hours_values,
+                        backgroundColor: 'rgba(139, 92, 246, 0.65)',
+                        borderColor: 'rgb(139, 92, 246)',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        // Chart 4: Wallet profits
+        destroyMerchantChart('walletProfits');
+        const wpCtx = document.getElementById('merchantWalletProfitsChart');
+        if (wpCtx) {
+            merchantChartInstances['walletProfits'] = new Chart(wpCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: d.wallet_profits_labels,
+                    datasets: [{
+                        label: 'الأرباح (EGP)',
+                        data: d.wallet_profits_values,
+                        backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                        borderColor: 'rgb(245, 158, 11)',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        // Top contacts table
+        const tbody = document.getElementById('merchantTopContactsTable');
+        if (d.top_contacts && d.top_contacts.length > 0) {
+            tbody.innerHTML = d.top_contacts.map((c, i) => `
+                <tr class="hover:bg-gray-50/50 transition-colors">
+                    <td class="px-4 py-3 font-mono text-sm text-gray-700 font-semibold">${i + 1}. ${c.phone}</td>
+                    <td class="px-4 py-3 text-center text-sm text-emerald-600 font-bold">${c.received_count}</td>
+                    <td class="px-4 py-3 text-center text-sm text-emerald-700">${c.received_amount.toFixed(2)} ج.م</td>
+                    <td class="px-4 py-3 text-center text-sm text-blue-600 font-bold">${c.sent_count}</td>
+                    <td class="px-4 py-3 text-center text-sm text-blue-700">${c.sent_amount.toFixed(2)} ج.م</td>
+                    <td class="px-4 py-3 text-center text-sm font-bold text-gray-900">${c.total_amount.toFixed(2)} ج.م</td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-400 text-sm">لا توجد جهات اتصال مسجلة لهذا التاجر</td></tr>';
+        }
+    }
 </script>
+
+<!-- Modal: AI SMS Parser Generator Dialog -->
+<div id="ai-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden p-4">
+  <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 text-right relative space-y-6">
+    <button onclick="closeAIModal()" class="absolute top-4 left-4 text-gray-400 hover:text-gray-600">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+
+    <div class="flex items-center gap-2 border-b border-gray-100 pb-3">
+      <span class="material-symbols-outlined text-blue-600 text-2xl font-bold">psychology</span>
+      <h3 class="text-lg font-bold text-gray-900">نتائج تحليل الذكاء الاصطناعي للرسالة</h3>
+    </div>
+
+    <!-- SMS Details -->
+    <div class="bg-blue-50/50 p-4 rounded-xl space-y-2 border border-blue-100">
+      <div class="text-xs text-blue-800 font-semibold">نص الرسالة الأصلي:</div>
+      <p id="modal-sms-body" class="text-sm font-mono text-gray-700 bg-white p-3 rounded-lg border border-gray-100 leading-relaxed select-all"></p>
+    </div>
+
+    <input type="hidden" id="modal-sms-id" value="">
+
+    <!-- Generator Inputs -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-1.5">معرف النمط فريد (Pattern ID):</label>
+        <input type="text" id="modal-pattern-id" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white transition-all text-left font-mono" placeholder="auto_received_ar_12">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-1.5">نوع العملية (Transaction Type):</label>
+        <select id="modal-pattern-type" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white transition-all text-left">
+          <option value="RECEIVED">RECEIVED (استلام تحويل)</option>
+          <option value="SENT">SENT (إرسال تحويل)</option>
+          <option value="BILL">BILL (دفع فاتورة)</option>
+          <option value="PURCHASE">PURCHASE (شراء كرت شراء)</option>
+          <option value="TOPUP">TOPUP (شحن رصيد)</option>
+          <option value="BALANCE">BALANCE (استعلام رصيد)</option>
+          <option value="ATM_WITHDRAWAL">ATM_WITHDRAWAL (سحب نقدي)</option>
+          <option value="ATM_DEPOSIT">ATM_DEPOSIT (إيداع نقدي)</option>
+          <option value="FEE">FEE (خصم خدمة / رسوم)</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs font-bold text-gray-700 mb-1.5">التعبير المنتظم (Regex Pattern):</label>
+      <textarea id="modal-pattern-regex" rows="3" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white transition-all text-left font-mono" placeholder=".*"></textarea>
+    </div>
+
+    <div>
+      <label class="block text-xs font-bold text-gray-700 mb-2">تطابق المجموعات (Capture Groups index):</label>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-[10px] text-gray-500 mb-0.5">المبلغ (Amount Group):</label>
+          <input type="number" id="modal-group-amount" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-left" placeholder="0">
+        </div>
+        <div>
+          <label class="block text-[10px] text-gray-500 mb-0.5">الطرف الآخر (Counterpart Group):</label>
+          <input type="text" id="modal-group-counterpart" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-left" placeholder="0 أو اسم">
+        </div>
+        <div>
+          <label class="block text-[10px] text-gray-500 mb-0.5">الرصيد بعد العملية (Balance Group):</label>
+          <input type="number" id="modal-group-balance" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-left" placeholder="0">
+        </div>
+        <div>
+          <label class="block text-[10px] text-gray-500 mb-0.5">رقم العملية (Trx ID Group):</label>
+          <input type="number" id="modal-group-trx" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-left" placeholder="0">
+        </div>
+        <div>
+          <label class="block text-[10px] text-gray-500 mb-0.5">التاريخ (Date Group):</label>
+          <input type="text" id="modal-group-date" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-left" placeholder="0">
+        </div>
+        <div>
+          <label class="block text-[10px] text-gray-500 mb-0.5">الوقت (Time Group):</label>
+          <input type="text" id="modal-group-time" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-left" placeholder="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between border-t border-gray-100 pt-4">
+      <button onclick="savePattern()" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-sm">save</span>
+        حفظ واعتماد النمط
+      </button>
+      <button onclick="closeAIModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-colors">
+        إلغاء
+      </button>
+    </div>
+  </div>
+</div>
+
 </body></html>

@@ -3,13 +3,110 @@
 {% block title %}لوحة التحكم - دفتر كاش (Daftar Cash){% endblock %}
 
 {% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
+    /* تخطيط لوحة التحكم الاحترافية */
+    .dashboard-layout {
+        display: flex;
+        gap: 30px;
+        margin-top: 20px;
+        align-items: flex-start;
+    }
+    .dashboard-sidebar {
+        width: 260px;
+        background: white;
+        border-radius: 16px;
+        padding: 15px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+        border: 1px solid rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+    .sidebar-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 10px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .sidebar-link i {
+        font-size: 16px;
+        width: 20px;
+        text-align: center;
+    }
+    .sidebar-link:hover {
+        background: rgba(139, 92, 246, 0.05);
+        color: var(--accent-purple);
+    }
+    .sidebar-link.active {
+        background: var(--primary-gradient);
+        color: white;
+    }
+    .dashboard-content-area {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        min-width: 0;
+    }
+    
+    /* عرض وتغيير التبويبات */
+    .dashboard-tab-content {
+        display: none;
+    }
+    .dashboard-tab-content.active {
+        display: block;
+    }
+
+    /* الـ Grid للتحليلات */
+    .analytics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    .analytics-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+        border: 1px solid rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    .analytics-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+    }
+    .chart-container {
+        position: relative;
+        height: 250px;
+        width: 100%;
+    }
+    .charts-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 30px;
+        margin-bottom: 30px;
+    }
     .dashboard-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
         gap: 30px;
         align-items: start;
-        margin-top: 20px;
     }
     
     .license-card {
@@ -22,7 +119,7 @@
         border: 1px dashed rgba(0,0,0,0.15);
         border-radius: 12px;
         padding: 15px;
-        font-family: 'Outfit', 'Courier New', monospace;
+        font-family: 'Outfit', monospace;
         font-size: 20px;
         font-weight: 700;
         letter-spacing: 1.5px;
@@ -47,7 +144,6 @@
         justify-content: center;
         transition: var(--transition-smooth);
     }
-    
     .copy-btn:hover {
         background: var(--accent-blue);
         color: white;
@@ -59,13 +155,11 @@
         flex-direction: column;
         gap: 15px;
     }
-    
     .instruction-step {
         display: flex;
         gap: 15px;
         align-items: flex-start;
     }
-    
     .step-number {
         background: var(--primary-gradient);
         color: white;
@@ -80,225 +174,940 @@
         flex-shrink: 0;
     }
 
-    @media (max-width: 992px) {
-        .dashboard-grid {
+    /* حاسبة الرسوم */
+    .calculator-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+    }
+    @media (max-width: 768px) {
+        .calculator-container {
             grid-template-columns: 1fr;
         }
+    }
+
+    /* الفلاتر والبحث */
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .filter-input {
+        background: #FFFFFF;
+        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 10px;
+        padding: 10px 15px;
+        font-size: 14px;
+        color: var(--text-primary);
+        outline: none;
+    }
+    .filter-input:focus {
+        border-color: var(--accent-purple);
+    }
+
+    /* الخزينة والنقدية */
+    .cash-kpi-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    /* التحايل على الموبايل */
+    @media (max-width: 992px) {
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+        .dashboard-layout {
+            flex-direction: column;
+        }
+        .dashboard-sidebar {
+            width: 100%;
+            flex-direction: row;
+            overflow-x: auto;
+            padding: 10px;
+            white-space: nowrap;
+        }
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(20, 184, 166, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(20, 184, 166, 0); }
     }
 </style>
 {% endblock %}
 
 {% block content %}
+<!-- Header Bar -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px;">
     <div>
-        <h1 style="font-size: 32px; font-weight: 800;">لوحة تحكم المشترك</h1>
-        <p style="color: var(--text-secondary); font-size: 15px;">مرحباً بك مجدداً، {{ user.username }}! أدر اشتراكك وحمل أدوات التشغيل هنا.</p>
+        <h1 style="font-size: 32px; font-weight: 800;">لوحة تحكم المشترك السحابية</h1>
+        <p style="color: var(--text-secondary); font-size: 15px;">إدارة كاملة لحسابك، ومتابعة المعاملات والأرباح مع مزامنة فورية.</p>
     </div>
     <div>
-        <a href="{% url 'landing' %}#pricing" class="btn-primary"><i class="fa-solid fa-cart-plus"></i> شراء اشتراك جديد</a>
+        <span class="badge badge-active" style="padding: 8px 16px; font-size: 13px;"><i class="fa-solid fa-cloud-arrow-up"></i> اتصال سحابي مباشر نشط</span>
     </div>
 </div>
 
-<div class="dashboard-grid">
-    <!-- License Status Card -->
-    <div class="glass-card license-card">
-        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-blue);">
-            <i class="fa-solid fa-key"></i> الاشتراك الحالي (License Status)
-        </h3>
-        
-        {% if active_license %}
-            <p style="color: var(--text-secondary); font-size: 14px;">بيانات حساب التفعيل الخاص بك (سجل الدخول بها في تطبيق الديسكتوب):</p>
-            <div class="key-box" style="font-size: 16px; letter-spacing: 0.5px;">
-                <button class="copy-btn" onclick="copyKey('{{ user.username }}')" title="نسخ اسم المستخدم">
-                    <i class="fa-regular fa-copy"></i>
-                </button>
-                <span>اسم المستخدم: <strong>{{ user.username }}</strong></span>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 14px; margin-bottom: 25px;">
-                <div>
-                    <span style="color: var(--text-secondary);">نوع الاشتراك:</span>
-                    <strong style="color: var(--text-primary); display: block; margin-top: 4px;">{{ active_license.get_type_display }}</strong>
-                </div>
-                <div>
-                    <span style="color: var(--text-secondary);">تاريخ الانتهاء:</span>
-                    <strong style="color: var(--text-primary); display: block; margin-top: 4px;">{{ active_license.expires_at|date:"Y-m-d H:i" }}</strong>
-                </div>
-                <div>
-                    <span style="color: var(--text-secondary);">حالة التفعيل:</span>
-                    <span style="display: block; margin-top: 4px;">
-                        <span class="badge badge-active">نشط (Active)</span>
-                    </span>
-                </div>
-                <div>
-                    <span style="color: var(--text-secondary);">الجهاز المرتبط (MAC):</span>
-                    <strong style="color: var(--accent-pink); font-family: monospace; display: block; margin-top: 4px;">
-                        {% if active_license.mac_address %}{{ active_license.mac_address }}{% else %}لم يتم الربط بعد{% endif %}
-                    </strong>
-                </div>
-            </div>
-            
-            {% if active_license.mac_address %}
-                <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; padding: 15px; font-size: 13px;">
-                    <i class="fa-solid fa-circle-info" style="color: var(--error-red); margin-left: 5px;"></i>
-                    الترخيص مغلق ومربوط حالياً بجهازك الكمبيوتر. إذا قمت بتغيير الجهاز أو واجهت مشكلة، يرجى الاتصال بالإدارة لإعادة تعيين قفل الـ MAC.
-                </div>
-            {% else %}
-                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 15px; font-size: 13px;">
-                    <i class="fa-solid fa-circle-info" style="color: var(--success-green); margin-left: 5px;"></i>
-                    حسابك جاهز لتفعيل التطبيق! قم بتسجيل الدخول في تطبيق سطح المكتب وسيتم ربط رخصتك بجهازك تلقائياً عند تسجيل الدخول الأول.
-                </div>
-            {% endif %}
-        {% else %}
-            <div style="text-align: center; padding: 30px 10px;">
-                <i class="fa-solid fa-triangle-exclamation" style="font-size: 48px; color: var(--warning-amber); margin-bottom: 15px;"></i>
-                <h4>لا يوجد اشتراك نشط حالياً</h4>
-                <p style="color: var(--text-secondary); font-size: 14px; margin-top: 10px; margin-bottom: 20px;">لم تقم بالاشتراك بعد أو انتهت صلاحية اشتراكك القديم.</p>
-                <div style="display: flex; gap: 10px; justify-content: center;">
-                    <a href="{% url 'landing' %}#pricing" class="btn-primary"><i class="fa-solid fa-cart-shopping"></i> اشترك الآن</a>
-                </div>
-            </div>
-        {% endif %}
+<div class="dashboard-layout">
+    <!-- Sidebar Navigation -->
+    <div class="dashboard-sidebar">
+        <a class="sidebar-link active" onclick="switchTab('overview')">
+            <i class="fa-solid fa-chart-pie"></i> الرئيسية (Overview)
+        </a>
+        <a class="sidebar-link" onclick="switchTab('transactions')">
+            <i class="fa-solid fa-list-check"></i> المعاملات (Transactions)
+        </a>
+        <a class="sidebar-link" onclick="switchTab('profits')">
+            <i class="fa-solid fa-circle-dollar-to-slot"></i> إدارة الأرباح (Profits)
+        </a>
+        <a class="sidebar-link" onclick="switchTab('cash')">
+            <i class="fa-solid fa-vault"></i> الخزينة والنقدية (Cash)
+        </a>
+        <a class="sidebar-link" onclick="switchTab('contacts')">
+            <i class="fa-solid fa-address-book"></i> جهات الاتصال النشطة
+        </a>
+        <a class="sidebar-link" onclick="switchTab('tools')">
+            <i class="fa-solid fa-calculator"></i> حاسبة العمولات والأدوات
+        </a>
+        <a class="sidebar-link" href="{% url 'logout' %}">
+            <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
+        </a>
     </div>
 
-    <!-- Instructions / Setup Card -->
-    <div class="glass-card">
-        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-purple);">
-            <i class="fa-solid fa-circle-info"></i> خطوات التحميل والإعداد للتشغيل
-        </h3>
+    <!-- Content Area -->
+    <div class="dashboard-content-area">
         
-        <div class="instructions-list">
-            <div class="instruction-step">
-                <div class="step-number">1</div>
-                <div>
-                    <h5 style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">تحميل ملفات التشغيل</h5>
-                    <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 10px;">قم بتحميل تطبيق سطح المكتب للكمبيوتر وتثبيت تطبيق الموبايل (APK) المخصص لهاتفك.</p>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <a href="{% url 'download_file' 'desktop' %}" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;"><i class="fa-brands fa-windows"></i> تطبيق الكمبيوتر (.exe)</a>
-                        <a href="{% url 'download_file' 'mobile' %}" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;"><i class="fa-brands fa-android"></i> تطبيق الموبايل (.apk)</a>
+        <!-- ═════════════════ التبويب 1: الرئيسية ═════════════════ -->
+        <div id="tab-overview" class="dashboard-tab-content active">
+            <div class="dashboard-grid">
+                <!-- License Status Card -->
+                <div class="glass-card license-card">
+                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-blue);">
+                        <i class="fa-solid fa-key"></i> الاشتراك الحالي (License Status)
+                    </h3>
+                    {% if active_license %}
+                        <p style="color: var(--text-secondary); font-size: 14px;">اسم مستخدم تفعيل الترخيص في التطبيقات:</p>
+                        <div class="key-box" style="font-size: 16px; letter-spacing: 0.5px;">
+                            <button class="copy-btn" onclick="copyKey('{{ user.username }}')" title="نسخ اسم المستخدم">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                            <span>اسم المستخدم: <strong>{{ user.username }}</strong></span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 14px; margin-bottom: 25px;">
+                            <div>
+                                <span style="color: var(--text-secondary);">نوع الاشتراك:</span>
+                                <strong style="color: var(--text-primary); display: block; margin-top: 4px;">{{ active_license.get_type_display }}</strong>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary);">تاريخ الانتهاء:</span>
+                                <strong style="color: var(--text-primary); display: block; margin-top: 4px;">{{ active_license.expires_at|date:"Y-m-d H:i" }}</strong>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary);">حالة التفعيل:</span>
+                                <span style="display: block; margin-top: 4px;"><span class="badge badge-active">نشط (Active)</span></span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary);">الـ MAC المقترن:</span>
+                                <strong style="color: var(--accent-pink); font-family: monospace; display: block; margin-top: 4px;">
+                                    {{ active_license.mac_address|default:"لم يقترن بالديسكتوب بعد" }}
+                                </strong>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div style="text-align: center; padding: 20px 0;">
+                            <i class="fa-solid fa-triangle-exclamation" style="font-size: 40px; color: var(--warning-amber); margin-bottom: 10px;"></i>
+                            <h4>لا يوجد ترخيص نشط حالياً</h4>
+                            <p style="color: var(--text-secondary); font-size: 13px; margin: 10px 0 20px 0;">يرجى الاشتراك لتفعيل الخدمة.</p>
+                            <a href="{% url 'landing' %}#pricing" class="btn-primary"><i class="fa-solid fa-cart-shopping"></i> اشترك الآن</a>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Setup Instructions -->
+                <div class="glass-card">
+                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-purple);">
+                        <i class="fa-solid fa-circle-info"></i> خطوات التحميل والإعداد للتشغيل
+                    </h3>
+                    <div class="instructions-list">
+                        <div class="instruction-step">
+                            <div class="step-number">1</div>
+                            <div>
+                                <h5 style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">تحميل التطبيقات</h5>
+                                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">حمل التطبيق الهاتفي والديسكتوب لبدء مراقبة الرسائل.</p>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <a href="{% url 'download_file' 'desktop' %}" class="btn-secondary" style="padding: 6px 12px; font-size: 11px;"><i class="fa-brands fa-windows"></i> نسخة الديسكتوب</a>
+                                    <a href="{% url 'download_file' 'mobile' %}" class="btn-secondary" style="padding: 6px 12px; font-size: 11px;"><i class="fa-brands fa-android"></i> نسخة المحمول</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="instruction-step">
+                            <div class="step-number">2</div>
+                            <div>
+                                <h5 style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">المزامنة والتشغيل</h5>
+                                <p style="font-size: 13px; color: var(--text-secondary);">سجل الدخول بحسابك في التطبيقات، وسيتم ربط البيانات ومزامنتها تلقائياً.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mobile Sync Status Card -->
+                <div class="glass-card" style="background: linear-gradient(135deg, #FFFFFF 0%, #F0FDFA 100%); border: 1px solid rgba(20, 184, 166, 0.25);">
+                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: #0d9488;">
+                        <i class="fa-solid fa-mobile-screen-button"></i> مزامنة تطبيق الهاتف (Mobile Sync)
+                    </h3>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px; background: rgba(20, 184, 166, 0.08); padding: 15px; border-radius: 12px; border: 1px solid rgba(20, 184, 166, 0.15);">
+                        <div style="width: 12px; height: 12px; border-radius: 50%; background: #10b981; animation: pulse 2s infinite;"></div>
+                        <div>
+                            <span style="font-size: 14px; font-weight: bold; color: #0f766e; display: block;">المزامنة السحابية المباشرة: نشطة</span>
+                            <span style="font-size: 12px; color: var(--text-secondary);">جاهز لاستقبال المعاملات مباشرة من تطبيق الهاتف</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 13px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 10px;">
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 8px;">
+                            <span>رابط السيرفر للتطبيق (API URL):</span>
+                            <strong style="color: var(--text-primary); font-family: monospace;" id="serverApiUrl">جاري الكشف...</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 8px;">
+                            <span>مفتاح الترخيص للموبايل:</span>
+                            <strong style="color: var(--text-primary); font-family: monospace;">{{ active_license.key|default:"-" }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overview Stat Cards -->
+            <div class="analytics-grid" style="margin-top: 30px;">
+                <div class="analytics-card">
+                    <div class="analytics-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                        <i class="fa-solid fa-arrow-down-long"></i>
+                    </div>
+                    <div>
+                        <span style="font-size: 12px; color: var(--text-secondary); display: block;">إجمالي السحوبات للعملاء (RECEIVED)</span>
+                        <strong style="font-size: 18px; font-weight: bold; color: var(--text-primary);">{{ analytics.total_received }} ج.م</strong>
+                    </div>
+                </div>
+                <div class="analytics-card">
+                    <div class="analytics-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
+                        <i class="fa-solid fa-arrow-up-long"></i>
+                    </div>
+                    <div>
+                        <span style="font-size: 12px; color: var(--text-secondary); display: block;">إجمالي الإيداعات للعملاء (SENT)</span>
+                        <strong style="font-size: 18px; font-weight: bold; color: var(--text-primary);">{{ analytics.total_sent }} ج.م</strong>
+                    </div>
+                </div>
+                <div class="analytics-card">
+                    <div class="analytics-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                        <i class="fa-solid fa-percent"></i>
+                    </div>
+                    <div>
+                        <span style="font-size: 12px; color: var(--text-secondary); display: block;">إجمالي عمولات الأرباح المقدرة</span>
+                        <strong style="font-size: 18px; font-weight: bold; color: var(--text-primary);">{{ analytics.total_fee }} ج.م</strong>
+                    </div>
+                </div>
+                <div class="analytics-card">
+                    <div class="analytics-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
+                        <i class="fa-solid fa-hashtag"></i>
+                    </div>
+                    <div>
+                        <span style="font-size: 12px; color: var(--text-secondary); display: block;">عدد العمليات الكلي</span>
+                        <strong style="font-size: 18px; font-weight: bold; color: var(--text-primary);">{{ analytics.count }} عملية</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overview Charts Grid -->
+            <div class="charts-grid">
+                <div style="background: white; border-radius: 16px; border: 1px solid rgba(0,0,0,0.05); padding: 20px;">
+                    <h4 style="font-size: 14px; font-weight: bold; margin-bottom: 15px; color: var(--text-primary);">
+                        <i class="fa-solid fa-chart-area"></i> حجم السحوبات والإيداعات اليومي (آخر 7 أيام)
+                    </h4>
+                    <div class="chart-container">
+                        <canvas id="trendsChart"></canvas>
+                    </div>
+                </div>
+                <div style="background: white; border-radius: 16px; border: 1px solid rgba(0,0,0,0.05); padding: 20px;">
+                    <h4 style="font-size: 14px; font-weight: bold; margin-bottom: 15px; color: var(--text-primary);">
+                        <i class="fa-solid fa-wallet"></i> توزيع المحافظ والشبكات
+                    </h4>
+                    <div class="chart-container" style="height: 200px;">
+                        <canvas id="walletsChart"></canvas>
                     </div>
                 </div>
             </div>
             
-            <div class="instruction-step">
-                <div class="step-number">2</div>
-                <div>
-                    <h5 style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">تسجيل الدخول والتفعيل</h5>
-                    <p style="font-size: 13px; color: var(--text-secondary);">افتح البرنامج على الكمبيوتر، وسجل الدخول باستخدام اسم المستخدم أو البريد الإلكتروني وكلمة مرور هذا الحساب لتفعيل الترخيص فوراً.</p>
-                </div>
-            </div>
-            
-            <div class="instruction-step">
-                <div class="step-number">3</div>
-                <div>
-                    <h5 style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">الربط والمزامنة</h5>
-                    <p style="font-size: 13px; color: var(--text-secondary);">تأكد من اتصال الهاتف والحاسوب بنفس شبكة الإنترنت، واكتب عنوان الـ IP المحلي في إعدادات الموبايل لبدء استقبال الرسائل.</p>
+            <div style="background: white; border-radius: 16px; border: 1px solid rgba(0,0,0,0.05); padding: 20px; margin-bottom: 20px;">
+                <h4 style="font-size: 14px; font-weight: bold; margin-bottom: 15px; color: var(--text-primary);">
+                    <i class="fa-solid fa-clock"></i> ساعات الذروة وتوزيع العمليات خلال ساعات اليوم
+                </h4>
+                <div class="chart-container" style="height: 200px;">
+                    <canvas id="hoursChart"></canvas>
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
-<!-- Subscription History Table -->
-<div class="glass-card" style="margin-top: 40px;">
-    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px;">
-        <i class="fa-solid fa-clock-rotate-left"></i> سجل مفاتيح التفعيل والعمليات السابقة
-    </h3>
-    
-    <div class="table-responsive">
-        <table>
-            <thead>
-                <tr>
-                    <th>كود الاشتراك</th>
-                    <th>نوع الاشتراك</th>
-                    <th>تاريخ الإنشاء</th>
-                    <th>تاريخ الانتهاء</th>
-                    <th>الحالة</th>
-                    <th>الـ MAC المقترن</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for lic in licenses %}
-                    <tr>
-                        <td class="ltr" style="font-family: monospace; font-weight: bold;">{{ lic.key }}</td>
-                        <td>{{ lic.get_type_display }}</td>
-                        <td>{{ lic.created_at|date:"Y-m-d H:i" }}</td>
-                        <td>{{ lic.expires_at|date:"Y-m-d H:i" }}</td>
-                        <td>
-                            {% if lic.status == 'ACTIVE' and lic.expires_at > timezone.now %}
-                                <span class="badge badge-active">نشط</span>
-                            {% elif lic.status == 'SUSPENDED' %}
-                                <span class="badge badge-suspended">معطل</span>
-                            {% else %}
-                                <span class="badge badge-expired">منتهي</span>
-                            {% endif %}
-                        </td>
-                        <td class="ltr" style="font-family: monospace; font-size: 12px; color: var(--text-muted);">
-                            {% if lic.mac_address %}{{ lic.mac_address }}{% else %}-{% endif %}
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 30px;">
-                            لا يوجد لديك أي أكواد تفعيل أو اشتراكات سابقة بعد.
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-</div>
+        <!-- ═════════════════ التبويب 2: المعاملات ═════════════════ -->
+        <div id="tab-transactions" class="dashboard-tab-content">
+            <div class="glass-card">
+                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px;">
+                    <i class="fa-solid fa-table-list"></i> دفتر سجل المعاملات (Transactions History)
+                </h3>
 
-<!-- Payment & Billing History Table -->
-<div class="glass-card" style="margin-top: 40px;">
-    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--success-green);">
-        <i class="fa-solid fa-receipt"></i> سجل عمليات الدفع وفواتير الاشتراك
-    </h3>
-    
-    <div class="table-responsive">
-        <table>
-            <thead>
-                <tr>
-                    <th>رمز العملية (Tx ID)</th>
-                    <th>كود التفعيل المرتبط</th>
-                    <th>طريقة الدفع</th>
-                    <th>المبلغ المدفوع</th>
-                    <th>الحالة</th>
-                    <th>تاريخ العملية</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for p in payments %}
-                    <tr>
-                        <td class="ltr" style="font-family: monospace; font-size: 13px;">{{ p.transaction_id }}</td>
-                        <td class="ltr" style="font-family: monospace; font-weight: bold; color: var(--accent-blue);">{{ p.license_key.key }}</td>
-                        <td>{{ p.payment_method }}</td>
-                        <td style="font-family: Outfit; font-weight: bold; color: var(--success-green);">{{ p.amount }} ج.م</td>
-                        <td>
-                            <span class="badge badge-active">{{ p.status }}</span>
-                        </td>
-                        <td>{{ p.created_at|date:"Y-m-d H:i" }}</td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 30px;">
-                            لا توجد أي فواتير أو عمليات دفع مسجلة حتى الآن.
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                <!-- Filters -->
+                <div class="filters-bar">
+                    <input type="text" id="txSearchInput" class="filter-input" placeholder="البحث برقم العملية أو الطرف الآخر..." onkeyup="filterTransactionsTable()">
+                    <select id="txTypeFilter" class="filter-input" onchange="filterTransactionsTable()">
+                        <option value="">كل أنواع العمليات</option>
+                        <option value="سحب للعميل">سحب للعميل (RECEIVED)</option>
+                        <option value="إيداع للعميل">إيداع للعميل (SENT)</option>
+                    </select>
+                    <select id="txWalletFilter" class="filter-input" onchange="filterTransactionsTable()">
+                        <option value="">كل المحافظ</option>
+                        {% for wallet in analytics.wallets_labels %}
+                            <option value="{{ wallet }}">{{ wallet }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="transactionsTable">
+                        <thead>
+                            <tr>
+                                <th>رمز العملية</th>
+                                <th>المحفظة</th>
+                                <th>النوع</th>
+                                <th>المبلغ</th>
+                                <th>الأرباح المقدرة</th>
+                                <th>الطرف الآخر</th>
+                                <th>حالة الأرباح</th>
+                                <th>التاريخ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tx in user_transactions %}
+                                <tr>
+                                    <td class="ltr font-mono" style="font-size: 13px;">{{ tx.transaction_id }}</td>
+                                    <td class="wallet-col">{{ tx.wallet_id }}</td>
+                                    <td class="type-col">
+                                        {% if tx.type == 'RECEIVED' %}
+                                            <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: none; padding: 4px 8px; border-radius: 6px;">سحب للعميل</span>
+                                        {% else %}
+                                            <span class="badge" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: none; padding: 4px 8px; border-radius: 6px;">إيداع للعميل</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="font-family: Outfit; font-weight: bold; color: var(--text-primary);">{{ tx.amount }} ج.م</td>
+                                    <td style="font-family: Outfit; font-weight: bold; color: var(--accent-purple);">{{ tx.calculated_fee }} ج.م</td>
+                                    <td class="counterpart-col ltr font-mono" style="font-weight: bold;">{{ tx.decrypted_counterpart }}</td>
+                                    <td>
+                                        <select class="filter-input" style="padding: 5px; font-size: 12px; height: auto;" onchange="updateProfitStatus('{{ tx.transaction_id }}', this.value)">
+                                            <option value="UNSET" {% if tx.profit_status == 'UNSET' %}selected{% endif %}>معلقة (Unset)</option>
+                                            <option value="CASH" {% if tx.profit_status == 'CASH' %}selected{% endif %}>في الخزينة كاش (Cash)</option>
+                                            <option value="IN_WALLET" {% if tx.profit_status == 'IN_WALLET' %}selected{% endif %}>في المحفظة (Wallet)</option>
+                                            <option value="NONE" {% if tx.profit_status == 'NONE' %}selected{% endif %}>لا توجد أرباح (None)</option>
+                                        </select>
+                                    </td>
+                                    <td>{{ tx.sms_timestamp|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                                        لا توجد معاملات مسجلة لحسابك حالياً.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═════════════════ التبويب 3: إدارة الأرباح ═════════════════ -->
+        <div id="tab-profits" class="dashboard-tab-content">
+            <div class="glass-card">
+                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-purple);">
+                    <i class="fa-solid fa-sack-dollar"></i> لوحة تحليل وإدارة الأرباح والعمولات (Profits Dashboard)
+                </h3>
+
+                <!-- Profit KPI Cards -->
+                <div class="analytics-grid">
+                    <div class="analytics-card" style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color: white;">
+                        <div class="analytics-icon" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">
+                            <i class="fa-solid fa-percent"></i>
+                        </div>
+                        <div>
+                            <span style="font-size: 12px; color: #94a3b8; display: block;">إجمالي الأرباح الكلية</span>
+                            <strong style="font-size: 22px; font-weight: bold; color: white;">{{ analytics.total_fee }} ج.م</strong>
+                        </div>
+                    </div>
+                    <div class="analytics-card" style="background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); color: white;">
+                        <div class="analytics-icon" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">
+                            <i class="fa-solid fa-wallet"></i>
+                        </div>
+                        <div>
+                            <span style="font-size: 12px; color: #a7f3d0; display: block;">أرباح في المحفظة (In Wallet)</span>
+                            <strong style="font-size: 22px; font-weight: bold; color: #34d399;">{{ analytics.profit_in_wallet }} ج.م</strong>
+                        </div>
+                    </div>
+                    <div class="analytics-card" style="background: linear-gradient(135deg, #0b2535 0%, #081a26 100%); color: white;">
+                        <div class="analytics-icon" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee;">
+                            <i class="fa-solid fa-money-bill-wave"></i>
+                        </div>
+                        <div>
+                            <span style="font-size: 12px; color: #a5f3fc; display: block;">أرباح في الدرج كاش (Cash)</span>
+                            <strong style="font-size: 22px; font-weight: bold; color: #22d3ee;">{{ analytics.profit_cash }} ج.م</strong>
+                        </div>
+                    </div>
+                    <div class="analytics-card" style="background: linear-gradient(135deg, #78350f 0%, #451a03 100%); color: white;">
+                        <div class="analytics-icon" style="background: rgba(251, 191, 36, 0.2); color: #fbbf24;">
+                            <i class="fa-solid fa-clock"></i>
+                        </div>
+                        <div>
+                            <span style="font-size: 12px; color: #fde68a; display: block;">أرباح معلقة (Pending/Unset)</span>
+                            <strong style="font-size: 22px; font-weight: bold; color: #fbbf24;">{{ analytics.profit_unset }} ج.م</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wallet Profits Chart -->
+                <div style="background: white; border-radius: 16px; border: 1px solid rgba(0,0,0,0.05); padding: 20px; margin-bottom: 30px;">
+                    <h4 style="font-size: 15px; font-weight: bold; margin-bottom: 20px;">
+                        <i class="fa-solid fa-wallet"></i> إجمالي أرباح العمولات المقدرة حسب كل محفظة
+                    </h4>
+                    <div class="chart-container">
+                        <canvas id="walletProfitsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═════════════════ التبويب 4: الخزينة والنقدية ═════════════════ -->
+        <div id="tab-cash" class="dashboard-tab-content">
+            <!-- Balance cards -->
+            <div class="cash-kpi-container">
+                <div class="analytics-card" style="background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%); color: white;">
+                    <div class="analytics-icon" style="background: rgba(255,255,255,0.2); color: white;">
+                        <i class="fa-solid fa-vault"></i>
+                    </div>
+                    <div>
+                        <span style="font-size: 13px; color: rgba(255,255,255,0.8); display: block;">رصيد الخزينة الكلي الحالي</span>
+                        <strong style="font-size: 26px; font-weight: bold;">{{ cash_balance }} ج.م</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <!-- Add Cash Entry Form -->
+                <div class="glass-card">
+                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-purple);">
+                        <i class="fa-solid fa-circle-plus"></i> تسجيل حركة نقدية جديدة (إيداع/سحب)
+                    </h3>
+                    <form id="addCashForm" onsubmit="submitCashMovement(event)">
+                        <div style="display: flex; flex-direction: column; gap: 15px;">
+                            <div>
+                                <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px;">نوع الحركة:</label>
+                                <select id="cash_type" class="filter-input" style="width: 100%;" required>
+                                    <option value="DEPOSIT">إيداع نقدية في الخزينة (+)</option>
+                                    <option value="WITHDRAWAL">سحب نقدية من الخزينة (-)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px;">المبلغ (ج.م):</label>
+                                <input type="number" id="cash_amount" class="filter-input" style="width: 100%;" min="1" step="any" required>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px;">البيان / الملاحظة:</label>
+                                <textarea id="cash_description" class="filter-input" style="width: 100%; height: 80px;" placeholder="اكتب سبباً للإيداع أو السحب..." required></textarea>
+                            </div>
+                            <button type="submit" class="btn-primary" style="width: 100%; padding: 12px;"><i class="fa-solid fa-floppy-disk"></i> تسجيل الحركة الآن</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Cash Ledger History Table -->
+                <div class="glass-card">
+                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px;">
+                        <i class="fa-solid fa-book"></i> سجل حركات الخزينة (Cash Ledger)
+                    </h3>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>الحركة</th>
+                                    <th>المبلغ</th>
+                                    <th>البيان</th>
+                                    <th>التاريخ</th>
+                                    <th>حذف</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in cash_records %}
+                                    <tr>
+                                        <td>
+                                            {% if record.type == 'DEPOSIT' %}
+                                                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: bold; border: none; padding: 4px 8px; border-radius: 6px;">إيداع (+)</span>
+                                            {% else %}
+                                                <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; font-weight: bold; border: none; padding: 4px 8px; border-radius: 6px;">سحب (-)</span>
+                                            {% endif %}
+                                        </td>
+                                        <td style="font-family: Outfit; font-weight: bold;">{{ record.amount }} ج.م</td>
+                                        <td style="font-size: 13px; color: var(--text-primary);">{{ record.description }}</td>
+                                        <td style="font-size: 12px; color: var(--text-muted);">{{ record.created_at|date:"Y-m-d H:i" }}</td>
+                                        <td>
+                                            <button class="copy-btn" onclick="deleteCashRecord({{ record.id }})" style="width: 32px; height: 32px; color: #ef4444; border-color: rgba(239, 68, 68, 0.2);" title="حذف">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                                            لا توجد أي حركات نقدية مسجلة بعد.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═════════════════ التبويب 5: جهات الاتصال ═════════════════ -->
+        <div id="tab-contacts" class="dashboard-tab-content">
+            <div class="glass-card">
+                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-blue);">
+                    <i class="fa-solid fa-address-book"></i> قائمة العملاء الأكثر نشاطاً وتعاملاً
+                </h3>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>الرقم / جهة الاتصال</th>
+                                <th>عدد العمليات الكلي</th>
+                                <th>سحوبات العميل للتاجر</th>
+                                <th>إيداعات العميل للتاجر</th>
+                                <th>إجمالي المبالغ المتداولة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in top_contacts %}
+                                <tr>
+                                    <td class="ltr font-mono" style="font-weight: bold; font-size: 14px;">{{ c.phone }}</td>
+                                    <td>{{ c.total_count }} عملية</td>
+                                    <td style="color: #10b981; font-weight: 600;">{{ c.received_amount }} ج.م ({{ c.received_count }})</td>
+                                    <td style="color: #3b82f6; font-weight: 600;">{{ c.sent_amount }} ج.م ({{ c.sent_count }})</td>
+                                    <td style="font-family: Outfit; font-weight: 800; font-size: 15px; color: var(--text-primary);">{{ c.total_amount }} ج.م</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                                        لا تتوفر معاملات كافية لحساب إحصائيات العملاء.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═════════════════ التبويب 6: أدوات كاش ═════════════════ -->
+        <div id="tab-tools" class="dashboard-tab-content">
+            <div class="calculator-container">
+                <!-- Fees Calculator -->
+                <div class="glass-card">
+                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--accent-purple);">
+                        <i class="fa-solid fa-calculator"></i> حاسبة الرسوم والعمولات الذكية (Fee Calculator)
+                    </h3>
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <div>
+                            <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px;">الشبكة / المحفظة:</label>
+                            <select id="calc_network" class="filter-input" style="width: 100%;" onchange="runCalculator()">
+                                <option value="vodafone_cash">فودافون كاش (Vodafone Cash)</option>
+                                <option value="orange_cash">أورنج كاش (Orange Cash)</option>
+                                <option value="etisalat_cash">اتصالات كاش (Etisalat Cash)</option>
+                                <option value="we_pay">وي باي (WE Pay)</option>
+                                <option value="instapay">انستاباي (InstaPay)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px;">نوع العملية:</label>
+                            <select id="calc_type" class="filter-input" style="width: 100%;" onchange="runCalculator()">
+                                <option value="withdraw">سحب للعميل من المحفظة (التاجر يستلم كاش)</option>
+                                <option value="deposit">إيداع للعميل في المحفظة (التاجر يسلم كاش)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px;">مبلغ العملية (ج.م):</label>
+                            <input type="number" id="calc_amount" class="filter-input" style="width: 100%;" value="1000" oninput="runCalculator()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calc Result Card -->
+                <div class="glass-card" style="background: linear-gradient(135deg, #1E1B4B 0%, #311042 100%); color: white;">
+                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: #e9d5ff;">
+                        <i class="fa-solid fa-square-poll-vertical"></i> النتائج والعمولة المحتسبة للعملية
+                    </h3>
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+                            <span style="color: #c084fc;">رسوم السحب الرسمية (من العميل للشركة):</span>
+                            <strong id="res_company_fee" style="font-size: 16px;">-</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+                            <span style="color: #fb7185;">أرباح التاجر الصافية (العمولة):</span>
+                            <strong id="res_merchant_profit" style="font-size: 22px; color: #34d399;">-</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+                            <span style="color: #a7f3d0;">إجمالي المبلغ المستلم أو المسلم باليد:</span>
+                            <strong id="res_total_cash" style="font-size: 18px;">-</strong>
+                        </div>
+                        <div style="font-size: 11px; color: #a5b4fc; line-height: 1.5;">
+                            * ملاحظة: الحسابات مبنية على نسبة أرباح افتراضية (1% للسحب و 0.5% للإيداع مع حد أدنى للربح 5 جنيهات) لتسهيل تسعير الخدمات اليومي.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    // نسخ اسم مستخدم الترخيص
     function copyKey(keyText) {
         navigator.clipboard.writeText(keyText).then(function() {
-            alert("✅ تم نسخ كود التفعيل إلى الحافظة بنجاح!");
+            alert("✅ تم نسخ الكود بنجاح إلى الحافظة!");
         }, function(err) {
             console.error('Failed to copy text: ', err);
         });
     }
+
+    // التنقل بين التبويبات بدون ريلود (Single Page Dashboard)
+    function switchTab(tabName) {
+        // إخفاء كافة التبويبات
+        document.querySelectorAll('.dashboard-tab-content').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        // إزالة الكلاس النشط من روابط القائمة الجانبية
+        document.querySelectorAll('.sidebar-link').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        
+        // إظهار التبويب المطلوب
+        const activeTab = document.getElementById('tab-' + tabName);
+        if (activeTab) {
+            activeTab.classList.add('active');
+        }
+        
+        // وسم الرابط النشط
+        event.currentTarget.classList.add('active');
+        
+        // حفظ التبويب النشط في الذاكرة المحلية للمتصفح
+        localStorage.setItem('active_dashboard_tab', tabName);
+    }
+
+    // استعادة التبويب النشط عند إعادة تحميل الصفحة
+    document.addEventListener("DOMContentLoaded", function() {
+        // كشف وتعبئة رابط السيرفر للموبايل
+        const host = window.location.origin;
+        const apiEl = document.getElementById("serverApiUrl");
+        if (apiEl) {
+            apiEl.innerText = host + "/api";
+        }
+
+        const storedTab = localStorage.getItem('active_dashboard_tab');
+        if (storedTab) {
+            const tabBtn = Array.from(document.querySelectorAll('.sidebar-link')).find(el => el.getAttribute('onclick').includes(storedTab));
+            if (tabBtn) {
+                tabBtn.click();
+            }
+        }
+        
+        // تشغيل الحاسبة لأول مرة تلقائياً
+        runCalculator();
+    });
+
+    // ── فلترة جدول المعاملات ──
+    function filterTransactionsTable() {
+        const searchVal = document.getElementById('txSearchInput').value.toLowerCase();
+        const typeVal = document.getElementById('txTypeFilter').value;
+        const walletVal = document.getElementById('txWalletFilter').value;
+        const rows = document.querySelectorAll('#transactionsTable tbody tr');
+
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            const typeText = row.querySelector('.type-col').innerText;
+            const walletText = row.querySelector('.wallet-col').innerText;
+
+            const matchesSearch = text.includes(searchVal);
+            const matchesType = !typeVal || typeText.includes(typeVal);
+            const matchesWallet = !walletVal || walletText.includes(walletVal);
+
+            if (matchesSearch && matchesType && matchesWallet) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    // ── AJAX: تحديث حالة الربح لعملية ما ──
+    function updateProfitStatus(txId, status) {
+        fetch('/dashboard/transaction/update-profit/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                transaction_id: txId,
+                profit_status: status
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                // إظهار إشعار خفيف أو ريلود لتحديث إحصائيات كروت الأرباح
+                console.log(data.message);
+            } else {
+                alert("❌ فشل تحديث حالة الأرباح: " + data.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("❌ خطأ اتصال أثناء تحديث حالة الأرباح.");
+        });
+    }
+
+    // ── AJAX: تسجيل حركة نقدية جديدة في الخزينة ──
+    function submitCashMovement(e) {
+        e.preventDefault();
+        const type = document.getElementById('cash_type').value;
+        const amount = document.getElementById('cash_amount').value;
+        const description = document.getElementById('cash_description').value;
+
+        fetch('/dashboard/cash/add/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                type: type,
+                amount: amount,
+                description: description
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert("✅ " + data.message);
+                // ريلود لتحديث رصيد الخزينة والجدول مباشرة
+                location.reload();
+            } else {
+                alert("❌ خطأ: " + data.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("❌ فشل إرسال الحركة النقدية.");
+        });
+    }
+
+    // ── AJAX: حذف حركة نقدية ──
+    function deleteCashRecord(recordId) {
+        if (!confirm("هل أنت متأكد من رغبتك في حذف حركة الخزينة هذه؟")) return;
+
+        fetch('/dashboard/cash/delete/' + recordId + '/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert("✅ تم الحذف بنجاح.");
+                location.reload();
+            } else {
+                alert("❌ خطأ أثناء الحذف.");
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("❌ خطأ اتصال بالخادم.");
+        });
+    }
+
+    // ── الحاسبة التفاعلية ──
+    function runCalculator() {
+        const network = document.getElementById('calc_network').value;
+        const type = document.getElementById('calc_type').value;
+        const amount = parseFloat(document.getElementById('calc_amount').value || 0);
+
+        let companyFee = 0.0;
+        let merchantProfit = 0.0;
+        let totalCash = 0.0;
+
+        if (amount > 0) {
+            // 1. حساب رسوم الشركة الرسمية
+            if (network === 'vodafone_cash' || network === 'orange_cash' || network === 'etisalat_cash' || network === 'we_pay') {
+                if (type === 'withdraw') {
+                    // رسوم السحب الافتراضية للشركة هي 1% (بحد أدنى 3 جنيهات)
+                    companyFee = Math.max(amount * 0.01, 3.0);
+                } else {
+                    // رسوم الإيداع مجانية رسمياً بالشركة
+                    companyFee = 0.0;
+                }
+            } else if (network === 'instapay') {
+                companyFee = 0.0; // مجاني بالكامل حالياً
+            }
+
+            // 2. حساب عمولة ربح التاجر الافتراضية
+            if (type === 'withdraw') {
+                merchantProfit = Math.max(amount * 0.01, 5.0);
+                totalCash = amount - companyFee; // ما يستلمه التاجر بالهاتف مطروحاً منه الرسوم
+            } else {
+                merchantProfit = Math.max(amount * 0.005, 5.0);
+                totalCash = amount; // المبلغ المراد إيداعه
+            }
+        }
+
+        document.getElementById('res_company_fee').innerText = companyFee.toFixed(2) + " ج.م";
+        document.getElementById('res_merchant_profit').innerText = merchantProfit.toFixed(2) + " ج.م";
+        document.getElementById('res_total_cash').innerText = totalCash.toFixed(2) + " ج.م";
+    }
+
+    // ── Chart.js Configurations ──
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. Daily Trends Chart
+        const trendsCtx = document.getElementById('trendsChart').getContext('2d');
+        new Chart(trendsCtx, {
+            type: 'line',
+            data: {
+                labels: {{ analytics.days_labels|safe }},
+                datasets: [
+                    {
+                        label: 'السحوبات (RECEIVED)',
+                        data: {{ analytics.daily_received|safe }},
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 3
+                    },
+                    {
+                        label: 'الإيداعات (SENT)',
+                        data: {{ analytics.daily_sent|safe }},
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { font: { family: 'Cairo, sans-serif' } }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // 2. Wallets Distribution Chart
+        const walletsCtx = document.getElementById('walletsChart').getContext('2d');
+        new Chart(walletsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: {{ analytics.wallets_labels|safe }},
+                datasets: [{
+                    data: {{ analytics.wallets_values|safe }},
+                    backgroundColor: [
+                        '#ff3b30', '#34c759', '#007aff', '#ffcc00', '#af52de', '#5856d6'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { font: { family: 'Cairo, sans-serif' } }
+                    }
+                }
+            }
+        });
+
+        // 3. Peak Hours Chart
+        const hoursCtx = document.getElementById('hoursChart').getContext('2d');
+        const hoursLabels = Array.from({length: 24}, (_, i) => `${i}:00`);
+        new Chart(hoursCtx, {
+            type: 'bar',
+            data: {
+                labels: hoursLabels,
+                datasets: [{
+                    label: 'عدد العمليات',
+                    data: {{ analytics.hours_values|safe }},
+                    backgroundColor: 'rgba(139, 92, 246, 0.6)',
+                    borderColor: '#8b5cf6',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // 4. Wallet Profits Chart
+        const walletProfitsCtx = document.getElementById('walletProfitsChart').getContext('2d');
+        new Chart(walletProfitsCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ analytics.wallet_profits_labels|safe }},
+                datasets: [{
+                    label: 'العمولة والأرباح بالجنيه',
+                    data: {{ analytics.wallet_profits_values|safe }},
+                    backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                    borderColor: '#f59e0b',
+                    borderWidth: 1,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    });
 </script>
 {% endblock %}

@@ -6,6 +6,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 from django.utils import timezone
 from django.http import JsonResponse, FileResponse, Http404
@@ -14,6 +15,7 @@ from django.template.loader import render_to_string
 from django.conf import settings
 from licensing.models import LicenseKey, Coupon, PaymentRecord, SiteConfiguration
 from licensing.utils import normalize_egyptian_phone
+from .infobip import send_whatsapp_otp, send_whatsapp_welcome, send_whatsapp_payment_confirmation
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +91,9 @@ def signup_view(request):
         p = request.POST.get('password', '').strip()
         p_c = request.POST.get('password_confirm', '').strip()
         phone = request.POST.get('phone', '').strip()
-        has_whatsapp = request.POST.get('has_whatsapp', '') == 'true'
         
-        if not u or not p:
-            messages.error(request, "يرجى ملء جميع الحقول المطلوبة.")
+        if not u or not p or not phone:
+            messages.error(request, "يرجى ملء جميع الحقول المطلوبة (اسم المستخدم، كلمة المرور، ورقم الهاتف).")
             return render(request, 'web/register.html')
             
         if p != p_c:
@@ -103,35 +104,27 @@ def signup_view(request):
             messages.error(request, "اسم المستخدم هذا مسجل بالفعل.")
             return render(request, 'web/register.html')
             
+        if e and User.objects.filter(email=e).exists():
+            messages.error(request, "البريد الإلكتروني هذا مسجل بالفعل.")
+            return render(request, 'web/register.html')
+            
         try:
             user = User.objects.create_user(username=u, email=e, password=p)
             
             # Save UserProfile fields
             profile = user.profile
-            profile.phone = phone
-            profile.has_whatsapp = has_whatsapp
+            profile.phone = normalize_egyptian_phone(phone)
+            profile.has_whatsapp = True
+            profile.email_verified = False
             profile.save()
             
-            login(request, user)
+            # Send verification OTP code via WhatsApp
+            send_whatsapp_otp(user)
             
-            # Create a 7-day trial license key for this user
-            trial_key = f"VC-TRIAL-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}"
-            expires_at = timezone.now() + timedelta(days=7)
-            
-            lic = LicenseKey.objects.create(
-                key=trial_key,
-                user=user,
-                client_name=user.username,
-                type='TRIAL',
-                status='ACTIVE',
-                expires_at=expires_at
-            )
-            
-            send_welcome_email(user)
-            send_license_email(user, lic.key, lic.type, lic.expires_at)
-            
-            messages.success(request, f"تم تسجيل الحساب وتفعيل فترة تجريبية مجانية (7 أيام)! مفتاح التفعيل الخاص بك: {lic.key}")
-            return redirect('dashboard')
+            # Store in session for verification page lookup
+            request.session['verification_username'] = user.username
+            messages.success(request, "تم تسجيل حسابك بنجاح! تم إرسال رمز تفعيل مؤقت إلى حساب الواتس آب الخاص بك.")
+            return redirect('verify_email')
         except Exception as ex:
             messages.error(request, f"حدث خطأ أثناء التسجيل: {ex}")
             
@@ -250,11 +243,16 @@ def social_callback_view(request, provider):
             profile = user.profile
             profile.phone = ""
             profile.has_whatsapp = False
+            profile.email_verified = True
             profile.save()
 
             send_welcome_email(user)
             messages.success(request, f"مرحباً بك! تم تسجيل حسابك عبر {provider.capitalize()} وتفعيل اشتراك تجريبي 7 أيام.")
         else:
+            profile = user.profile
+            if not profile.email_verified:
+                profile.email_verified = True
+                profile.save()
             messages.success(request, f"تم تسجيل الدخول بنجاح عبر {provider.capitalize()}.")
 
         login(request, user)
@@ -279,6 +277,13 @@ def login_view(request):
         
         user = authenticate(request, username=u, password=p)
         if user is not None:
+            profile = getattr(user, 'profile', None)
+            if profile and not profile.email_verified and not user.is_staff and not user.is_superuser:
+                send_whatsapp_otp(user)
+                request.session['verification_username'] = user.username
+                messages.warning(request, "يرجى تأكيد حسابك أولاً. تم إرسال رمز تحقق جديد إلى حساب الواتس آب الخاص بك.")
+                return redirect('verify_email')
+
             login(request, user)
             messages.success(request, "تم تسجيل الدخول بنجاح.")
             if next_url:
@@ -307,14 +312,219 @@ def dashboard_view(request):
         if lic.is_valid():
             active_license = lic
             break
+
+    # ── طبقة التحليلات وحساب الإحصائيات الخاصة بهذا التاجر فقط ──
+    from licensing.models import MerchantTransaction, CashLedger
+    import datetime
+    
+    txs = MerchantTransaction.objects.filter(user=request.user).order_by('-sms_timestamp')
+    
+    # ── دالة مساعدة لحساب الرسوم (الأرباح) المقدرة ──
+    def calculate_tx_fee(tx):
+        w_id = (tx.wallet_id or "").strip().lower()
+        if not w_id or w_id in ["unspecified", ""]:
+            return 0.0
+        amount = float(tx.amount)
+        if tx.type == 'RECEIVED': # سحب للعميل
+            return max(amount * 0.01, 5.0) if amount > 0 else 0.0
+        elif tx.type in ['SENT', 'BILL', 'PURCHASE', 'TOPUP']: # إيداع للعميل
+            return max(amount * 0.005, 5.0) if amount > 0 else 0.0
+        return 0.0
+
+    # حساب الإحصائيات الأساسية
+    total_received = sum(t.amount for t in txs if t.type == 'RECEIVED')
+    total_sent = sum(t.amount for t in txs if t.type == 'SENT')
+    
+    # حساب الأرباح والرسوم المفصلة
+    total_fee = 0.0
+    profit_cash = 0.0
+    profit_in_wallet = 0.0
+    profit_unset = 0.0
+    wallet_profits = {}
+    
+    for t in txs:
+        fee = calculate_tx_fee(t)
+        total_fee += fee
+        
+        # ربح المحفظة
+        w_id = t.wallet_id or "غير محدد"
+        wallet_profits[w_id] = wallet_profits.get(w_id, 0.0) + fee
+        
+        # أرباح مصنفة
+        p_status = t.profit_status or "UNSET"
+        if p_status == 'CASH':
+            profit_cash += fee
+        elif p_status == 'IN_WALLET':
+            profit_in_wallet += fee
+        else:
+            profit_unset += fee
+
+    tx_count = txs.count()
+
+    # 1. المخطط الدائري: توزيع المحافظ
+    wallets_data = {}
+    for t in txs:
+        w = t.wallet_id or "غير محدد"
+        wallets_data[w] = wallets_data.get(w, 0) + 1
+    
+    # 2. المخطط الشريطي: ساعات الذروة (24 ساعة)
+    hours_data = [0] * 24
+    for t in txs:
+        try:
+            local_time = timezone.localtime(t.sms_timestamp)
+            hours_data[local_time.hour] += 1
+        except Exception:
+            hours_data[t.sms_timestamp.hour] += 1
+
+    # 3. المخطط الخطي: اتجاهات الأرباح/الحركات اليومية للـ 7 أيام الأخيرة
+    today = timezone.localtime(timezone.now()).date()
+    days = [today - datetime.timedelta(days=i) for i in range(6, -1, -1)]
+    days_str = [d.strftime('%Y-%m-%d') for d in days]
+    daily_received = [0.0] * 7
+    daily_sent = [0.0] * 7
+
+    for t in txs:
+        try:
+            t_date = timezone.localtime(t.sms_timestamp).date()
+        except Exception:
+            t_date = t.sms_timestamp.date()
+            
+        if t_date in days:
+            idx = days.index(t_date)
+            if t.type == 'RECEIVED':
+                daily_received[idx] += float(t.amount)
+            elif t.type == 'SENT':
+                daily_sent[idx] += float(t.amount)
+
+    # ── جلب وحساب حركات الخزينة والنقدية (Cash Ledger) ──
+    cash_records = CashLedger.objects.filter(user=request.user).order_by('-created_at')
+    cash_deposits = sum(r.amount for r in cash_records if r.type == 'DEPOSIT')
+    cash_withdrawals = sum(r.amount for r in cash_records if r.type == 'WITHDRAWAL')
+    cash_balance = cash_deposits - cash_withdrawals
+
+    # ── حساب جهات الاتصال الأكثر تعاملاً (Top Contacts) ──
+    contacts = {}
+    for t in txs:
+        c = t.decrypted_counterpart
+        if c:
+            if c not in contacts:
+                contacts[c] = {"received_count": 0, "sent_count": 0, "received_amount": 0.0, "sent_amount": 0.0}
+            if t.type == 'RECEIVED':
+                contacts[c]["received_count"] += 1
+                contacts[c]["received_amount"] += float(t.amount)
+            elif t.type in ['SENT', 'BILL', 'PURCHASE', 'TOPUP']:
+                contacts[c]["sent_count"] += 1
+                contacts[c]["sent_amount"] += float(t.amount)
+
+    sorted_contacts = sorted(
+        [{"phone": k, **v, "total_count": v["received_count"] + v["sent_count"], "total_amount": v["received_amount"] + v["sent_amount"]} for k, v in contacts.items()],
+        key=lambda x: x["total_amount"],
+        reverse=True
+    )[:15]
+
+    # تجهيز مصفوفة العمليات مع إضافة حقل الربح المحسوب
+    decorated_txs = []
+    for t in txs[:200]: # زيادة الحد إلى 200 لعرض سجل كامل في جدول المعاملات
+        t.calculated_fee = calculate_tx_fee(t)
+        decorated_txs.append(t)
+
+    analytics = {
+        "total_received": total_received,
+        "total_sent": total_sent,
+        "total_fee": total_fee,
+        "count": tx_count,
+        "wallets_labels": list(wallets_data.keys()),
+        "wallets_values": list(wallets_data.values()),
+        "hours_values": hours_data,
+        "days_labels": days_str,
+        "daily_received": daily_received,
+        "daily_sent": daily_sent,
+        
+        # بيانات الأرباح المفصلة
+        "profit_cash": profit_cash,
+        "profit_in_wallet": profit_in_wallet,
+        "profit_unset": profit_unset,
+        "wallet_profits_labels": list(wallet_profits.keys()),
+        "wallet_profits_values": list(wallet_profits.values()),
+    }
             
     context = {
         "licenses": user_licenses,
         "payments": user_payments,
         "active_license": active_license,
-        "is_admin": request.user.is_staff or request.user.is_superuser
+        "is_admin": request.user.is_staff or request.user.is_superuser,
+        "user_transactions": decorated_txs,
+        "analytics": analytics,
+        
+        # صفحات الديسكتوب الإضافية
+        "cash_records": cash_records,
+        "cash_balance": cash_balance,
+        "top_contacts": sorted_contacts,
     }
     return render(request, 'web/dashboard.html', context)
+
+
+@login_required
+@csrf_exempt
+def dashboard_update_profit_status(request):
+    if request.method != 'POST':
+        return JsonResponse({"success": False, "message": "Method not allowed"}, status=405)
+    try:
+        data = json.loads(request.body)
+        tx_id = data.get("transaction_id")
+        profit_status = data.get("profit_status")
+    except Exception:
+        tx_id = request.POST.get("transaction_id")
+        profit_status = request.POST.get("profit_status")
+        
+    if not tx_id or not profit_status:
+        return JsonResponse({"success": False, "message": "Missing arguments"}, status=400)
+        
+    from licensing.models import MerchantTransaction
+    tx = get_object_or_404(MerchantTransaction, transaction_id=tx_id, user=request.user)
+    tx.profit_status = profit_status
+    tx.save()
+    return JsonResponse({"success": True, "message": "تم تحديث حالة الأرباح بنجاح."})
+
+
+@login_required
+@csrf_exempt
+def dashboard_add_cash_movement(request):
+    if request.method != 'POST':
+        return JsonResponse({"success": False, "message": "Method not allowed"}, status=405)
+    try:
+        data = json.loads(request.body)
+        m_type = data.get("type")
+        amount = float(data.get("amount", 0))
+        description = data.get("description", "")
+    except Exception:
+        m_type = request.POST.get("type")
+        amount = float(request.POST.get("amount", 0))
+        description = request.POST.get("description", "")
+        
+    if not m_type or m_type not in ['DEPOSIT', 'WITHDRAWAL'] or amount <= 0:
+        return JsonResponse({"success": False, "message": "بيانات الحركة غير صالحة"}, status=400)
+        
+    from licensing.models import CashLedger
+    CashLedger.objects.create(
+        user=request.user,
+        type=m_type,
+        amount=amount,
+        description=description
+    )
+    return JsonResponse({"success": True, "message": "تم تسجيل الحركة في الخزينة بنجاح."})
+
+
+@login_required
+@csrf_exempt
+def dashboard_delete_cash_movement(request, record_id):
+    if request.method != 'POST':
+        return JsonResponse({"success": False, "message": "Method not allowed"}, status=405)
+    from licensing.models import CashLedger
+    record = get_object_or_404(CashLedger, id=record_id, user=request.user)
+    record.delete()
+    return JsonResponse({"success": True, "message": "تم حذف حركة الخزينة."})
+
 
 @login_required
 def checkout_view(request, plan_type):
@@ -752,8 +962,8 @@ def admin_panel_view(request):
                 status='SUCCESS'
             )
 
-            if user_obj.email:
-                send_license_email(user_obj, lic.key, lic.type, lic.expires_at)
+            # Send payment confirmation and license details via WhatsApp
+            send_whatsapp_payment_confirmation(user_obj, amount, lic.key)
 
         elif action == 'delete_payment':
             pay_id = request.POST.get('payment_id', '')
@@ -761,15 +971,500 @@ def admin_panel_view(request):
             pay_obj.delete()
             messages.success(request, "تم حذف سجل العملية المالي بنجاح.")
 
+        elif action == 'delete_pattern':
+            p_id = request.POST.get('pattern_id', '')
+            from licensing.models import SMSPattern
+            p = get_object_or_404(SMSPattern, pattern_id=p_id)
+            p.delete()
+            messages.success(request, "تم حذف نمط تحليل الرسائل بنجاح.")
+
+        elif action == 'delete_merchant_transaction':
+            tx_id = request.POST.get('transaction_id', '')
+            from licensing.models import MerchantTransaction
+            tx_obj = get_object_or_404(MerchantTransaction, transaction_id=tx_id)
+            tx_obj.delete()
+            messages.success(request, "تم حذف معاملة التاجر بنجاح.")
+
+        elif action == 'update_settings':
+            cfg = SiteConfiguration.get_solo()
+            cfg.admin_wallet = request.POST.get('admin_wallet', '').strip()
+            cfg.gateway_api_key = request.POST.get('gateway_api_key', '').strip()
+            cfg.infobip_api_key = request.POST.get('infobip_api_key', '').strip()
+            cfg.infobip_base_url = request.POST.get('infobip_base_url', '').strip()
+            cfg.infobip_from_email = request.POST.get('infobip_from_email', '').strip()
+            cfg.resend_api_key = request.POST.get('resend_api_key', '').strip()
+            cfg.resend_from_email = request.POST.get('resend_from_email', '').strip()
+            
+            cfg.whatsapp_enabled = request.POST.get('whatsapp_enabled', '') == 'true' or request.POST.get('whatsapp_enabled', '') == 'on'
+            cfg.whatsapp_from_number = request.POST.get('whatsapp_from_number', '').strip()
+            cfg.whatsapp_template_otp = request.POST.get('whatsapp_template_otp', '').strip()
+            cfg.whatsapp_template_welcome = request.POST.get('whatsapp_template_welcome', '').strip()
+            cfg.whatsapp_template_payment = request.POST.get('whatsapp_template_payment', '').strip()
+            cfg.whatsapp_template_language = request.POST.get('whatsapp_template_language', '').strip() or 'en'
+            cfg.save()
+            messages.success(request, "تم تحديث إعدادات النظام بنجاح.")
+
         return redirect('admin_panel')
 
     users = User.objects.all().order_by('-date_joined')
+    from licensing.models import UnclassifiedSMSReport, SMSPattern, MerchantTransaction
+    from django.db.models import Count, Sum
+    
+    unclassified_reports = UnclassifiedSMSReport.objects.all().order_by('-received_at')
+    patterns_list = SMSPattern.objects.all().order_by('-created_at')
+    merchant_transactions = MerchantTransaction.objects.all().order_by('-sms_timestamp')
+
+    # ── حساب إحصائيات التحليلات التجارية للإدارة ──
+    merchant_tx_stats = MerchantTransaction.objects.values('user__username').annotate(
+        tx_count=Count('transaction_id'),
+        total_amount=Sum('amount')
+    ).order_by('-total_amount')
+    
+    admin_merchant_names = [item['user__username'] for item in merchant_tx_stats]
+    admin_merchant_counts = [item['tx_count'] for item in merchant_tx_stats]
+    admin_merchant_amounts = [float(item['total_amount']) for item in merchant_tx_stats]
+
+    wallet_dist = MerchantTransaction.objects.values('wallet_id').annotate(
+        count=Count('transaction_id')
+    ).order_by('-count')
+    admin_wallet_labels = [item['wallet_id'] or "غير محدد" for item in wallet_dist]
+    admin_wallet_counts = [item['count'] for item in wallet_dist]
+
+    # ── حساب تحليلات تفصيلية لكل تاجر بشكل منفصل ──
+    import json
+    import datetime
+    merchant_analytics_data = {}
+    
+    def calculate_tx_fee_helper(tx):
+        w_id = (tx.wallet_id or "").strip().lower()
+        if not w_id or w_id in ["unspecified", ""]:
+            return 0.0
+        amount = float(tx.amount)
+        if tx.type == 'RECEIVED': # سحب للعميل
+            return max(amount * 0.01, 5.0) if amount > 0 else 0.0
+        elif tx.type in ['SENT', 'BILL', 'PURCHASE', 'TOPUP']: # إيداع للعميل
+            return max(amount * 0.005, 5.0) if amount > 0 else 0.0
+        return 0.0
+
+    today = timezone.localtime(timezone.now()).date()
+    days_range = [today - datetime.timedelta(days=i) for i in range(6, -1, -1)]
+    days_str = [d.strftime('%Y-%m-%d') for d in days_range]
+
+    all_txs_by_user = {}
+    for tx in MerchantTransaction.objects.all().order_by('-sms_timestamp'):
+        all_txs_by_user.setdefault(tx.user_id, []).append(tx)
+
+    for u in users:
+        u_txs = all_txs_by_user.get(u.id, [])
+        u_total_received = sum(t.amount for t in u_txs if t.type == 'RECEIVED')
+        u_total_sent = sum(t.amount for t in u_txs if t.type == 'SENT')
+        
+        u_total_fee = 0.0
+        u_profit_cash = 0.0
+        u_profit_in_wallet = 0.0
+        u_profit_unset = 0.0
+        u_wallet_profits = {}
+        
+        u_wallets_data = {}
+        u_hours_data = [0] * 24
+        
+        u_daily_received = [0.0] * 7
+        u_daily_sent = [0.0] * 7
+        
+        u_contacts = {}
+        
+        for t in u_txs:
+            fee = calculate_tx_fee_helper(t)
+            u_total_fee += fee
+            
+            w_id = t.wallet_id or "غير محدد"
+            u_wallet_profits[w_id] = u_wallet_profits.get(w_id, 0.0) + fee
+            
+            p_status = t.profit_status or "UNSET"
+            if p_status == 'CASH':
+                u_profit_cash += fee
+            elif p_status == 'IN_WALLET':
+                u_profit_in_wallet += fee
+            else:
+                u_profit_unset += fee
+                
+            u_wallets_data[w_id] = u_wallets_data.get(w_id, 0) + 1
+            
+            try:
+                local_time = timezone.localtime(t.sms_timestamp)
+                u_hours_data[local_time.hour] += 1
+            except Exception:
+                u_hours_data[t.sms_timestamp.hour] += 1
+                
+            try:
+                t_date = timezone.localtime(t.sms_timestamp).date()
+            except Exception:
+                t_date = t.sms_timestamp.date()
+                
+            if t_date in days_range:
+                idx = days_range.index(t_date)
+                if t.type == 'RECEIVED':
+                    u_daily_received[idx] += float(t.amount)
+                elif t.type == 'SENT':
+                    u_daily_sent[idx] += float(t.amount)
+                    
+            c = t.decrypted_counterpart
+            if c:
+                if c not in u_contacts:
+                    u_contacts[c] = {"received_count": 0, "sent_count": 0, "received_amount": 0.0, "sent_amount": 0.0}
+                if t.type == 'RECEIVED':
+                    u_contacts[c]["received_count"] += 1
+                    u_contacts[c]["received_amount"] += float(t.amount)
+                elif t.type in ['SENT', 'BILL', 'PURCHASE', 'TOPUP']:
+                    u_contacts[c]["sent_count"] += 1
+                    u_contacts[c]["sent_amount"] += float(t.amount)
+
+        u_sorted_contacts = sorted(
+            [{"phone": k, **v, "total_count": v["received_count"] + v["sent_count"], "total_amount": v["received_amount"] + v["sent_amount"]} for k, v in u_contacts.items()],
+            key=lambda x: x["total_amount"],
+            reverse=True
+        )[:10]
+
+        merchant_analytics_data[u.username] = {
+            "total_received": float(u_total_received),
+            "total_sent": float(u_total_sent),
+            "total_fee": float(u_total_fee),
+            "count": len(u_txs),
+            "wallets_labels": list(u_wallets_data.keys()),
+            "wallets_values": list(u_wallets_data.values()),
+            "hours_values": u_hours_data,
+            "days_labels": days_str,
+            "daily_received": u_daily_received,
+            "daily_sent": u_daily_sent,
+            "profit_cash": float(u_profit_cash),
+            "profit_in_wallet": float(u_profit_in_wallet),
+            "profit_unset": float(u_profit_unset),
+            "wallet_profits_labels": list(u_wallet_profits.keys()),
+            "wallet_profits_values": list(u_wallet_profits.values()),
+            "top_contacts": u_sorted_contacts
+        }
 
     context = {
         "stats": stats,
         "licenses": licenses,
         "coupons": coupons,
         "payments": payments,
-        "users": users
+        "users": users,
+        "config": SiteConfiguration.get_solo(),
+        "unclassified_reports": unclassified_reports,
+        "patterns_list": patterns_list,
+        "merchant_transactions": merchant_transactions,
+        
+        # بيانات التحليلات التجارية المركزية والتفصيلية
+        "admin_merchant_names": admin_merchant_names,
+        "admin_merchant_counts": admin_merchant_counts,
+        "admin_merchant_amounts": admin_merchant_amounts,
+        "admin_wallet_labels": admin_wallet_labels,
+        "admin_wallet_counts": admin_wallet_counts,
+        "merchant_analytics_json": json.dumps(merchant_analytics_data),
     }
     return render(request, 'web/admin_panel.html', context)
+
+
+def verify_email_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+        
+    username = request.session.get('verification_username')
+    if not username:
+        messages.error(request, "لم يتم العثور على جلسة تحقق صالحة. يرجى تسجيل الدخول أو إنشاء حساب.")
+        return redirect('login')
+        
+    user = get_object_or_404(User, username=username)
+    profile = user.profile
+    
+    if profile.email_verified:
+        messages.success(request, "الحساب مؤكد بالفعل. يرجى تسجيل الدخول.")
+        return redirect('login')
+        
+    if request.method == 'POST':
+        otp_input = request.POST.get('otp', '').strip()
+        
+        if not otp_input:
+            messages.error(request, "يرجى إدخال رمز التحقق.")
+        elif profile.otp_code != otp_input:
+            messages.error(request, "رمز التحقق غير صحيح.")
+        else:
+            # Check expiration (15 minutes)
+            if profile.otp_created_at:
+                expiration_time = profile.otp_created_at + timedelta(minutes=15)
+                if timezone.now() > expiration_time:
+                    messages.error(request, "انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد.")
+                    return render(request, 'web/verify_email.html', {'phone': profile.phone})
+            
+            # OTP is correct! Mark verified
+            profile.email_verified = True
+            profile.otp_code = None
+            profile.otp_created_at = None
+            profile.save()
+            
+            # Create a 7-day trial license key for this user
+            trial_key = f"VC-TRIAL-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}"
+            expires_at = timezone.now() + timedelta(days=7)
+            
+            lic = LicenseKey.objects.create(
+                key=trial_key,
+                user=user,
+                client_name=user.username,
+                type='TRIAL',
+                status='ACTIVE',
+                expires_at=expires_at
+            )
+            
+            # Send welcome & activation details via WhatsApp
+            send_whatsapp_welcome(user, lic.key)
+            
+            # Log user in
+            login(request, user)
+            
+            # Clear session
+            if 'verification_username' in request.session:
+                del request.session['verification_username']
+                
+            messages.success(request, f"تم تأكيد حسابك وتفعيل فترة تجريبية مجانية (7 أيام)! مفتاح التفعيل الخاص بك: {lic.key}")
+            return redirect('dashboard')
+            
+    return render(request, 'web/verify_email.html', {'phone': profile.phone})
+
+
+def resend_otp_view(request):
+    username = request.session.get('verification_username')
+    if not username:
+        return JsonResponse({'success': False, 'message': 'جلسة غير صالحة.'}, status=400)
+        
+    try:
+        user = User.objects.get(username=username)
+        if user.profile.email_verified:
+            return JsonResponse({'success': False, 'message': 'الحساب مؤكد بالفعل.'}, status=400)
+            
+        # Send new verification OTP via WhatsApp
+        send_whatsapp_otp(user)
+        return JsonResponse({'success': True, 'message': 'تم إعادة إرسال رمز التحقق بنجاح عبر الواتس آب!'})
+    except User.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'المستخدم غير موجود.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'فشل الإرسال: {str(e)}'}, status=500)
+
+
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt
+def admin_api_analyze_sms(request):
+    if not request.user.is_authenticated or not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({"success": False, "message": "Unauthorized"}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({"success": False, "message": "Method not allowed"}, status=405)
+    
+    try:
+        body_unicode = request.body.decode('utf-8')
+        data = json.loads(body_unicode)
+        sms_id = data.get("sms_id")
+    except Exception as e:
+        import traceback
+        logger.error(f"JSON Parse error: {e}\n{traceback.format_exc()}")
+        return JsonResponse({"success": False, "message": f"Invalid JSON: {str(e)}"}, status=400)
+        
+    from licensing.models import UnclassifiedSMSReport
+    try:
+        report = UnclassifiedSMSReport.objects.get(id=sms_id)
+    except UnclassifiedSMSReport.DoesNotExist:
+        return JsonResponse({"success": False, "message": "SMS Report not found"}, status=404)
+        
+    from dotenv import load_dotenv
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # backend/
+    load_dotenv(os.path.join(base_dir, '.env'))
+
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return JsonResponse({"success": False, "message": f"لم يتم ضبط مفتاح GEMINI_API_KEY في السيرفر. المسار المستهدف: {os.path.join(base_dir, '.env')}"}, status=400)
+        
+    system_instruction = (
+        "You are an expert regular expression (regex) developer. "
+        "Analyze the structure of the provided SMS and construct a precise Python regex pattern "
+        "that matches this SMS and similar future messages of the same transaction type.\n"
+        "The regex must be compatible with Python's re.compile(pattern, re.IGNORECASE | re.DOTALL).\n"
+        "Classify the SMS type into one of: RECEIVED, SENT, BILL, PURCHASE, TOPUP, BALANCE, ATM_WITHDRAWAL, ATM_DEPOSIT.\n"
+        "Ensure capture groups are mapped correctly. The regex must capture:\n"
+        "- amount: (\\d+(?:\\.\\d+)?)\n"
+        "- counterpart: (\\d{11,14}) or name ([A-Za-z\\u0621-\\u064a\\s\\-\\*]+?)\n"
+        "- balance: (\\d+(?:\\.\\d+)?)\n"
+        "- trx_id: (\\d{10,15}) or (\\w{10,20})\n"
+        "- date: (\\d{2}-\\d{2}-\\d{2}) or similar date formats\n"
+        "- time: (\\d{2}:\\d{2}(?::\\d{2})?)\n\n"
+        "You must return ONLY a JSON object with the following fields:\n"
+        "{\n"
+        "  \"type\": \"RECEIVED | SENT | BILL | PURCHASE | TOPUP | BALANCE | ATM_WITHDRAWAL | ATM_DEPOSIT\",\n"
+        "  \"regex_pattern\": \"regex string pattern with capture groups\",\n"
+        "  \"groups\": {\"amount\": 1, \"counterpart\": 2, ... (map each captured field to its group index (1-based))},\n"
+        "  \"confidence\": 0.95\n"
+        "}\n"
+        "Do not include markdown code block syntax (like ```json) in your response, output raw JSON only."
+    )
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": f"SMS Message to analyze:\nSender: {report.sender}\nBody: {report.raw_sms}"}
+            ]
+        }],
+        "systemInstruction": {
+            "parts": [
+                {"text": system_instruction}
+            ]
+        },
+        "generationConfig": {
+            "responseMimeType": "application/json"
+        }
+    }
+
+    try:
+        import httpx
+        response = httpx.post(url, json=payload, timeout=20.0)
+        if response.status_code != 200:
+            # Fallback to local heuristics if Gemini fails (e.g. 429 quota reached)
+            logger.warning(f"Gemini API returned error status {response.status_code}. Falling back to local heuristics.")
+            fallback_data = heuristic_regex_proposer(report.raw_sms)
+            return JsonResponse({"success": True, "analysis": fallback_data, "note": "تحذير: تم استخدام التحليل المحلي الاحتياطي لانتهاء حصة مفتاح Gemini."})
+        
+        result = response.json()
+        text_response = result['candidates'][0]['content']['parts'][0]['text']
+        parsed_data = json.loads(text_response.strip())
+        return JsonResponse({"success": True, "analysis": parsed_data})
+    except Exception as e:
+        logger.error(f"Failed to analyze using Gemini: {e}. Falling back to local heuristics.")
+        try:
+            fallback_data = heuristic_regex_proposer(report.raw_sms)
+            return JsonResponse({"success": True, "analysis": fallback_data, "note": "تحذير: تم استخدام التحليل المحلي الاحتياطي بسبب خطأ في الشبكة."})
+        except Exception as fallback_err:
+            return JsonResponse({"success": False, "message": f"Failed to analyze: {str(e)}"}, status=500)
+
+
+def heuristic_regex_proposer(raw_sms: str) -> dict:
+    """
+    محلل احتياطي ذكي (Heuristic Fallback) لتوليد نمط عندما يفشل الـ API الخاص بـ Gemini.
+    """
+    import re
+    pattern = raw_sms
+    groups = {}
+    group_idx = 1
+    
+    # 1. Date (e.g., 2026-06-26 or 26-06-26)
+    date_match = re.search(r'(\d{2,4}-\d{2}-\d{2,4})', raw_sms)
+    if date_match:
+        pattern = pattern.replace(date_match.group(1), r"(\d{2,4}-\d{2}-\d{2,4})")
+        groups["date"] = group_idx
+        group_idx += 1
+
+    # 2. Time (e.g., 14:30)
+    time_match = re.search(r'(\d{2}:\d{2}(?::\d{2})?)', raw_sms)
+    if time_match:
+        pattern = pattern.replace(time_match.group(1), r"(\d{2}:\d{2}(?::\d{2})?)")
+        groups["time"] = group_idx
+        group_idx += 1
+
+    # 3. Transaction ID (large integer, usually 10+ digits)
+    trx_match = re.search(r'\b(\d{10,15})\b', raw_sms)
+    if trx_match:
+        pattern = pattern.replace(trx_match.group(1), r"(\d{10,15})")
+        groups["trx_id"] = group_idx
+        group_idx += 1
+
+    # 4. Phone numbers (11 digits starting with 01)
+    phone_match = re.search(r'\b(01\d{9})\b', raw_sms)
+    if phone_match:
+        pattern = pattern.replace(phone_match.group(1), r"(\d{11})")
+        groups["counterpart"] = group_idx
+        group_idx += 1
+
+    # Clean escaping for regex metacharacters
+    escaped_pattern = re.escape(pattern)
+    # Restore the captured group placeholders
+    escaped_pattern = escaped_pattern.replace(r"\(\d\{2,4\}\-\\d\{2\}\-\\d\{2,4\}\)", r"(\d{2,4}-\d{2}-\d{2,4})")
+    escaped_pattern = escaped_pattern.replace(r"\(\d\{2\}\:\\d\{2\}\(\?\:\\\:\\d\{2\}\)\?\)", r"(\d{2}:\d{2}(?::\d{2})?)")
+    escaped_pattern = escaped_pattern.replace(r"\(\d\{10,15\}\)", r"(\d{10,15})")
+    escaped_pattern = escaped_pattern.replace(r"\(\d\{11\}\)", r"(\d{11})")
+
+    # Guess type
+    tx_type = "RECEIVED"
+    if "تحويل" in raw_sms and ("إلى" in raw_sms or "لرقم" in raw_sms):
+        tx_type = "SENT"
+    elif "سحب" in raw_sms or "atm" in raw_sms.lower():
+        tx_type = "ATM_WITHDRAWAL"
+    elif "إيداع" in raw_sms or "deposit" in raw_sms.lower():
+        tx_type = "ATM_DEPOSIT"
+    elif "رصيد" in raw_sms:
+        tx_type = "BALANCE"
+
+    return {
+        "type": tx_type,
+        "regex_pattern": escaped_pattern,
+        "groups": groups,
+        "confidence": 0.5
+    }
+
+
+@csrf_exempt
+def admin_api_save_pattern(request):
+    if not request.user.is_authenticated or not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({"success": False, "message": "Unauthorized"}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({"success": False, "message": "Method not allowed"}, status=405)
+        
+    try:
+        data = json.loads(request.body)
+        pattern_id = data.get("pattern_id")
+        tx_type = data.get("type")
+        regex_pattern = data.get("regex_pattern")
+        groups = data.get("groups", {})
+        sms_id = data.get("sms_id")
+    except Exception:
+        return JsonResponse({"success": False, "message": "Invalid JSON"}, status=400)
+        
+    if not pattern_id or not tx_type or not regex_pattern:
+        return JsonResponse({"success": False, "message": "Missing required fields"}, status=400)
+        
+    from licensing.models import SMSPattern, UnclassifiedSMSReport
+    try:
+        SMSPattern.objects.update_or_create(
+            pattern_id=pattern_id,
+            defaults={
+                "type": tx_type,
+                "regex_pattern": regex_pattern,
+                "groups_json": json.dumps(groups),
+                "is_active": True
+            }
+        )
+        
+        if sms_id:
+            UnclassifiedSMSReport.objects.filter(id=sms_id).delete()
+            
+        return JsonResponse({"success": True, "message": "تم حفظ النمط بنجاح وصياغته وتحديث النظام."})
+    except Exception as e:
+        return JsonResponse({"success": False, "message": f"Failed to save: {str(e)}"}, status=500)
+
+
+@csrf_exempt
+def admin_api_delete_unclassified(request):
+    if not request.user.is_authenticated or not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({"success": False, "message": "Unauthorized"}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({"success": False, "message": "Method not allowed"}, status=405)
+        
+    try:
+        data = json.loads(request.body)
+        sms_id = data.get("sms_id")
+    except Exception:
+        return JsonResponse({"success": False, "message": "Invalid JSON"}, status=400)
+        
+    from licensing.models import UnclassifiedSMSReport
+    UnclassifiedSMSReport.objects.filter(id=sms_id).delete()
+    return JsonResponse({"success": True, "message": "تم حذف الرسالة بنجاح."})
+
+

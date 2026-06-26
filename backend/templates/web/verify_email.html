@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+
+{% block title %}تأكيد البريد الإلكتروني - دفتر كاش (Daftar Cash){% endblock %}
+
+{% block extra_head %}
+<style>
+    .verify-page {
+        max-width: 480px;
+        margin: 60px auto;
+        padding: 0 20px;
+    }
+    .verify-card {
+        background: var(--bg-surface);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        border-radius: 24px;
+        padding: 40px;
+        box-shadow: var(--shadow-premium);
+        position: relative;
+        overflow: hidden;
+    }
+    .verify-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 5px;
+        background: linear-gradient(90deg, #0F3C6D, #1E8F8B, #CCA133);
+    }
+    .verify-icon-wrapper {
+        width: 70px;
+        height: 70px;
+        background: linear-gradient(135deg, rgba(15,60,109,0.12), rgba(30,143,139,0.15));
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        border: 1px solid rgba(30,143,139,0.2);
+    }
+    .verify-icon-wrapper i {
+        font-size: 28px;
+        background: linear-gradient(135deg, #0F3C6D, #1E8F8B);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .verify-title {
+        text-align: center;
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin-bottom: 8px;
+    }
+    .verify-subtitle {
+        text-align: center;
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 30px;
+        line-height: 1.5;
+    }
+    .otp-input-group {
+        display: flex;
+        justify-content: center;
+        direction: ltr;
+        margin-bottom: 25px;
+    }
+    .otp-input-field {
+        width: 100%;
+        max-width: 250px;
+        height: 50px;
+        font-size: 24px;
+        font-weight: 700;
+        text-align: center;
+        letter-spacing: 8px;
+        border-radius: 12px;
+        border: 1.5px solid rgba(15,60,109,0.15);
+        background: rgba(248,250,252,0.9);
+        color: var(--text-primary);
+        transition: all 0.25s ease;
+        padding-left: 8px; /* Offset the letter-spacing */
+    }
+    .otp-input-field:focus {
+        border-color: #1E8F8B;
+        box-shadow: 0 0 0 4px rgba(30,143,139,0.15);
+        outline: none;
+    }
+    .resend-container {
+        text-align: center;
+        margin-top: 25px;
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+    .resend-btn {
+        color: #1E8F8B;
+        text-decoration: none;
+        font-weight: 700;
+        cursor: pointer;
+        transition: color 0.2s ease;
+    }
+    .resend-btn.disabled {
+        color: var(--text-muted);
+        pointer-events: none;
+        cursor: not-allowed;
+    }
+    .resend-feedback {
+        margin-top: 10px;
+        font-size: 12px;
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="verify-page">
+    <div class="verify-card">
+        <div class="verify-icon-wrapper">
+            <i class="fa-brands fa-whatsapp" style="color: #25D366; background: none; -webkit-text-fill-color: initial;"></i>
+        </div>
+        <h2 class="verify-title">تأكيد الحساب عبر الواتس آب</h2>
+        <p class="verify-subtitle">
+            لقد أرسلنا رمز تحقق مؤقت إلى حساب الواتس آب الخاص بك:<br>
+            <strong style="color: var(--text-primary); font-family: monospace; font-size: 16px;">{{ phone }}</strong>
+        </p>
+
+        <form method="POST" id="verifyForm">
+            {% csrf_token %}
+            
+            <div class="otp-input-group">
+                <input type="text" id="otp" name="otp" class="otp-input-field" 
+                       placeholder="------" maxlength="6" pattern="\d{6}" 
+                       required autocomplete="one-time-code" inputmode="numeric">
+            </div>
+
+            <button type="submit" class="btn-primary" style="width: 100%; padding: 14px;">
+                <i class="fa-solid fa-circle-check"></i> تأكيد وتفعيل الحساب
+            </button>
+        </form>
+
+        <div class="resend-container">
+            لم يصلك الرمز؟ 
+            <span id="resendBtn" class="resend-btn" onclick="resendCode()">إعادة الإرسال</span>
+            <span id="countdown" style="display:none;">(خلال <span id="seconds">60</span> ثانية)</span>
+            
+            <div id="resendFeedback" class="resend-feedback"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let countdownInterval;
+    let countdownSeconds = 60;
+
+    function startCountdown() {
+        const resendBtn = document.getElementById('resendBtn');
+        const countdownSpan = document.getElementById('countdown');
+        const secondsSpan = document.getElementById('seconds');
+        
+        resendBtn.classList.add('disabled');
+        countdownSpan.style.display = 'inline';
+        countdownSeconds = 60;
+        secondsSpan.innerText = countdownSeconds;
+
+        clearInterval(countdownInterval);
+        countdownInterval = setInterval(() => {
+            countdownSeconds--;
+            secondsSpan.innerText = countdownSeconds;
+            if (countdownSeconds <= 0) {
+                clearInterval(countdownInterval);
+                resendBtn.classList.remove('disabled');
+                countdownSpan.style.display = 'none';
+            }
+        }, 1000);
+    }
+
+    function resendCode() {
+        const resendBtn = document.getElementById('resendBtn');
+        if (resendBtn.classList.contains('disabled')) return;
+
+        const feedback = document.getElementById('resendFeedback');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--text-muted)';
+        feedback.innerText = 'جاري إرسال الرمز الجديد...';
+
+        fetch("{% url 'resend_otp' %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                feedback.style.color = '#1E8F8B';
+                feedback.innerText = data.message;
+                startCountdown();
+            } else {
+                feedback.style.color = '#E11D48';
+                feedback.innerText = data.message || 'حدث خطأ أثناء المحاولة.';
+            }
+        })
+        .catch(error => {
+            feedback.style.color = '#E11D48';
+            feedback.innerText = 'فشل الاتصال بالخادم. يرجى المحاولة لاحقاً.';
+            console.error('Error resending OTP:', error);
+        });
+    }
+
+    // Auto-focus OTP field
+    document.addEventListener("DOMContentLoaded", function() {
+        document.getElementById('otp').focus();
+    });
+</script>
+{% endblock %}

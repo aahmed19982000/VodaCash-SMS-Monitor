@@ -375,22 +375,10 @@
             <div class="form-group">
                 <label for="phone">
                     <i class="fa-solid fa-mobile-screen-button" style="color:#1E8F8B; margin-left:5px;"></i>
-                    رقم الهاتف
+                    رقم الهاتف (الذي عليه واتساب) <span class="required">*</span>
                 </label>
                 <input type="tel" id="phone" name="phone" class="form-control"
-                       placeholder="مثال: 01012345678" maxlength="15" autocomplete="tel" dir="ltr" style="text-align:right;">
-            </div>
-
-            <!-- WhatsApp Toggle -->
-            <div class="form-group">
-                <label class="whatsapp-toggle" for="has_whatsapp_check" id="whatsapp-toggle-wrapper">
-                    <input type="checkbox" id="has_whatsapp_check" onchange="updateWhatsAppHidden(this)">
-                    <input type="hidden" id="has_whatsapp" name="has_whatsapp" value="false">
-                    <span class="whatsapp-toggle-label">
-                        <i class="fa-brands fa-whatsapp"></i>
-                        يوجد واتساب على هذا الرقم
-                    </span>
-                </label>
+                       placeholder="مثال: 01012345678" maxlength="15" autocomplete="tel" dir="ltr" style="text-align:right;" required>
             </div>
 
             <!-- Submit Button -->
@@ -408,17 +396,4 @@
     </div>
 </div>
 
-<script>
-    function updateWhatsAppHidden(checkbox) {
-        document.getElementById('has_whatsapp').value = checkbox.checked ? 'true' : 'false';
-        const wrapper = document.getElementById('whatsapp-toggle-wrapper');
-        if (checkbox.checked) {
-            wrapper.style.background = 'rgba(37,211,102,0.12)';
-            wrapper.style.borderColor = 'rgba(37,211,102,0.45)';
-        } else {
-            wrapper.style.background = 'rgba(37,211,102,0.06)';
-            wrapper.style.borderColor = 'rgba(37,211,102,0.18)';
-        }
-    }
-</script>
 {% endblock %}

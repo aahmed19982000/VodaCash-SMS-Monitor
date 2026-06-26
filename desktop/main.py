@@ -35,6 +35,8 @@ class MainApplication:
         self.db = DesktopDatabase()
         self.server = DesktopServer()
         self.ui_app = None
+        from desktop.utils.licensing import LicensingManager
+        self.lic_mgr = LicensingManager(db=self.db)
         
         # ربط الـ Callbacks
         self.server.on_transaction(self.handle_transaction)
@@ -95,6 +97,20 @@ class MainApplication:
             logger.warning(f"🚫 Transaction {tx.transaction_id} ignored: Subscription has expired or is inactive.")
             return
 
+        # Check if InstaPay tracking is disabled
+        track_instapay = self.db.get_setting("track_instapay", "true") == "true"
+        if not track_instapay:
+            raw_lower = (tx.raw_sms or "").lower()
+            is_instapay = (
+                "instapay" in raw_lower or 
+                "انستاباي" in raw_lower or 
+                "ipn" in raw_lower or 
+                tx.wallet_id == "instapay"
+            )
+            if is_instapay:
+                logger.info(f"🚫 InstaPay tracking is disabled. Ignoring transaction {tx.transaction_id}.")
+                return
+
         # Check if transaction was already processed/read before
         if self.db.transaction_exists(tx.transaction_id, tx.raw_sms):
             logger.info(f"ℹ️ Transaction {tx.transaction_id} already read before. Ignoring completely.")
@@ -133,6 +149,15 @@ class MainApplication:
         
         # 2. حفظ في قاعدة البيانات المحلية للديسكتوب
         self.db.save_transaction(tx)
+
+        # 2.5 محاولة مزامنة فورية مع السيرفر في الخلفية
+        def try_immediate_sync():
+            try:
+                self.lic_mgr.upload_transaction(tx)
+            except Exception as sync_err:
+                logger.error(f"Error during immediate transaction sync: {sync_err}")
+        
+        threading.Thread(target=try_immediate_sync, daemon=True).start()
         
         # 3. تحديث واجهة المستخدم لو كانت شغالة
         if self.ui_app:
@@ -248,6 +273,40 @@ class MainApplication:
         logger.info("═══════════════════════════════════════════")
         logger.info("   VodaCash SMS Monitor — Desktop Server   ")
         logger.info("═══════════════════════════════════════════")
+
+        # Load local cached patterns and sync from Django server
+        try:
+            self.lic_mgr.load_local_patterns()
+            
+            # Run patterns and transactions sync in background thread
+            def background_sync():
+                import time
+                last_patterns_sync = 0
+                while True:
+                    # 1. Sync offline transactions every 30 seconds
+                    try:
+                        self.lic_mgr.sync_offline_transactions()
+                    except Exception as tx_sync_err:
+                        logger.error(f"Error syncing offline transactions in background: {tx_sync_err}")
+                    
+                    # 2. Sync patterns every 1 hour (3600 seconds)
+                    current_time = time.time()
+                    if current_time - last_patterns_sync >= 3600:
+                        try:
+                            synced = self.lic_mgr.sync_patterns()
+                            if synced and self.ui_app:
+                                try:
+                                    self.ui_app.page.run_thread(self.ui_app.refresh_all_views)
+                                except Exception:
+                                    pass
+                            last_patterns_sync = current_time
+                        except Exception as ex:
+                            logger.error(f"Error syncing patterns in background: {ex}")
+                    time.sleep(30)
+            
+            threading.Thread(target=background_sync, daemon=True).start()
+        except Exception as e:
+            logger.error(f"Failed to initialize pattern loading/sync: {e}")
 
         # 1. تشغيل الـ WebSocket Server في الخلفية
         server_thread = threading.Thread(target=self._start_server, daemon=True)

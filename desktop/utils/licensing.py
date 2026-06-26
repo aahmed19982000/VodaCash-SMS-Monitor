@@ -591,3 +591,123 @@ class LicensingManager:
             logger.error(f"Error reporting unclassified SMS to Django: {e}")
             return False
 
+    def sync_patterns(self) -> bool:
+        """تحميل الأنماط من السيرفر وتحديث الكاش المحلي ومحرك التحليل"""
+        self.refresh_credentials()
+        try:
+            api_url = f"{self.django_url}/parser-rules/"
+            response = httpx.get(api_url, timeout=10.0)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("success", False):
+                    patterns = data.get("patterns", [])
+                    if self.db:
+                        self.db.save_cached_patterns(patterns)
+                    
+                    from mobile.parser.engine import SMSEngine
+                    SMSEngine.set_patterns(patterns)
+                    logger.info(f"🔄 Successfully synchronized {len(patterns)} patterns from server.")
+                    
+                    # Auto-reparse unclassified messages with the new patterns
+                    try:
+                        self.reparse_unclassified_sms()
+                    except Exception as reparse_err:
+                        logger.error(f"Error during auto re-parsing: {reparse_err}")
+                        
+                    return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to sync patterns from Django server: {e}")
+            return False
+
+    def upload_transaction(self, tx: Transaction) -> bool:
+        """إرسال المعاملة إلى السيرفر المركزي للمزامنة وحفظها"""
+        self.refresh_credentials()
+        lic_key = ""
+        if self.db:
+            lic_key = self.db.get_setting("license_key", "")
+        
+        if not lic_key:
+            logger.warning("⚠️ Cannot upload transaction: no license_key set locally.")
+            return False
+
+        try:
+            api_url = f"{self.django_url}/transactions/"
+            payload = tx.to_dict()
+            payload["license_key"] = lic_key
+            payload["profit_status"] = tx.profit_status
+
+            response = httpx.post(api_url, json=payload, timeout=10.0)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("success", False):
+                    if self.db:
+                        self.db.mark_transaction_synced(tx.transaction_id)
+                    logger.info(f"✅ Transaction {tx.transaction_id} synced to server successfully.")
+                    return True
+            logger.warning(f"⚠️ Failed to sync transaction {tx.transaction_id}: {response.status_code} {response.text}")
+            return False
+        except Exception as e:
+            logger.error(f"❌ Connection error syncing transaction {tx.transaction_id}: {e}")
+            return False
+
+    def sync_offline_transactions(self) -> bool:
+        """مزامنة كافة المعاملات غير المزامنة المخزنة محلياً"""
+        if not self.db:
+            return False
+        
+        unsynced = self.db.get_unsynced_transactions()
+        if not unsynced:
+            return True
+            
+        logger.info(f"🔄 Found {len(unsynced)} unsynced transactions. Syncing to server...")
+        success_count = 0
+        for tx in unsynced:
+            if self.upload_transaction(tx):
+                success_count += 1
+                
+        logger.info(f"📊 Central sync complete: {success_count}/{len(unsynced)} successfully uploaded.")
+        return success_count == len(unsynced)
+
+    def reparse_unclassified_sms(self):
+        """إعادة تحليل الرسائل غير المصنفة محلياً بعد تحديث الأنماط من السيرفر"""
+        if not self.db:
+            return
+            
+        unclassified_list = self.db.get_unclassified_sms()
+        if not unclassified_list:
+            return
+            
+        from mobile.parser.engine import SMSEngine
+        from shared.config import CONFIDENCE_THRESHOLD
+        
+        reparsed_count = 0
+        for sms in unclassified_list:
+            tx = SMSEngine.parse(sms["raw_sms"], sender=sms["sender"])
+            if sms.get("received_at"):
+                try:
+                    from datetime import datetime
+                    tx.sms_timestamp = datetime.fromisoformat(sms["received_at"])
+                except Exception:
+                    pass
+            
+            if tx.confidence >= CONFIDENCE_THRESHOLD:
+                ok = self.db.save_transaction(tx)
+                if ok:
+                    self.db.delete_unclassified_sms(sms["id"])
+                    reparsed_count += 1
+                    logger.info(f"✅ Auto-reparsed unclassified SMS to transaction: {tx.transaction_id} ({tx.amount} EGP)")
+                    
+        if reparsed_count > 0:
+            logger.info(f"✨ Successfully auto-reparsed {reparsed_count} unclassified messages into transactions!")
+
+    def load_local_patterns(self):
+        """تحميل الأنماط المخزنة محلياً في SQLite وتمريرها للمحرك"""
+        if self.db:
+            cached = self.db.get_cached_patterns()
+            if cached:
+                from mobile.parser.engine import SMSEngine
+                SMSEngine.set_patterns(cached)
+                logger.info(f"Loaded {len(cached)} cached patterns from local database.")
+
+
